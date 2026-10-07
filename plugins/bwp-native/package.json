@@ -1,0 +1,28 @@
+{
+  "name": "bwp-native",
+  "version": "1.0.0",
+  "description": "Native features for the BWP Billing app: downloads, print, share, pull-to-refresh, back button, safe areas, file chooser.",
+  "main": "index.js",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "BWP Experts",
+  "files": [
+    "android/src/main/",
+    "android/build.gradle",
+    "ios/Sources",
+    "Package.swift",
+    "BwpNative.podspec",
+    "index.js"
+  ],
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    },
+    "android": {
+      "src": "android"
+    }
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=7.0.0"
+  }
+}

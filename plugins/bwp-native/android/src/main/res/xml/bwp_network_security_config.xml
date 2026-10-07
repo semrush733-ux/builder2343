@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BWP Billing: no cleartext (http://) traffic, and only certificates issued by the
+     system's trusted authorities are accepted. Do not add user certificates or exceptions here. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

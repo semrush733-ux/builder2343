@@ -1,0 +1,130 @@
+name: iOS build (IPA)
+
+# Builds the iOS app on a GitHub-hosted Mac - no Mac of your own is needed.
+#
+# Always produced : BWP-Billing-unsigned.ipa   (proves the app compiles; cannot be installed as is)
+# With secrets    : BWP-Billing.ipa            (signed, ready for TestFlight / App Store)
+#
+# Secrets for the signed build (repository > Settings > Secrets and variables > Actions):
+#   APPLE_TEAM_ID            10-character Team ID        (developer.apple.com > Membership)
+#   APPSTORE_API_KEY_ID      Key ID                      (App Store Connect > Users and Access > Integrations > App Store Connect API)
+#   APPSTORE_API_ISSUER_ID   Issuer ID                   (same page)
+#   APPSTORE_API_KEY_P8      full text of the downloaded AuthKey_XXXX.p8 file (role: Admin or App Manager)
+
+on:
+  push:
+    branches: [main, bwp-billing-app]
+    paths-ignore: ['**.md', 'docs/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      HAS_SIGNING: ${{ secrets.APPLE_TEAM_ID != '' && secrets.APPSTORE_API_KEY_ID != '' && secrets.APPSTORE_API_ISSUER_ID != '' && secrets.APPSTORE_API_KEY_P8 != '' }}
+      BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Tool versions
+        run: |
+          sw_vers
+          xcodebuild -version
+          node -v && npm -v
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Create and configure the Xcode project
+        run: |
+          if [ ! -d ios ]; then npx cap add ios; fi
+          npx capacitor-assets generate --ios
+          npx cap sync ios
+          node scripts/configure-native.mjs
+
+      - name: Locate the Xcode project
+        working-directory: ios/App
+        run: |
+          ls -la
+          if [ -d App.xcworkspace ]; then
+            echo "XC_TARGET=-workspace App.xcworkspace" >> "$GITHUB_ENV"
+          else
+            echo "XC_TARGET=-project App.xcodeproj" >> "$GITHUB_ENV"
+          fi
+          mkdir -p "$GITHUB_WORKSPACE/out/logs"
+
+      - name: Compile (simulator, no signing)
+        working-directory: ios/App
+        run: |
+          set -o pipefail
+          xcodebuild $XC_TARGET -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$GITHUB_WORKSPACE/out/logs/simulator-build.log" | grep -E "error:|warning: unre|BUILD|\*\*" || true
+          grep -q "BUILD SUCCEEDED" "$GITHUB_WORKSPACE/out/logs/simulator-build.log"
+
+      - name: Archive without signing -> unsigned IPA
+        working-directory: ios/App
+        run: |
+          set -o pipefail
+          xcodebuild $XC_TARGET -scheme App -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App-unsigned.xcarchive" archive \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" 2>&1 \
+            | tee "$GITHUB_WORKSPACE/out/logs/unsigned-archive.log" | grep -E "error:|ARCHIVE|\*\*" || true
+          grep -q "ARCHIVE SUCCEEDED" "$GITHUB_WORKSPACE/out/logs/unsigned-archive.log"
+          mkdir -p "$RUNNER_TEMP/unsigned/Payload"
+          cp -R "$RUNNER_TEMP/App-unsigned.xcarchive/Products/Applications/App.app" "$RUNNER_TEMP/unsigned/Payload/"
+          (cd "$RUNNER_TEMP/unsigned" && zip -qry "$GITHUB_WORKSPACE/out/BWP-Billing-unsigned.ipa" Payload)
+          ls -la "$GITHUB_WORKSPACE/out"
+
+      - name: Archive and export signed IPA
+        if: env.HAS_SIGNING == 'true'
+        working-directory: ios/App
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+          API_KEY_P8: ${{ secrets.APPSTORE_API_KEY_P8 }}
+        run: |
+          set -o pipefail
+          KEY_FILE="$RUNNER_TEMP/AuthKey_${API_KEY_ID}.p8"
+          printf '%s' "$API_KEY_P8" > "$KEY_FILE"
+          AUTH="-allowProvisioningUpdates -authenticationKeyPath $KEY_FILE -authenticationKeyID $API_KEY_ID -authenticationKeyIssuerID $API_ISSUER_ID"
+          xcodebuild $XC_TARGET -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" archive \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic $AUTH 2>&1 \
+            | tee "$GITHUB_WORKSPACE/out/logs/signed-archive.log" | grep -E "error:|ARCHIVE|\*\*" || true
+          grep -q "ARCHIVE SUCCEEDED" "$GITHUB_WORKSPACE/out/logs/signed-archive.log"
+          OPTIONS="$RUNNER_TEMP/ExportOptions.plist"
+          cp "$GITHUB_WORKSPACE/native-config/ios/ExportOptions.plist" "$OPTIONS"
+          /usr/libexec/PlistBuddy -c "Set :teamID $APPLE_TEAM_ID" "$OPTIONS"
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportPath "$RUNNER_TEMP/signed" -exportOptionsPlist "$OPTIONS" $AUTH 2>&1 \
+            | tee "$GITHUB_WORKSPACE/out/logs/export.log" | grep -E "error:|EXPORT|\*\*" || true
+          grep -q "EXPORT SUCCEEDED" "$GITHUB_WORKSPACE/out/logs/export.log"
+          cp "$RUNNER_TEMP"/signed/*.ipa "$GITHUB_WORKSPACE/out/BWP-Billing.ipa"
+          rm -f "$KEY_FILE"
+
+      - name: Package the generated Xcode project
+        if: always()
+        run: |
+          if [ -d ios ]; then zip -qry out/ios-xcode-project.zip ios -x "ios/App/build/*" "ios/DerivedData/*" "ios/App/Pods/*"; fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bwp-billing-ios
+          path: out/
+          if-no-files-found: warn

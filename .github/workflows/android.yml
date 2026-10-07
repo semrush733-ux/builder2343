@@ -1,0 +1,93 @@
+name: Android build (APK + AAB)
+
+# Builds the Android app on a GitHub-hosted machine.
+#
+# Always produced : app-debug.apk (installable for testing) and unsigned release APK / AAB
+# With secrets    : signed app-release.apk and app-release.aab (Google Play)
+#
+# Secrets for the signed build (repository > Settings > Secrets and variables > Actions):
+#   ANDROID_KEYSTORE_BASE64    your .jks file encoded as base64 (one line)
+#   ANDROID_KEYSTORE_PASSWORD  keystore password
+#   ANDROID_KEY_ALIAS          key alias (for example bwp-billing)
+#   ANDROID_KEY_PASSWORD       key password
+
+on:
+  push:
+    branches: [main, bwp-billing-app]
+    paths-ignore: ['**.md', 'docs/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Create and configure the Android project
+        run: |
+          if [ ! -d android ]; then npx cap add android; fi
+          npx capacitor-assets generate --android
+          npx cap sync android
+          node scripts/configure-native.mjs
+          chmod +x android/gradlew
+          cat android/variables.gradle
+
+      - name: Add the release keystore
+        if: env.HAS_SIGNING == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/release.jks
+          {
+            echo "storeFile=release.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > android/keystore.properties
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Build release APK and AAB
+        working-directory: android
+        run: ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace
+
+      - name: Collect outputs
+        if: always()
+        run: |
+          mkdir -p out
+          find android/app/build/outputs -name "*.apk" -exec cp {} out/ \; 2>/dev/null || true
+          find android/app/build/outputs -name "*.aab" -exec cp {} out/ \; 2>/dev/null || true
+          rm -f android/release.jks android/keystore.properties
+          if [ -d android ]; then zip -qry out/android-studio-project.zip android -x "android/.gradle/*" "android/build/*" "android/app/build/*" "android/local.properties"; fi
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bwp-billing-android
+          path: out/
+          if-no-files-found: warn

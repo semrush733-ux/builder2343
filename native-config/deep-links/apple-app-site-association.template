@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["REPLACE_WITH_TEAM_ID.com.bwpexperts.billing"],
+        "components": [
+          { "/": "/*", "comment": "Open every page of the billing site in the app" }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+node_modules/
+*.log
+.DS_Store
+
+# Signing material - never commit
+*.jks
+*.keystore
+keystore.properties
+*.p12
+*.mobileprovision
+
+# Android build output
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/app/src/main/assets/public/
+android/capacitor-cordova-android-plugins/
+
+# iOS build output
+ios/App/build/
+ios/App/Pods/
+ios/App/App/public/
+ios/DerivedData/
+xcuserdata/
+
+# Test output
+tests/output/

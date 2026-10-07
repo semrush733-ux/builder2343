@@ -1,0 +1,38 @@
+{
+  "name": "bwp-billing-app",
+  "version": "1.0.0",
+  "description": "BWP Billing mobile app (Android + iOS) - Capacitor shell around https://bill.bwpexperts.com/",
+  "private": true,
+  "author": "BWP Experts",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "brand": "node scripts/make-brand-assets.mjs && capacitor-assets generate --android --ios",
+    "configure": "node scripts/configure-native.mjs",
+    "sync": "cap sync && node scripts/configure-native.mjs",
+    "android:open": "cap open android",
+    "android:debug": "node scripts/gradle.mjs assembleDebug",
+    "android:release:apk": "node scripts/gradle.mjs assembleRelease",
+    "android:release:aab": "node scripts/gradle.mjs bundleRelease",
+    "android:clean": "node scripts/gradle.mjs clean",
+    "ios:open": "cap open ios",
+    "doctor": "cap doctor"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
+    "@capacitor/keyboard": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.0",
+    "bwp-native": "file:plugins/bwp-native"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.0.0",
+    "sharp": "^0.32.6",
+    "typescript": "^5.6.0"
+  }
+}

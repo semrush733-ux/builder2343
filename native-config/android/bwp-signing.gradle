@@ -1,0 +1,36 @@
+// BWP Billing - release signing.
+//
+// Copied to android/app/ by scripts/configure-native.mjs and applied from android/app/build.gradle.
+// Reads android/keystore.properties, which is NOT committed (see README, "Android signed release").
+// Without that file release builds still work but are unsigned.
+
+def bwpKeystoreFile = rootProject.file('keystore.properties')
+
+if (bwpKeystoreFile.exists()) {
+    def bwpKeystore = new Properties()
+    bwpKeystoreFile.withInputStream { bwpKeystore.load(it) }
+
+    def required = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword']
+    def missing = required.findAll { !bwpKeystore.getProperty(it) }
+    if (!missing.isEmpty()) {
+        throw new GradleException("android/keystore.properties is missing: ${missing.join(', ')}")
+    }
+
+    android {
+        signingConfigs {
+            bwpRelease {
+                storeFile rootProject.file(bwpKeystore.getProperty('storeFile'))
+                storePassword bwpKeystore.getProperty('storePassword')
+                keyAlias bwpKeystore.getProperty('keyAlias')
+                keyPassword bwpKeystore.getProperty('keyPassword')
+            }
+        }
+        buildTypes {
+            release {
+                signingConfig signingConfigs.bwpRelease
+            }
+        }
+    }
+} else {
+    logger.lifecycle('BWP Billing: android/keystore.properties not found - release builds will be unsigned.')
+}

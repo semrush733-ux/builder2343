@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#FFFFFF">
+  <title>BWP Billing</title>
+  <link rel="stylesheet" href="shell.css">
+</head>
+<body data-mode="error">
+  <!-- Error screen: Capacitor loads this (server.errorPath) instead of the raw WebView error page. -->
+  <main class="shell" role="main">
+    <div class="brand">
+      <img src="logo.png" alt="" width="132" height="132">
+      <h1 id="app-name">BWP Billing</h1>
+      <p id="app-company">by BWP Experts</p>
+    </div>
+
+    <div class="panel" aria-live="polite">
+      <section class="state" id="state-loading">
+        <div class="spinner" role="progressbar" aria-label="Loading"></div>
+        <p class="hint" id="loading-text">Loading your dashboard...</p>
+      </section>
+
+      <section class="state" id="state-offline">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M2 8.5a15 15 0 0 1 5.2-3.2M22 8.5A15 15 0 0 0 11 4.6M5.5 12.2a10 10 0 0 1 3.6-2.3M18.5 12.2a10 10 0 0 0-4-2.4M9 15.8a5 5 0 0 1 6 0"/>
+          <circle cx="12" cy="19.2" r="0.9" fill="currentColor"/>
+          <path d="M3 3l18 18"/>
+        </svg>
+        <h2>No Internet Connection</h2>
+        <p class="message">Please check your internet connection and try again.</p>
+        <button class="primary" type="button" data-action="retry">Retry</button>
+        <p class="note" data-role="note"></p>
+      </section>
+
+      <section class="state is-active" id="state-unreachable">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4.25 4.25 0 0 1 .5 8.47"/>
+          <path d="M12 12.5v3.2"/>
+          <circle cx="12" cy="18.6" r="0.9" fill="currentColor"/>
+        </svg>
+        <h2>We couldn't connect to BWP Billing.</h2>
+        <p class="message">The service may be temporarily unavailable. Please try again in a moment.</p>
+        <button class="primary" type="button" data-action="retry">Retry</button>
+        <button class="link" type="button" data-action="home" id="home-link" hidden>Go to dashboard</button>
+        <p class="note" data-role="note"></p>
+      </section>
+    </div>
+  </main>
+  <script src="shell.js"></script>
+</body>
+</html>

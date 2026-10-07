@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Downloaded invoices / reports waiting to be opened or shared. -->
+    <cache-path name="bwp_downloads" path="bwp-downloads/" />
+    <!-- Photos taken for an upload field. -->
+    <cache-path name="bwp_camera" path="bwp-camera/" />
+</paths>
