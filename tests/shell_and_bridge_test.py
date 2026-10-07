@@ -39,6 +39,7 @@ DASH = '''<!doctype html><html><head><meta charset="utf-8"><meta name="viewport"
 <p><a id="ext" href="https://example.org/">External</a></p>
 <p><a id="plain" href="/customers">Customers</a></p>
 <p><button id="blobbtn" onclick="var a=document.createElement('a');a.href=window.URL.createObjectURL(new Blob(['a,b\\n1,2\\n'],{type:'text/csv'}));a.download='export.csv';a.click();">Blob</button></p>
+<p><a id="datalink" href="data:text/csv;charset=utf-8,name%2Ctotal%0AAli%2C50%0A" download="data-export.csv">Data</a></p>
 <p><button id="printbtn" onclick="window.print()">Print</button></p>
 <p><button id="openbtn" onclick="window.open('/invoices/9')">Open</button></p>
 <div id="list"><div>long</div></div>
@@ -60,7 +61,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split('?')[0]
         logged_in = 'bwpsession=abc123' in (self.headers.get('Cookie') or '')
-        html = {'content-type': 'text/html; charset=utf-8'}
+        # Strict policy like a real billing site: page scripts may only connect to the site itself.
+        html = {'content-type': 'text/html; charset=utf-8',
+                'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'"}
         if path == '/login':
             return self.send(200, '<html><title>Login</title><body>login</body></html>', dict(html, **{'Set-Cookie': 'bwpsession=abc123; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=86400'}))
         if path == '/logout':
@@ -200,10 +203,13 @@ with sync_playwright() as p:
 
     page.click('#blobbtn'); page.wait_for_timeout(600)
     sv = calls(page, 'saveFile')
-    check('download: script-generated blob -> saveFile(export.csv)', len(sv) == 3 and sv[2]['a']['name'] == 'export.csv' and base64.b64decode(sv[2]['a']['data']) == b'a,b\n1,2\n', sv[2:])
+    check('download: script-generated blob -> saveFile(export.csv), despite the site CSP', len(sv) == 3 and sv[2]['a']['name'] == 'export.csv' and base64.b64decode(sv[2]['a']['data']) == b'a,b\n1,2\n', sv[2:])
 
     page.evaluate("window.__bwp.download('https://bill.bwpexperts.com/files/invoice-123.pdf','guess.bin','application/pdf')"); page.wait_for_timeout(600)
     check('download: native DownloadListener hand-over works', len(calls(page, 'saveFile')) == 4)
+    page.click('#datalink'); page.wait_for_timeout(600)
+    sv = calls(page, 'saveFile')
+    check('download: data: link -> saveFile(data-export.csv)', len(sv) == 5 and sv[4]['a']['name'] == 'data-export.csv' and sv[4]['a']['mime'] == 'text/csv' and base64.b64decode(sv[4]['a']['data']) == b'name,total\nAli,50\n', sv[4:])
 
     page.click('#printbtn'); page.wait_for_timeout(200)
     check('print: window.print -> native print dialog', len(calls(page, 'printPage')) == 1)
@@ -242,10 +248,10 @@ with sync_playwright() as p:
     page.go_back(); page.wait_for_url(SITE + '/')
     page.click('#expired'); page.wait_for_url(SITE + '/login', timeout=5000)
     check('session expired: file link that returns the login page shows the login page', page.url == SITE + '/login')
-    check('session expired: nothing saved', len(calls(page, 'saveFile')) == 4)
+    check('session expired: nothing saved', len(calls(page, 'saveFile')) == 5)
     page.goto(SITE + '/logout'); page.goto(SITE + '/'); page.wait_for_timeout(400)
     page.click('#pdf'); page.wait_for_url(SITE + '/login', timeout=5000)
-    check('logged out: protected file is not saved, login page is shown', page.url == SITE + '/login' and len(calls(page, 'saveFile')) == 4)
+    check('logged out: protected file is not saved, login page is shown', page.url == SITE + '/login' and len(calls(page, 'saveFile')) == 5)
     page.goto(SITE + '/'); page.wait_for_timeout(300)
     page.click('#plain'); page.wait_for_url(SITE + '/customers', timeout=5000)
     check('links: normal internal link untouched', page.url == SITE + '/customers')

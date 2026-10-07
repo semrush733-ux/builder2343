@@ -237,7 +237,7 @@ jobs:
           ls out/smoke/*.png >/dev/null 2>&1 || exit 0
           D="$RUNNER_TEMP/smoke-branch"; rm -rf "$D"; mkdir -p "$D"
           cp out/smoke/*.png out/smoke/*.md "$D"/
-          grep -E " [EWF] |BwpNative|Capacitor" out/smoke/logcat.txt | tail -400 > "$D/logcat-filtered.txt" 2>/dev/null || true
+          { grep -E "Capacitor/Console|BwpNative|FATAL|AndroidRuntime" out/smoke/logcat.txt | cut -c1-400 | tail -300; echo "-----"; grep -E " [EWF] " out/smoke/logcat.txt | tail -200; } > "$D/logcat-filtered.txt" 2>/dev/null || true
           cd "$D"
           git init -q && git checkout -q -b ci-smoke-android && git add -A
           git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -q -m "Android smoke test output (build $BUILD_NUMBER)"

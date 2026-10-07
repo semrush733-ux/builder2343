@@ -169,6 +169,8 @@ def t_probe():
                 visible = re.sub(r'<(script|style)[^>]*>.*?</\1>', ' ', body, flags=re.S | re.I)
                 visible = re.sub(r'<[^>]+>', ' ', visible)
                 visible = re.sub(r'\s+', ' ', visible).strip()
+                if path == '/login/':
+                    note('site security policy: %s' % (res.headers.get('Content-Security-Policy') or 'none')[:300])
                 note('site %s -> %s %s | title: %s | <input>: %d | text: %s' % (
                     path, res.status, res.geturl(), (title.group(1).strip() if title else '')[:60], body.count('<input'), visible[:140]))
         except urllib.error.HTTPError as exc:
@@ -260,7 +262,8 @@ def t_download():
     js("(function(){var a=document.createElement('a');a.href=window.URL.createObjectURL(new Blob(['id,total\\n1,50\\n'],{type:'text/csv'}));a.download='bwp-smoke-export.csv';a.click();})()")
     seen = wait_for(lambda: 'bwp-smoke-export.csv' in [t.lower() for t in texts(ui())], 12, 1.5)
     shot('03b-blob-download-dialog')
-    check('download: page-generated file (blob) reaches the native dialog', bool(seen), [t for t in texts(ui())][:6])
+    check('download: page-generated file (blob) reaches the native dialog', bool(seen),
+          'notice: %s' % js("(document.querySelector('[data-bwp-notice]') || {}).textContent || ''"))
     back()
     time.sleep(1)
 

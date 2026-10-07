@@ -262,9 +262,80 @@
     });
   }
 
+  // Files the page builds itself (blob: URLs) are remembered here, so a download can read them
+  // directly. Fetching a blob: URL would be blocked by a strict Content-Security-Policy
+  // (connect-src 'self'), which billing sites commonly send.
+  var blobStore = {};
+  var blobOrder = [];
+  var BLOB_LIMIT = 24;
+
+  function forgetBlob(url) {
+    if (blobStore[url]) {
+      delete blobStore[url];
+      var at = blobOrder.indexOf(url);
+      if (at !== -1) { blobOrder.splice(at, 1); }
+    }
+  }
+
+  try {
+    var nativeCreateObjectURL = window.URL.createObjectURL;
+    var nativeRevokeObjectURL = window.URL.revokeObjectURL;
+    window.URL.createObjectURL = function (object) {
+      var url = nativeCreateObjectURL.apply(window.URL, arguments);
+      try {
+        if (typeof Blob !== 'undefined' && object instanceof Blob) {
+          blobStore[url] = object;
+          blobOrder.push(url);
+          while (blobOrder.length > BLOB_LIMIT) { delete blobStore[blobOrder.shift()]; }
+        }
+      } catch (e) { /* keep the normal behaviour */ }
+      return url;
+    };
+    window.URL.revokeObjectURL = function (url) {
+      // Pages usually revoke the URL right after starting the download: keep it a little longer.
+      setTimeout(function () { forgetBlob(url); }, 60000);
+      return nativeRevokeObjectURL.apply(window.URL, arguments);
+    };
+  } catch (e) { /* leave the default behaviour */ }
+
+  // data: URL -> { mime, data (base64) } without any network request.
+  function parseDataUrl(href) {
+    var comma = href.indexOf(',');
+    if (comma === -1) { return null; }
+    var meta = href.slice(5, comma);
+    var payload = href.slice(comma + 1);
+    var isBase64 = /;base64$/i.test(meta);
+    var mime = (meta.replace(/;base64$/i, '').split(';')[0] || 'text/plain').toLowerCase();
+    try {
+      if (isBase64) {
+        return { mime: mime, data: decodeURIComponent(payload).replace(/\s+/g, '') };
+      }
+      // unescape() turns %XX into single bytes, which is exactly what btoa() expects.
+      return { mime: mime, data: window.btoa(unescape(payload)) };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveBase64(data, name, mime) {
+    return callNative('saveFile', { name: cleanName(name, mime), mime: mime || 'application/octet-stream', data: data });
+  }
+
+  function finishDownload(promise, href) {
+    promise.then(function () {
+      notice('', 0);
+    }, function () {
+      notice(navigator.onLine === false ? 'No internet connection' : 'Download failed. Please try again.', 3500);
+    }).then(function () {
+      delete busy[href];
+    });
+  }
+
   /**
-   * Fetch a file with the user's existing session and hand it to the native side,
-   * which saves it and shows Open / Share (Android) or a preview with Share (iOS).
+   * Hand a file to the native side, which saves it and shows Open / Share (Android) or a
+   * preview with Share (iOS).
+   *   blob: / data:  read directly from memory
+   *   https          fetched with the user's existing session (same site only)
    */
   function download(url, suggestedName, mimeHint) {
     var abs = toAbsolute(url);
@@ -280,31 +351,40 @@
     busy[href] = true;
     notice('Preparing file...', 0);
 
+    if (abs.protocol === 'data:') {
+      var parsed = parseDataUrl(href);
+      finishDownload(parsed
+        ? saveBase64(parsed.data, suggestedName || 'download', parsed.mime)
+        : Promise.reject(new Error('Unreadable data URL')), href);
+      return;
+    }
+
+    if (abs.protocol === 'blob:' && blobStore[href]) {
+      var stored = blobStore[href];
+      var storedMime = String(stored.type || mimeHint || 'application/octet-stream').split(';')[0].trim().toLowerCase();
+      finishDownload(blobToBase64(stored).then(function (data) {
+        return saveBase64(data, suggestedName || 'download', storedMime);
+      }), href);
+      return;
+    }
+
     var options = { credentials: 'include', cache: 'no-store' };
-    window.fetch(href, isHttp ? options : undefined).then(function (res) {
+    finishDownload(window.fetch(href, isHttp ? options : undefined).then(function (res) {
       if (!res.ok) { throw new Error('HTTP ' + res.status); }
       var type = String(res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
       if (isHttp && type === 'text/html') {
         // Not a file (for example the login page after the session expired): show it normally.
-        notice('', 0);
         window.location.assign(res.url || href);
         return null;
       }
       var headerName = nameFromDisposition(res.headers.get('content-disposition'));
       return res.blob().then(function (blob) {
         var mime = type || blob.type || mimeHint || 'application/octet-stream';
-        var name = cleanName(headerName || suggestedName || nameFromUrl(abs), mime);
         return blobToBase64(blob).then(function (data) {
-          return callNative('saveFile', { name: name, mime: mime, data: data });
+          return saveBase64(data, headerName || suggestedName || nameFromUrl(abs), mime);
         });
-      }).then(function () {
-        notice('', 0);
       });
-    }).then(null, function () {
-      notice(navigator.onLine === false ? 'No internet connection' : 'Download failed. Please try again.', 3500);
-    }).then(function () {
-      delete busy[href];
-    });
+    }), href);
   }
 
   function closestAnchor(node) {

@@ -27,7 +27,7 @@ Mac with Xcode. No Mac or Android Studio of your own is needed for a build.
 | iOS: Xcode project, simulator build, device archive, IPA | **Built in CI.** The IPA is unsigned until Apple signing is added (section 9) |
 | Android app on an emulator | Smoke-tested in CI on every build (`scripts/ci/android_smoke.py`), result in the release notes |
 | iOS app on a simulator | Smoke-tested in CI on every build (`scripts/ci/ios_smoke.sh`), result in the release notes |
-| Launch / offline / error screens and bridge script (`src/`) | Tested in a browser against a mock site (`tests/`, 36 checks) |
+| Launch / offline / error screens and bridge script (`src/`) | Tested in a browser against a mock site with a strict security policy (`tests/`, 42 checks) |
 | **Real phone** (Android or iPhone) | **Not tested** |
 | **Logged-in flows** on the real site (sales, refunds, expenses, uploads, invoices...) | **Not tested** - the tests never log in. Use `docs/TEST_CHECKLIST.md` |
 
