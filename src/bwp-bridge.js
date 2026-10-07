@@ -31,6 +31,15 @@
 
   var isIOS = cfg.platform === 'ios' || (!cfg.platform && /iPhone|iPad|iPod/.test(navigator.userAgent));
   var isAndroid = !isIOS;
+
+  // On Android the Capacitor core only exists on the app's local pages, but it still sends its
+  // window events (keyboard, resume...) to whatever page is open. Give it something to call so
+  // the website's console is not filled with errors.
+  if (isAndroid && !window.Capacitor) {
+    try {
+      window.Capacitor = { Plugins: {}, triggerEvent: function () { return false; }, fromNative: function () {} };
+    } catch (e) { /* not essential */ }
+  }
   var DOC_EXT = cfg.downloadExtensions || ['pdf', 'csv', 'xls', 'xlsx', 'doc', 'docx', 'zip'];
   var SECURE_PATHS = cfg.secureScreenPaths || [];
 

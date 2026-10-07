@@ -207,6 +207,7 @@
       if (plugin && typeof plugin.getLastUrl === 'function') {
         plugin.getLastUrl().then(function (res) {
           if (res && res.url) { api.setRetryUrl(res.url); }
+          if (res && res.detail) { api.setErrorDetail(res.detail); }
         }, function () {});
       }
     } catch (e) { /* not available: Retry goes to the home page */ }

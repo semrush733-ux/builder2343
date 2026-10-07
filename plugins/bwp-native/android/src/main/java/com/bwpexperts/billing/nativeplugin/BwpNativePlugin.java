@@ -1187,6 +1187,10 @@ public class BwpNativePlugin extends Plugin {
     private void doGetLastUrl(final NativeCall call) {
         JSObject result = new JSObject();
         result.put("url", lastUrl != null ? lastUrl : homeUrl);
+        // Reason of the failure that brought up the error screen (only while it is recent).
+        if (!lastErrorDetail.isEmpty() && SystemClock.elapsedRealtime() - lastErrorAt < 20000L) {
+            result.put("detail", lastErrorDetail);
+        }
         call.resolve(result);
     }
 
