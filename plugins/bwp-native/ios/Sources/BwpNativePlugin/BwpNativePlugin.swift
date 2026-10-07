@@ -37,7 +37,7 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
     ]
 
     // Configuration (capacitor.config.ts -> plugins.BwpNative)
-    private var homeUrl = "https://bill.bwpexperts.com/"
+    private var homeUrl = "https://bill.bwpexperts.com/login"
     private var allowedHosts: [String] = ["bill.bwpexperts.com"]
     private var brandColor = UIColor(red: 1 / 255, green: 79 / 255, blue: 74 / 255, alpha: 1)
     private var shellColor = UIColor.white

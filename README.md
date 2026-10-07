@@ -10,7 +10,8 @@ around the website that adds what a browser tab cannot do.
 |---|---|
 | App name | BWP Billing |
 | Android package / iOS bundle ID | `com.bwpexperts.billing` |
-| Production URL | `https://bill.bwpexperts.com/` |
+| Website | `https://bill.bwpexperts.com/` |
+| Start page of the app | `https://bill.bwpexperts.com/login` (the site root is an empty page for logged-out visitors) |
 | Capacitor | 8.x |
 
 ---
@@ -78,7 +79,7 @@ bwp-billing-app/
 How it works:
 
 1. The app starts on a local page (`src/index.html`) - the branded loading screen.
-2. If the phone is online it replaces itself with `https://bill.bwpexperts.com/`. Login, cookies,
+2. If the phone is online it replaces itself with the start page (`homeUrl`, currently `https://bill.bwpexperts.com/login`). Login, cookies,
    localStorage, sessionStorage, AJAX and CSRF tokens work exactly as in a browser, because the
    website runs unchanged in the system web view (Android System WebView / WKWebView).
 3. The native plugin injects `bwp-bridge.js` into the website and provides the native features.
@@ -287,7 +288,7 @@ Everything is in **`src/app-config.json`**:
 
 ```json
 {
-  "homeUrl": "https://bill.bwpexperts.com/",
+  "homeUrl": "https://bill.bwpexperts.com/login",
   "allowedHosts": ["bill.bwpexperts.com"],
   "brandColor": "#014F4A",
   "backgroundColor": "#FFFFFF",

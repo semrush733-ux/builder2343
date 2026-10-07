@@ -17,7 +17,7 @@
   var DEFAULTS = {
     appName: 'BWP Billing',
     company: 'BWP Experts',
-    homeUrl: 'https://bill.bwpexperts.com/',
+    homeUrl: 'https://bill.bwpexperts.com/login',
     allowedHosts: ['bill.bwpexperts.com'],
     brandColor: '#014F4A',
     backgroundColor: '#FFFFFF',

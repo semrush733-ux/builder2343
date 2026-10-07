@@ -102,7 +102,7 @@ public class BwpNativePlugin extends Plugin {
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
 
     // Configuration (capacitor.config.ts -> plugins.BwpNative)
-    private String homeUrl = "https://bill.bwpexperts.com/";
+    private String homeUrl = "https://bill.bwpexperts.com/login";
     private final Set<String> allowedHosts = new HashSet<>();
     private int brandColor = Color.parseColor("#014F4A");
     private int shellColor = Color.WHITE;

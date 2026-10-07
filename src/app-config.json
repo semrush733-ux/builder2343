@@ -1,22 +1,12 @@
 {
   "appName": "BWP Billing",
   "company": "BWP Experts",
-  "homeUrl": "https://bill.bwpexperts.com/",
-  "allowedHosts": [
-    "bill.bwpexperts.com"
-  ],
+  "homeUrl": "https://bill.bwpexperts.com/login",
+  "allowedHosts": ["bill.bwpexperts.com"],
   "brandColor": "#014F4A",
   "backgroundColor": "#FFFFFF",
   "loadingText": "Loading your dashboard...",
   "pullToRefresh": true,
-  "downloadExtensions": [
-    "pdf",
-    "csv",
-    "xls",
-    "xlsx",
-    "doc",
-    "docx",
-    "zip"
-  ],
+  "downloadExtensions": ["pdf", "csv", "xls", "xlsx", "doc", "docx", "zip"],
   "secureScreenPaths": []
 }
