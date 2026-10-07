@@ -44,9 +44,26 @@ def shot(name):
         pass
 
 
-def ui():
+def raw_ui():
     adb('shell', 'uiautomator', 'dump', '/sdcard/bwp-ui.xml')
     return adb('shell', 'cat', '/sdcard/bwp-ui.xml')
+
+
+def ui():
+    """Screen content. Emulator-only system dialogs ("... isn't responding") are dismissed first."""
+    xml = raw_ui()
+    for _ in range(3):
+        if "isn't responding" not in xml and 'keeps stopping' not in xml:
+            break
+        m = re.search(r'text="(?:Wait|Close app)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml)
+        if not m:
+            break
+        x1, y1, x2, y2 = map(int, m.groups())
+        note('dismissed an emulator system dialog')
+        adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
+        time.sleep(2)
+        xml = raw_ui()
+    return xml
 
 
 def texts(xml):
@@ -149,6 +166,8 @@ def start_app():
 
 def run(name, fn):
     try:
+        if name not in ('site probe', 'logs'):
+            ui()
         fn()
     except Exception as exc:  # noqa: BLE001
         check(name + ' (test crashed)', False, repr(exc))
