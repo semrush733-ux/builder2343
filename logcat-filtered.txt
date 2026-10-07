@@ -1,0 +1,342 @@
+10-07 16:35:10.145  2415  2415 D Capacitor: Registering plugin instance: BwpNative
+10-07 16:35:16.036  2415  2415 W Capacitor/Console: File:  - Line 0 - Msg: Error with Permissions-Policy header: Unrecognized feature: 'payment'.
+10-07 16:35:16.037  2415  2415 W Capacitor/Console: File:  - Line 0 - Msg: Error with Permissions-Policy header: Unrecognized feature: 'usb'.
+10-07 16:35:23.332  2415  2415 W Capacitor/Console: File: https://bill.bwpexperts.com/login - Line 0 - Msg: The resource https://bill.bwpexperts.com/wp-content/plugins/bwp-experts-billing/assets/fonts/MonaSansVF.woff2?v=1.3.0.1791352089 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloa
+10-07 16:35:26.470  2415  2415 W Capacitor/Console: File: https://bill.bwpexperts.com/login - Line 0 - Msg: The resource https://bill.bwpexperts.com/wp-content/plugins/bwp-experts-billing/assets/fonts/MonaSansVF.woff2?v=1.3.0.1791352089 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloa
+10-07 16:35:29.039  3430  3430 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:35:29.042  3430  3430 I AndroidRuntime: Using default boot image
+10-07 16:35:29.042  3430  3430 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:35:29.171  3430  3430 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:35:30.546  3430  3430 D AndroidRuntime: Shutting down VM
+10-07 16:35:31.580  3518  3518 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:35:31.589  3518  3518 I AndroidRuntime: Using default boot image
+10-07 16:35:31.590  3518  3518 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:35:31.728  3518  3518 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:35:31.816  2415  2415 W Capacitor/Console: File: https://bill.bwpexperts.com/login - Line 0 - Msg: The resource https://bill.bwpexperts.com/wp-content/plugins/bwp-experts-billing/assets/fonts/MonaSansVF.woff2?v=1.3.0.1791352089 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloa
+10-07 16:35:32.849  3518  3518 D AndroidRuntime: Shutting down VM
+10-07 16:35:34.045  3680  3680 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:35:34.058  3680  3680 I AndroidRuntime: Using default boot image
+10-07 16:35:34.058  3680  3680 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:35:34.314  3680  3680 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:35:35.592  3680  3680 D AndroidRuntime: Shutting down VM
+10-07 16:35:43.300  2415  2415 W Capacitor/Console: File: https://bill.bwpexperts.com/login - Line 0 - Msg: The resource https://bill.bwpexperts.com/wp-content/plugins/bwp-experts-billing/assets/fonts/MonaSansVF.woff2?v=1.3.0.1791352089 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloa
+10-07 16:35:45.676  3926  3926 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:35:45.682  3926  3926 I AndroidRuntime: Using default boot image
+10-07 16:35:45.682  3926  3926 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:35:45.895  3926  3926 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:35:46.961  3926  3926 D AndroidRuntime: Shutting down VM
+10-07 16:35:47.654  2415  2415 W Capacitor/Console: File: https://bill.bwpexperts.com/login - Line 0 - Msg: The resource https://bill.bwpexperts.com/wp-content/plugins/bwp-experts-billing/assets/fonts/MonaSansVF.woff2?v=1.3.0.1791352089 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloa
+10-07 16:35:50.811  4065  4065 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:35:50.819  4065  4065 I AndroidRuntime: Using default boot image
+10-07 16:35:50.819  4065  4065 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:35:51.012  4065  4065 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:35:52.113  4065  4065 D AndroidRuntime: Shutting down VM
+10-07 16:35:54.934  4133  4133 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:35:54.941  4133  4133 I AndroidRuntime: Using default boot image
+10-07 16:35:54.941  4133  4133 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:35:55.152  4133  4133 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:35:57.232  4133  4133 D AndroidRuntime: Shutting down VM
+10-07 16:36:00.225  4189  4189 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:36:00.233  4189  4189 I AndroidRuntime: Using default boot image
+10-07 16:36:00.233  4189  4189 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:36:00.528  4189  4189 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:36:01.903  4189  4189 D AndroidRuntime: Shutting down VM
+10-07 16:36:08.252  4375  4375 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:36:08.264  4375  4375 I AndroidRuntime: Using default boot image
+10-07 16:36:08.264  4375  4375 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:36:08.635  4375  4375 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:36:09.685  2415  2415 W Capacitor/Console: File: https://bill.bwpexperts.com/login - Line 0 - Msg: The resource https://bill.bwpexperts.com/wp-content/plugins/bwp-experts-billing/assets/fonts/MonaSansVF.woff2?v=1.3.0.1791352089 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloa
+10-07 16:36:09.766  4375  4375 D AndroidRuntime: Shutting down VM
+10-07 16:36:13.019  4427  4427 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:36:13.022  4427  4427 I AndroidRuntime: Using default boot image
+10-07 16:36:13.022  4427  4427 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:36:13.134  4427  4427 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:36:14.203  4427  4427 D AndroidRuntime: Shutting down VM
+10-07 16:36:20.908  4625  4625 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:36:20.912  4625  4625 I AndroidRuntime: Using default boot image
+10-07 16:36:20.914  4625  4625 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:36:21.131  4625  4625 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:36:22.226  4625  4625 D AndroidRuntime: Shutting down VM
+10-07 16:36:26.566  2415  2415 W Capacitor/Console: File:  - Line 0 - Msg: Error with Permissions-Policy header: Unrecognized feature: 'payment'.
+10-07 16:36:26.568  2415  2415 W Capacitor/Console: File:  - Line 0 - Msg: Error with Permissions-Policy header: Unrecognized feature: 'usb'.
+10-07 16:36:30.127  4721  4721 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:36:30.132  4721  4721 I AndroidRuntime: Using default boot image
+10-07 16:36:30.132  4721  4721 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:36:30.136  2415  2415 W Capacitor/Console: File: https://bill.bwpexperts.com/login - Line 0 - Msg: The resource https://bill.bwpexperts.com/wp-content/plugins/bwp-experts-billing/assets/fonts/MonaSansVF.woff2?v=1.3.0.1791352089 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloa
+10-07 16:36:30.242  4721  4721 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:36:31.309  4721  4721 D AndroidRuntime: Shutting down VM
+10-07 16:36:32.727  2415  2415 W Capacitor/Console: File:  - Line 0 - Msg: Error with Permissions-Policy header: Unrecognized feature: 'payment'.
+10-07 16:36:32.730  2415  2415 W Capacitor/Console: File:  - Line 0 - Msg: Error with Permissions-Policy header: Unrecognized feature: 'usb'.
+10-07 16:36:35.788  2415  2415 W Capacitor/Console: File: https://bill.bwpexperts.com/login?bwp_smoke=1 - Line 0 - Msg: The resource https://bill.bwpexperts.com/wp-content/plugins/bwp-experts-billing/assets/fonts/MonaSansVF.woff2?v=1.3.0.1791352089 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and 
+10-07 16:36:35.861  2415  2415 W Capacitor/Console: File:  - Line 0 - Msg: Error with Permissions-Policy header: Unrecognized feature: 'payment'.
+10-07 16:36:35.861  2415  2415 W Capacitor/Console: File:  - Line 0 - Msg: Error with Permissions-Policy header: Unrecognized feature: 'usb'.
+10-07 16:36:38.889  2415  2415 W Capacitor/Console: File: https://bill.bwpexperts.com/login - Line 0 - Msg: The resource https://bill.bwpexperts.com/wp-content/plugins/bwp-experts-billing/assets/fonts/MonaSansVF.woff2?v=1.3.0.1791352089 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloa
+10-07 16:36:50.557  4858  4858 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:36:50.561  4858  4858 I AndroidRuntime: Using default boot image
+10-07 16:36:50.561  4858  4858 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:36:50.645  4858  4858 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:36:51.678  4858  4858 D AndroidRuntime: Shutting down VM
+10-07 16:36:55.742  2415  2415 W Capacitor/Console: File: https://bill.bwpexperts.com/login - Line 0 - Msg: The resource https://bill.bwpexperts.com/wp-content/plugins/bwp-experts-billing/assets/fonts/MonaSansVF.woff2?v=1.3.0.1791352089 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloa
+10-07 16:36:59.615  2415  2415 W Capacitor/Console: File: https://bill.bwpexperts.com/login - Line 0 - Msg: The resource https://bill.bwpexperts.com/wp-content/plugins/bwp-experts-billing/assets/fonts/MonaSansVF.woff2?v=1.3.0.1791352089 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloa
+10-07 16:37:02.740  2415  2415 W BwpNative: Page failed to load: net::ERR_INTERNET_DISCONNECTED (-2)
+10-07 16:37:02.798  2415  2415 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+10-07 16:37:02.798  2415  2415 V Capacitor/Plugin: To native (Capacitor plugin): callbackId: 34252274, pluginId: BwpNative, methodName: getLastUrl
+10-07 16:37:02.798  2415  2415 V Capacitor: callback: 34252274, pluginId: BwpNative, methodName: getLastUrl, methodData: {}
+10-07 16:37:02.801  2415  2415 I Capacitor/Console: File:  - Line 333 - Msg: {"url":"https://bill.bwpexperts.com/login","detail":"net::ERR_INTERNET_DISCONNECTED (-2)"}
+10-07 16:37:02.862  4955  4955 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:37:02.866  4955  4955 I AndroidRuntime: Using default boot image
+10-07 16:37:02.866  4955  4955 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:37:02.975  4955  4955 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:37:03.398  2415  2415 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+10-07 16:37:03.399  2415  2415 V Capacitor/Plugin: To native (Capacitor plugin): callbackId: 34252275, pluginId: BwpNative, methodName: getLastUrl
+10-07 16:37:03.399  2415  2415 V Capacitor: callback: 34252275, pluginId: BwpNative, methodName: getLastUrl, methodData: {}
+10-07 16:37:03.400  2415  2415 I Capacitor/Console: File:  - Line 333 - Msg: {"url":"https://bill.bwpexperts.com/login","detail":"net::ERR_INTERNET_DISCONNECTED (-2)"}
+10-07 16:37:04.020  4955  4955 D AndroidRuntime: Shutting down VM
+10-07 16:37:04.919  4972  4972 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:37:04.923  4972  4972 I AndroidRuntime: Using default boot image
+10-07 16:37:04.923  4972  4972 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:37:05.003  4972  4972 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:37:06.018  4972  4972 D AndroidRuntime: Shutting down VM
+10-07 16:37:08.011  2415  2415 W Capacitor/Console: File:  - Line 0 - Msg: Error with Permissions-Policy header: Unrecognized feature: 'payment'.
+10-07 16:37:08.014  2415  2415 W Capacitor/Console: File:  - Line 0 - Msg: Error with Permissions-Policy header: Unrecognized feature: 'usb'.
+10-07 16:37:11.279  2415  2415 W Capacitor/Console: File: https://bill.bwpexperts.com/login - Line 0 - Msg: The resource https://bill.bwpexperts.com/wp-content/plugins/bwp-experts-billing/assets/fonts/MonaSansVF.woff2?v=1.3.0.1791352089 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloa
+10-07 16:37:11.980  5085  5085 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:37:11.983  5085  5085 I AndroidRuntime: Using default boot image
+10-07 16:37:11.983  5085  5085 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:37:12.069  5085  5085 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:37:13.136  5085  5085 D AndroidRuntime: Shutting down VM
+10-07 16:37:17.047  2563  2563 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+10-07 16:37:19.343  5130  5130 D Capacitor: Registering plugin instance: BwpNative
+10-07 16:37:19.907  5130  5130 W BwpNative: Page failed to load: net::ERR_INTERNET_DISCONNECTED (-2)
+10-07 16:37:19.938  5130  5130 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+10-07 16:37:19.942  5130  5130 V Capacitor/Plugin: To native (Capacitor plugin): callbackId: 21844340, pluginId: BwpNative, methodName: getLastUrl
+10-07 16:37:19.943  5130  5130 V Capacitor: callback: 21844340, pluginId: BwpNative, methodName: getLastUrl, methodData: {}
+10-07 16:37:19.947  5130  5130 I Capacitor/Console: File:  - Line 333 - Msg: {"url":"https://bill.bwpexperts.com/login","detail":"net::ERR_INTERNET_DISCONNECTED (-2)"}
+10-07 16:37:20.710  5215  5215 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:37:20.717  5215  5215 I AndroidRuntime: Using default boot image
+10-07 16:37:20.717  5215  5215 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:37:20.861  5215  5215 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:37:21.883  5215  5215 D AndroidRuntime: Shutting down VM
+10-07 16:37:22.370  5130  5130 I Capacitor/Console: File:  - Line 349 - Msg: [object Object]
+10-07 16:37:22.518  5130  5130 V Capacitor/Plugin: To native (Capacitor plugin): callbackId: 21844341, pluginId: BwpNative, methodName: getLastUrl
+10-07 16:37:22.519  5130  5130 V Capacitor: callback: 21844341, pluginId: BwpNative, methodName: getLastUrl, methodData: {}
+10-07 16:37:22.570  5130  5130 I Capacitor/Console: File:  - Line 333 - Msg: {"url":"https://bill.bwpexperts.com/login","detail":"net::ERR_INTERNET_DISCONNECTED (-2)"}
+10-07 16:37:24.950  5234  5234 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:37:24.953  5234  5234 I AndroidRuntime: Using default boot image
+10-07 16:37:24.953  5234  5234 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:37:25.041  5234  5234 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:37:26.079  5234  5234 D AndroidRuntime: Shutting down VM
+10-07 16:37:28.985  5250  5250 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:37:28.988  5250  5250 I AndroidRuntime: Using default boot image
+10-07 16:37:28.988  5250  5250 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:37:29.070  5250  5250 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:37:30.092  5250  5250 D AndroidRuntime: Shutting down VM
+10-07 16:37:30.987  5267  5267 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+10-07 16:37:30.990  5267  5267 I AndroidRuntime: Using default boot image
+10-07 16:37:30.990  5267  5267 I AndroidRuntime: Leaving lock profiling enabled
+10-07 16:37:31.073  5267  5267 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+10-07 16:37:32.091  5267  5267 D AndroidRuntime: Shutting down VM
+10-07 16:37:34.454  5130  5130 W Capacitor/Console: File:  - Line 0 - Msg: Error with Permissions-Policy header: Unrecognized feature: 'payment'.
+10-07 16:37:34.454  5130  5130 W Capacitor/Console: File:  - Line 0 - Msg: Error with Permissions-Policy header: Unrecognized feature: 'usb'.
+10-07 16:37:38.461  5130  5130 W Capacitor/Console: File: https://bill.bwpexperts.com/login - Line 0 - Msg: The resource https://bill.bwpexperts.com/wp-content/plugins/bwp-experts-billing/assets/fonts/MonaSansVF.woff2?v=1.3.0.1791352089 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloa
+-----
+10-07 16:37:37.432   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.432   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.433   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.434   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.435   554   834 W DnsManager: updatePrivateDns(105, PrivateDnsConfig{opportunistic:/[], dohName=, dohIps=[], dohPath=, dohPort=-1})
+10-07 16:37:37.439   554   993 W ScanResultUtil: Empty or null ScanResult list
+10-07 16:37:37.439   554   993 W WifiService: Attempt to retrieve WifiConfiguration with invalid scanResult List
+10-07 16:37:37.439   554   993 W ScanResultUtil: Empty or null ScanResult list
+10-07 16:37:37.440   554   993 E WifiService: Attempt to retrieve passpoint with invalid scanResult List
+10-07 16:37:37.440   554  2236 W ScanResultUtil: Empty or null ScanResult list
+10-07 16:37:37.440   554  2236 W WifiService: Attempt to retrieve OsuProviders with invalid scanResult List
+10-07 16:37:37.440   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.440   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.440   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.440   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.441   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.441   356  5327 W resolv  : Validating DnsTlsServer {10.0.2.3/} with mark 0xf0069
+10-07 16:37:37.441   356  5327 W resolv  : Socket failed to connect, errno=101: Network is unreachable
+10-07 16:37:37.441   356  5327 W resolv  : TCP Handshake failed: 101
+10-07 16:37:37.441   356  5327 W resolv  : query failed
+10-07 16:37:37.441   356  5327 W resolv  : validateDnsTlsServer returned 0 for {10.0.2.3/}
+10-07 16:37:37.441   356  5327 W resolv  : Validation failed
+10-07 16:37:37.442   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.442   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.442   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.442   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.442   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.442   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.442   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.442   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.442   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.442   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.442   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.442   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.442   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.442   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.444   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.450   554   565 W system_server: Missing inline cache for android.net.NetworkStatsHistory android.net.NetworkStatsCollection.getHistory(android.net.NetworkTemplate, android.telephony.SubscriptionPlan, int, int, int, int, long, long, int, int)
+10-07 16:37:37.451   554   565 W system_server: Missing inline cache for android.net.NetworkStatsHistory android.net.NetworkStatsCollection.getHistory(android.net.NetworkTemplate, android.telephony.SubscriptionPlan, int, int, int, int, long, long, int, int)
+10-07 16:37:37.463   356  5328 W resolv  : Validating DnsTlsServer {10.0.2.3/} with mark 0xf0069
+10-07 16:37:37.465   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.466   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.466   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.466   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.467   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.467   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.467   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.467   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.467   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.467   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.467   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.468   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.468   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.468   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.468   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.468   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.468   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.468   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.468   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.468   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.468   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.468   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.468   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.468   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.468   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.468   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.469   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.469   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.469   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.469   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.469   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.469   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.469   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.469   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.469   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.469   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.469   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.469   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.469   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.470   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.470   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.484   554   827 E WifiStaIfaceAidlImpl: stopRssiMonitoring failed with service-specific exception: android.os.ServiceSpecificException:  (code 5)
+10-07 16:37:37.484   356   388 E NetlinkEvent: NetlinkEvent::FindParam(): Parameter 'INTERFACE' not found
+10-07 16:37:37.485   356   388 E NetlinkEvent: NetlinkEvent::FindParam(): Parameter 'STATE' not found
+10-07 16:37:37.485   356   388 E NetlinkEvent: NetlinkEvent::FindParam(): Parameter 'TIME_NS' not found
+10-07 16:37:37.485   356   388 E NetlinkEvent: NetlinkEvent::FindParam(): Parameter 'UID' not found
+10-07 16:37:37.514  1227  1241 W .gms.persistent: Large reply transaction of 1056768 bytes, interface descriptor , code 1
+10-07 16:37:37.656   554   834 W ContextImpl: Calling a method in the system process without a qualified user: android.app.ContextImpl.sendStickyBroadcast:1655 android.net.connectivity.com.android.server.ConnectivityService.sendStickyBroadcast:3944 android.net.connectivity.com.android.server.ConnectivityService.sendLegacyNetworkBroadcast:11525 android.net.connectivity.com.android.server.ConnectivityService$LegacyTypeTracker.remove:1296 android.net.connectivity.com.android.server.ConnectivityService.updateLegacyTypeTrackerAndVpnLockdownForRematch:10988 
+10-07 16:37:37.665   554   834 W ContextImpl: Calling a method in the system process without a qualified user: android.app.ContextImpl.sendStickyBroadcast:1655 android.net.connectivity.com.android.server.ConnectivityService.sendStickyBroadcast:3944 android.net.connectivity.com.android.server.ConnectivityService.sendGeneralBroadcast:3914 android.net.connectivity.com.android.server.ConnectivityService.sendConnectedBroadcast:3887 android.net.connectivity.com.android.server.ConnectivityService.sendLegacyNetworkBroadcast:11497 
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.700   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.701   554   587 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:37.703   554   827 W LastMileLogger: Failed to stop event tracing: /sys/kernel/debug/tracing/instances/wifi/tracing_on: open failed: ENOENT (No such file or directory)
+10-07 16:37:37.781  1227  2115 W .gms.persistent: Large reply transaction of 1056768 bytes, interface descriptor , code 1
+10-07 16:37:38.043  1227  5320 W ctxmgr  : [NetworkStateProducer] No state change for network connection context [CONTEXT service_id=47 ]
+10-07 16:37:38.348   554   827 E WifiStaIfaceAidlImpl: setDtimMultiplier failed with service-specific exception: android.os.ServiceSpecificException:  (code 4)
+10-07 16:37:38.350   356   356 E netd    : Error adding route ::/0 -> fe80::2 wlan0 to table 1016: File exists
+10-07 16:37:38.361  1227  5077 E WakeLock: GCM_HB_ALARM release without a matched acquire!
+10-07 16:37:38.361  1227  5077 W WakeLock: GCM_HB_ALARM counter does not exist
+10-07 16:37:38.367   554   641 W JobInfo : Job 'com.google.android.settings.intelligence/.modules.routines.impl.RoutinesJobIntentService#1728' has a deadline with no functional constraints. The deadline won't improve job execution latency. Consider removing the deadline.
+10-07 16:37:38.408  1227  5320 E WakeLock: GCM_CONN_ALARM release without a matched acquire!
+10-07 16:37:38.408  1227  5320 W WakeLock: GCM_CONN_ALARM counter does not exist
+10-07 16:37:38.461  5130  5130 W Capacitor/Console: File: https://bill.bwpexperts.com/login - Line 0 - Msg: The resource https://bill.bwpexperts.com/wp-content/plugins/bwp-experts-billing/assets/fonts/MonaSansVF.woff2?v=1.3.0.1791352089 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+10-07 16:37:38.849  5346  5346 W BpBinder: Linking to death on android.gui.ISurfaceComposer but there are no threads (yet?) listening to incoming transactions. See ProcessState::startThreadPool and ProcessState::setThreadPoolMaxThreadCount. Generally you should setup the binder threadpool before other initialization steps.
+10-07 16:37:38.849  5346  5346 W ProcessState: Extra binder thread started, but 0 threads requested. Do not use *startThreadPool when zero threads are requested.
+10-07 16:37:39.068  1328  1729 E HandwritingSuperpacksUtil: HandwritingSuperpacksUtil.getPackMappingPackName():40 No pack mapping pack found in []
+10-07 16:37:39.097   554   586 W IPCThreadState: Sending oneway calls to frozen process.
+10-07 16:37:39.097   554   586 W IPCThreadState: Sending oneway calls to frozen process.
