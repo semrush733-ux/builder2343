@@ -118,6 +118,7 @@ public class BwpNativePlugin extends Plugin {
     private volatile boolean refreshAllowedByPage = true;
     private volatile String lastUrl = null;
     private volatile String lastErrorDetail = "";
+    private volatile long lastErrorAt = 0L;
     private long lastBackPress = 0L;
     private int topColor = Color.WHITE;
     private int bottomColor = Color.WHITE;
@@ -531,6 +532,7 @@ public class BwpNativePlugin extends Plugin {
             @Override
             public void onMainPageFailed(String detail, String url) {
                 lastErrorDetail = detail == null ? "" : detail;
+                lastErrorAt = SystemClock.elapsedRealtime();
                 if (isAllowedUrl(url)) {
                     lastUrl = url;
                 }
@@ -557,9 +559,6 @@ public class BwpNativePlugin extends Plugin {
                 String url = webView.getUrl();
                 refreshAllowedByPage = true;
                 if (isAllowedUrl(url)) {
-                    // A new attempt starts: forget the reason of an earlier failure.
-                    // (Not cleared when the page finishes - a failed page "finishes" too.)
-                    lastErrorDetail = "";
                     lastUrl = url;
                 } else if (isLocalUrl(url)) {
                     applyTheme(shellColor, shellColor);
@@ -582,7 +581,10 @@ public class BwpNativePlugin extends Plugin {
                     if (lastUrl != null) {
                         script.append("window.__bwpShell.setRetryUrl(").append(JSONObject.quote(lastUrl)).append(");");
                     }
-                    if (url != null && url.contains("error.html") && !lastErrorDetail.isEmpty()) {
+                    // The reason belongs to the failure that just brought up this screen. A failed page
+                    // also reports "started" and "finished", so freshness is judged by time, not by events.
+                    boolean fresh = SystemClock.elapsedRealtime() - lastErrorAt < 20000L;
+                    if (url != null && url.contains("error.html") && fresh && !lastErrorDetail.isEmpty()) {
                         script.append("window.__bwpShell.setErrorDetail(").append(JSONObject.quote(lastErrorDetail)).append(");");
                     }
                     script.append("}");
