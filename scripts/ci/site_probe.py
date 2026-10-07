@@ -114,6 +114,26 @@ for src in scripts:
         say('- hosts mentioned: ' + ', '.join(hosts[:30]))
 say()
 
+# ----------------------------------------------------------------------------- the header Android web views add
+# Android's in-app web view adds "X-Requested-With: <app package>" to every request, including
+# normal page loads (not on all devices - it depends on the WebView version). The site's own
+# script uses "X-Requested-With: fetch" for its background calls, so the server may treat any
+# request that carries the header as a background call. Compare both.
+say('## Does the server answer differently when the request carries X-Requested-With?')
+wv = AGENTS['app (Android WebView)']
+for path in ['/login', '/dashboard', '/sellers', '/notifications', '/api/notifications/count?after=0', '/']:
+    row = []
+    for label, extra in [('without header', {}), ('with app header', {'X-Requested-With': 'com.bwpexperts.billing'}), ('with "fetch"', {'X-Requested-With': 'fetch', 'Accept': 'application/json'})]:
+        st, final, hd, body = fetch(SITE + path, wv, follow=False, extra=extra)
+        ctype = (hd.get('Content-Type') or hd.get('content-type') or '').split(';')[0]
+        loc = hd.get('Location') or hd.get('location') or ''
+        snippet = re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', body)).strip()[:70]
+        row.append('%s: %s %s%s | %s' % (label, st, ctype, (' -> ' + loc.replace(SITE, '')) if loc else '', snippet if st != 200 or 'json' in ctype else '(page)'))
+    say('%s' % path)
+    for r in row:
+        say('    ' + r)
+say()
+
 # ----------------------------------------------------------------------------- browser check
 # If the host answers with its "Checking your browser" page (HTTP 403 + script), find out
 # whether a real browser engine gets through, and whether looking like an in-app web view
