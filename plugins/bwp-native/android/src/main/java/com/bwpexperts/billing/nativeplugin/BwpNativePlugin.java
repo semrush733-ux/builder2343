@@ -557,6 +557,9 @@ public class BwpNativePlugin extends Plugin {
                 String url = webView.getUrl();
                 refreshAllowedByPage = true;
                 if (isAllowedUrl(url)) {
+                    // A new attempt starts: forget the reason of an earlier failure.
+                    // (Not cleared when the page finishes - a failed page "finishes" too.)
+                    lastErrorDetail = "";
                     lastUrl = url;
                 } else if (isLocalUrl(url)) {
                     applyTheme(shellColor, shellColor);
@@ -569,7 +572,6 @@ public class BwpNativePlugin extends Plugin {
                 stopRefreshing.run();
                 String url = webView.getUrl();
                 if (isAllowedUrl(url)) {
-                    lastErrorDetail = "";
                     // Safety net for WebViews without document-start scripts.
                     if (!bridgeScript.isEmpty()) {
                         webView.evaluateJavascript(bridgeScript, null);

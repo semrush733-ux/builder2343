@@ -390,9 +390,10 @@ def t_logs():
     log = adb('logcat', '-d', timeout=60)
     with open(OUT + '/logcat.txt', 'w') as f:
         f.write(log)
-    crashes = [ln for ln in log.splitlines() if 'FATAL EXCEPTION' in ln]
+    # Only crashes of the app itself count (the emulator's own tools crash now and then).
+    crashes = [ln for ln in log.splitlines() if 'Process: ' + PKG in ln]
     ours = [ln for ln in log.splitlines() if re.search(r' [EW] BwpNative', ln) and 'Page failed to load' not in ln]
-    check('no crash (FATAL EXCEPTION) in logcat', not crashes, crashes[:2])
+    check('the app did not crash (no FATAL EXCEPTION for the app in logcat)', not crashes, crashes[:2])
     check('no errors logged by the BWP plugin', not ours, [x[-160:] for x in ours[:4]])
 
 
