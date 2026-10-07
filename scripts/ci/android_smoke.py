@@ -343,6 +343,9 @@ def t_offline_session():
     note('offline screen: %s | %s' % (url(), tx[:6]))
     check('offline: custom screen instead of the browser error', url().startswith('https://localhost/error.html'), url())
     check('offline: "No Internet Connection" + Retry shown', 'No Internet Connection' in tx and 'Retry' in tx, tx[:6])
+    details = [t for t in tx if t.startswith('Details:')]
+    check('offline: technical reason shown on the screen', bool(details), tx)
+    note('reason shown: %s' % details[:1])
     network(True)
     back_online = wait_for(on_site, 75, 2)
     time.sleep(2)
@@ -369,7 +372,7 @@ def t_logs():
     with open(OUT + '/logcat.txt', 'w') as f:
         f.write(log)
     crashes = [ln for ln in log.splitlines() if 'FATAL EXCEPTION' in ln]
-    ours = [ln for ln in log.splitlines() if re.search(r' [EW] BwpNative', ln)]
+    ours = [ln for ln in log.splitlines() if re.search(r' [EW] BwpNative', ln) and 'Page failed to load' not in ln]
     check('no crash (FATAL EXCEPTION) in logcat', not crashes, crashes[:2])
     check('no errors logged by the BWP plugin', not ours, [x[-160:] for x in ours[:4]])
 

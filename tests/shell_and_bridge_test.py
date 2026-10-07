@@ -9,7 +9,7 @@ NOT test the Android / iOS code itself.
 Requirements: Python 3, "pip install playwright", "playwright install chromium", openssl.
 Run:          python tests/shell_and_bridge_test.py
 """
-import subprocess, tempfile
+import subprocess, tempfile, time
 import base64, json, mimetypes, os, sys
 from playwright.sync_api import sync_playwright
 
@@ -64,6 +64,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         # Strict policy like a real billing site: page scripts may only connect to the site itself.
         html = {'content-type': 'text/html; charset=utf-8',
                 'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'"}
+        if path == '/pending':
+            return self.send(204, b'', {})
         if path == '/login':
             return self.send(200, '<html><title>Login</title><body>login</body></html>', dict(html, **{'Set-Cookie': 'bwpsession=abc123; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=86400'}))
         if path == '/logout':
@@ -106,7 +108,7 @@ def calls(page, name=None):
     return [c for c in all_ if name is None or c['m'] == name]
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(env={k: v for k, v in os.environ.items() if 'proxy' not in k.lower()}, args=['--host-resolver-rules=MAP bill.bwpexperts.com 127.0.0.1:8443', '--ignore-certificate-errors', '--no-proxy-server'])
+    browser = p.chromium.launch(env={k: v for k, v in os.environ.items() if 'proxy' not in k.lower()}, args=['--host-resolver-rules=MAP bill.bwpexperts.com 127.0.0.1:8443', '--ignore-certificate-errors', '--no-proxy-server', '--disable-features=LocalNetworkAccessChecks'])
     errors = []
 
     def new_ctx(bridge=True):
@@ -129,35 +131,66 @@ with sync_playwright() as p:
     check('launch: local page not kept in history (Back does not return to it)', not page.url.startswith('https://localhost'), page.url)
     ctx.close()
 
-    # ---------------- shell: launch offline, retry, reconnect
+    OFFLINE_FLAG = "Object.defineProperty(navigator,'onLine',{configurable:true,get:function(){return window.__online===true;}});"
+
+    # ---------------- shell: the phone wrongly reports "offline" (seen on some devices) - the app must still load
     ctx = new_ctx(bridge=False); page = ctx.new_page()
     page.on('pageerror', lambda e: errors.append('shell: ' + str(e)))
-    ctx.route(SITE + '/**', lambda r, q: r.abort())  # hold the site back while "offline"
-    page.add_init_script("Object.defineProperty(navigator,'onLine',{configurable:true,get:function(){return window.__online===true;}});")
+    page.add_init_script(OFFLINE_FLAG)
+    page.goto('https://localhost/index.html', wait_until='commit')
+    page.wait_for_url(SITE + '/login', timeout=8000)
+    check('launch: loads the site even when the phone reports "offline"', page.url == SITE + '/login')
+    ctx.close()
+
+    # ---------------- shell: slow server - keep loading, never show the error screen on a timer
+    # The mock answers "204 No Content", so the browser stays on the launch page exactly as it
+    # does while a slow server has not answered yet.
+    ctx = new_ctx(bridge=False); page = ctx.new_page()
+    page.on('pageerror', lambda e: errors.append('shell: ' + str(e)))
+    slow_cfg = json.loads(open(os.path.join(SRC, 'app-config.json')).read()); slow_cfg['homeUrl'] = SITE + '/pending'
+    ctx.route('https://localhost/app-config.json', lambda r, q: r.fulfill(status=200, body=json.dumps(slow_cfg), headers={'content-type': 'application/json'}))
     page.goto('https://localhost/index.html')
+    page.wait_for_timeout(1500)
+    check('launch screen: shows app name / company / loading text',
+          page.inner_text('#app-name') == 'BWP Billing' and page.inner_text('#app-company') == 'by BWP Experts' and page.inner_text('#loading-text') == 'Loading your dashboard...')
+    check('launch screen: logo loaded', page.evaluate("document.querySelector('.brand img').naturalWidth") > 0)
+    page.screenshot(path=SHOTS + '/shell-loading.png')
+    check('slow server: no "still loading" hint in the first seconds', page.is_visible('#state-loading') and page.is_hidden('#slow-text'))
+    page.wait_for_timeout(12000)
+    check('slow server: after 13 s still on the loading screen, with a "still loading" hint', page.is_visible('#state-loading') and page.is_visible('#slow-text') and page.is_hidden('#state-unreachable') and page.is_hidden('#state-offline'))
+    page.screenshot(path=SHOTS + '/shell-slow.png')
+    page.wait_for_timeout(19000)
+    check('slow server: after 32 s still loading (no error screen), "Try again" offered', page.is_visible('#state-loading') and page.is_visible('#slow-retry') and page.is_hidden('#state-unreachable') and page.is_hidden('#state-offline'))
+    ctx.close()
+
+    # ---------------- shell: error screen while offline; Retry always tries; reconnect
+    ctx = new_ctx(bridge=False); page = ctx.new_page()
+    page.on('pageerror', lambda e: errors.append('shell: ' + str(e)))
+    page.add_init_script(OFFLINE_FLAG)
+    page.goto('https://localhost/error.html')
     page.wait_for_selector('#state-offline.is-active', timeout=5000)
-    check('offline launch: "No Internet Connection" screen', 'No Internet Connection' in page.inner_text('#state-offline'))
-    check('offline launch: message text', 'Please check your internet connection and try again.' in page.inner_text('#state-offline'))
+    check('offline: "No Internet Connection" screen', 'No Internet Connection' in page.inner_text('#state-offline'))
+    check('offline: message text', 'Please check your internet connection and try again.' in page.inner_text('#state-offline'))
+    page.evaluate("window.__bwpShell.setErrorDetail('net::ERR_NAME_NOT_RESOLVED (-2)')")
+    check('offline: technical reason shown small under the message', page.is_visible('#error-detail') and page.inner_text('#error-detail') == 'Details: net::ERR_NAME_NOT_RESOLVED (-2)', page.inner_text('#error-detail'))
     page.screenshot(path=SHOTS + '/shell-offline.png')
     page.click('#state-offline button[data-action=retry]')
-    check('offline retry: stays on offline screen with a note', page.is_visible('#state-offline') and 'Still offline' in page.inner_text('#state-offline'))
-    check('offline retry: did not navigate', page.url.startswith('https://localhost/'))
-    ctx.unroute(SITE + '/**')
+    page.wait_for_url(SITE + '/login', timeout=8000)
+    check('offline: Retry tries to load even when the phone still reports "offline"', page.url == SITE + '/login')
+    page.goto('https://localhost/error.html'); page.wait_for_selector('#state-offline.is-active', timeout=5000)
     page.evaluate("window.__online=true; window.dispatchEvent(new Event('online'));")
     page.wait_for_url(SITE + '/login', timeout=8000)
     check('reconnect: loads the site automatically when internet returns', page.url == SITE + '/login')
+    page.goto('https://localhost/error.html'); page.wait_for_selector('.state.is-active', timeout=5000)
+    page.evaluate("window.__online=true; window.dispatchEvent(new Event('online'));"); page.wait_for_timeout(1500)
+    check('reconnect: a second automatic reconnect within 30 s is not made (no reload loop)', page.url == 'https://localhost/error.html', page.url)
     ctx.close()
 
-    # ---------------- shell: launch screen look (kept on screen by pretending to be offline)
+    # ---------------- shell: error screen notices by itself that the site is reachable again
     ctx = new_ctx(bridge=False); page = ctx.new_page()
-    page.add_init_script("Object.defineProperty(navigator,'onLine',{configurable:true,get:function(){return false;}});")
-    page.goto('https://localhost/index.html')
-    page.wait_for_selector('#state-offline.is-active', timeout=5000)
-    check('launch screen: shows app name / company / loading text',
-          page.inner_text('#app-name') == 'BWP Billing' and page.inner_text('#app-company') == 'by BWP Experts' and page.text_content('#loading-text') == 'Loading your dashboard...')
-    check('launch screen: logo loaded', page.evaluate("document.querySelector('.brand img').naturalWidth") > 0)
-    page.evaluate("document.getElementById('state-offline').classList.remove('is-active'); document.getElementById('state-loading').classList.add('is-active')")
-    page.screenshot(path=SHOTS + '/shell-loading.png')
+    page.goto('https://localhost/error.html'); page.wait_for_selector('#state-unreachable.is-active', timeout=5000)
+    page.wait_for_url(SITE + '/login', timeout=16000)
+    check('reconnect: error screen reopens the site by itself once it answers', page.url == SITE + '/login')
     ctx.close()
 
     # ---------------- shell: error page
@@ -166,7 +199,6 @@ with sync_playwright() as p:
     page.goto('https://localhost/error.html')
     page.wait_for_selector('#state-unreachable.is-active')
     check('error page: "We couldn\'t connect to BWP Billing."', "We couldn't connect to BWP Billing." in page.inner_text('#state-unreachable'))
-    check('error page: does not auto-reload (no loop)', page.url == 'https://localhost/error.html')
     page.screenshot(path=SHOTS + '/shell-error.png')
     page.evaluate("window.__bwpShell.setRetryUrl('https://bill.bwpexperts.com/invoices/42')")
     check('error page: "Go to dashboard" appears when retry target is another page', page.is_visible('#home-link'))
@@ -233,10 +265,15 @@ with sync_playwright() as p:
     page.evaluate("document.body.style.overflowY=''")
 
     # offline banner
-    page.evaluate("window.dispatchEvent(new Event('offline'))"); page.wait_for_timeout(100)
-    check('offline banner: shown', page.evaluate("(function(){var e=document.querySelector('[data-bwp-notice]');return !!e && e.style.display==='block' && e.textContent==='No internet connection'})()"))
+    banner = "(function(){var e=document.querySelector('[data-bwp-notice]');return !!e && e.style.display==='block' && e.textContent==='No internet connection'})()"
+    page.evaluate("window.dispatchEvent(new Event('offline'))"); page.wait_for_timeout(700)
+    check('offline banner: a false "offline" signal (site still answers) shows nothing', not page.evaluate(banner))
+    ctx.route(SITE + '/favicon.ico*', lambda r, q: r.abort())
+    page.evaluate("Object.defineProperty(navigator,'onLine',{configurable:true,get:function(){return false;}}); window.dispatchEvent(new Event('offline'))"); page.wait_for_timeout(700)
+    check('offline banner: shown when the site really cannot be reached', page.evaluate(banner))
     page.screenshot(path=SHOTS + '/site-offline-banner.png')
-    page.evaluate("window.dispatchEvent(new Event('online'))"); page.wait_for_timeout(2200)
+    ctx.unroute(SITE + '/favicon.ico*')
+    page.evaluate("Object.defineProperty(navigator,'onLine',{configurable:true,get:function(){return true;}}); window.dispatchEvent(new Event('online'))"); page.wait_for_timeout(2200)
     check('offline banner: hidden after reconnect', page.evaluate("document.querySelector('[data-bwp-notice]').style.display") == 'none')
 
     # links

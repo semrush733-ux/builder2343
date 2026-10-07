@@ -49,6 +49,6 @@ tested on a real phone.
 
 Known limits to verify on the real site:
 
-- Android shows the "couldn't connect" screen for any HTTP error status on a full page load (404 / 403 / 500).
+- The "couldn't connect" screen is meant only for real connection failures; server error pages (404 / 403 / 500) should appear as in a browser. Not yet checked on a device with a real error page.
 - Files returned by a form POST cannot be downloaded by the app (links / GET work).
 - "Print" flows that open a blank popup and write into it are not supported by mobile web views.

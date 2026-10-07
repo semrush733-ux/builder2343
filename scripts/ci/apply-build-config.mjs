@@ -126,7 +126,8 @@ for (const file of ['index.html', 'error.html']) {
     .replace(/(<p id="app-company")[^>]*>[^<]*(<\/p>)/, company ? `$1>by ${escapeHtml(company)}$2` : '$1 hidden>$2')
     .replace(/(<h2 id="unreachable-title">)[^<]*(<\/h2>)/, `$1We couldn't connect to ${escapeHtml(appName)}.$2`)
     .replace(/(<p class="hint" id="loading-text">)[^<]*(<\/p>)/, `$1${escapeHtml(loadingText)}$2`)
-    .replace(/(<meta name="theme-color" content=")[^"]*(">)/, `$1${backgroundColor}$2`);
+    .replace(/(<meta name="theme-color" content=")[^"]*(">)/, `$1${backgroundColor}$2`)
+    .replace(/(<link rel="preconnect" href=")[^"]*(">)/, `$1${home.origin}$2`);
   writeFileSync(path, html);
 }
 

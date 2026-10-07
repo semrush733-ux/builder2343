@@ -116,6 +116,10 @@ button.link {
   text-decoration: underline;
 }
 
+.state .slow { margin: 14px 0 0; font-size: 14px; line-height: 1.4; color: var(--ink-soft); }
+
+.detail { margin: 18px 0 0; max-width: 340px; font-size: 12px; line-height: 1.35; color: var(--ink-soft); opacity: 0.85; overflow-wrap: anywhere; }
+
 .note { margin: 12px 0 0; min-height: 18px; font-size: 13px; color: var(--ink-soft); }
 
 @keyframes spin { to { transform: rotate(360deg); } }

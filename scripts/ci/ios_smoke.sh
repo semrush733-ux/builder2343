@@ -46,11 +46,15 @@ xcrun simctl launch --stdout="$LOG" --stderr="$LOG" "$UDID" "$BUNDLE" > "$OUT/io
 note "launch: $(tr '\n' ' ' < "$OUT/ios-launch.txt" | cut -c1-120)"
 sleep 12
 xcrun simctl io "$UDID" screenshot "$OUT/ios-01-starting.png" >/dev/null 2>&1 || true
-sleep 40
+# Wait until the website has loaded (up to 2.5 minutes - the first load on a fresh simulator is slow).
+WAITED=12
+while [ $WAITED -lt 150 ] && ! grep -q "BwpNative: page ready" "$LOG" 2>/dev/null; do sleep 6; WAITED=$((WAITED + 6)); done
+note "website ready after about ${WAITED}s"
+sleep 4
 xcrun simctl io "$UDID" screenshot "$OUT/ios-02-loaded.png" >/dev/null 2>&1 || true
 
 RUNNING=$(xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -c "UIKitApplication:$BUNDLE" || true)
-check "app is still running after 50 seconds (no crash)" "$([ "${RUNNING:-0}" -ge 1 ] && echo 1 || echo 0)" "process not found"
+check "app is still running at the end of the test (no crash)" "$([ "${RUNNING:-0}" -ge 1 ] && echo 1 || echo 0)" "process not found"
 
 CRASHES=$(ls "$HOME/Library/Logs/DiagnosticReports" 2>/dev/null | grep -ciE "^App[-_.]" || true)
 check "no crash report written" "$([ "${CRASHES:-0}" -eq 0 ] && echo 1 || echo 0)" "$CRASHES report(s)"

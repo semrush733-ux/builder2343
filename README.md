@@ -331,7 +331,7 @@ and there is no certificate bypass anywhere in the project.
 | Gradle / JDK version errors | Use JDK 21 (Android Studio > Settings > Build Tools > Gradle > Gradle JDK) |
 | White screen, or "bwp-bridge.js not found" in Logcat | `npm run sync` |
 | Users are logged out every time the app is closed | The server sends a session cookie without an expiry date. Give the login cookie a lifetime (or enable "remember me") on the server; the app keeps any cookie that has an expiry |
-| A page shows "We couldn't connect" although the internet works | On Android any HTTP error status on a full page load (404, 403, 500) shows this screen. Check the URL in a browser |
+| "We couldn't connect" screen appears | It is shown only for real connection failures (no network, DNS, timeout, certificate). On Android the small "Details:" line under the message gives the technical reason, for example `net::ERR_NAME_NOT_RESOLVED`. Pages the server answers with an error status (403, 404, 500) are shown as the server sent them. A slow server never triggers this screen; the loading screen stays with a "Still loading" note |
 | Download does nothing | Files returned by a form `POST` cannot be re-fetched by the app. Offer them as a normal link (GET) on the server |
 | iOS: a file downloaded without a visible link shows no dialog | It is saved by Capacitor into the app's folder in the Files app ("On My iPhone > BWP Billing") |
 | Upload field offers no camera | Android: only for inputs that accept images. iOS: needs the Info.plist usage texts (`node scripts/configure-native.mjs`) |

@@ -117,6 +117,7 @@ public class BwpNativePlugin extends Plugin {
     private String bridgeScript = "";
     private volatile boolean refreshAllowedByPage = true;
     private volatile String lastUrl = null;
+    private volatile String lastErrorDetail = "";
     private long lastBackPress = 0L;
     private int topColor = Color.WHITE;
     private int bottomColor = Color.WHITE;
@@ -139,6 +140,7 @@ public class BwpNativePlugin extends Plugin {
         activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
 
         step("native channel", () -> installNativeChannel(webView));
+        step("page errors", this::installWebViewClient);
         step("bridge script", () -> installBridgeScript(webView));
         step("pull to refresh", () -> installContainer(activity, webView));
         step("safe areas", () -> installInsetsHandling(activity));
@@ -523,6 +525,31 @@ public class BwpNativePlugin extends Plugin {
         return out.toString();
     }
 
+    /** Replaces Capacitor's page client with one that only shows the error screen for real connection problems. */
+    private void installWebViewClient() {
+        getBridge().setWebViewClient(new BwpWebViewClient(getBridge(), new BwpWebViewClient.Reporter() {
+            @Override
+            public void onMainPageFailed(String detail, String url) {
+                lastErrorDetail = detail == null ? "" : detail;
+                if (isAllowedUrl(url)) {
+                    lastUrl = url;
+                }
+                Log.w(TAG, "Page failed to load: " + lastErrorDetail);
+            }
+
+            @Override
+            public boolean isOwnSite(String url) {
+                return isAllowedUrl(url);
+            }
+
+            @Override
+            public String errorPageUrl() {
+                String local = getBridge().getLocalUrl();
+                return local == null ? null : local + "/error.html";
+            }
+        }));
+    }
+
     private void installPageListener() {
         getBridge().addWebViewListener(new WebViewListener() {
             @Override
@@ -542,16 +569,22 @@ public class BwpNativePlugin extends Plugin {
                 stopRefreshing.run();
                 String url = webView.getUrl();
                 if (isAllowedUrl(url)) {
+                    lastErrorDetail = "";
                     // Safety net for WebViews without document-start scripts.
                     if (!bridgeScript.isEmpty()) {
                         webView.evaluateJavascript(bridgeScript, null);
                     }
-                } else if (isLocalUrl(url) && lastUrl != null) {
-                    // Tell the local error screen which page to retry.
-                    webView.evaluateJavascript(
-                        "window.__bwpShell && window.__bwpShell.setRetryUrl(" + JSONObject.quote(lastUrl) + ");",
-                        null
-                    );
+                } else if (isLocalUrl(url)) {
+                    // Tell the local error screen which page to retry and why the load failed.
+                    StringBuilder script = new StringBuilder("if(window.__bwpShell){");
+                    if (lastUrl != null) {
+                        script.append("window.__bwpShell.setRetryUrl(").append(JSONObject.quote(lastUrl)).append(");");
+                    }
+                    if (url != null && url.contains("error.html") && !lastErrorDetail.isEmpty()) {
+                        script.append("window.__bwpShell.setErrorDetail(").append(JSONObject.quote(lastErrorDetail)).append(");");
+                    }
+                    script.append("}");
+                    webView.evaluateJavascript(script.toString(), null);
                 }
             }
 

@@ -651,14 +651,23 @@
     });
   }
 
-  window.addEventListener('offline', function () { setSticky('No internet connection'); });
+  // The phone's "offline" signal is unreliable on some devices: confirm with a tiny request
+  // to the site before showing the banner.
+  function confirmOffline() {
+    var probeUrl = window.location.origin + '/favicon.ico?bwp=' + Date.now();
+    window.fetch(probeUrl, { method: 'HEAD', cache: 'no-store', credentials: 'omit' }).then(function () {
+      setSticky('');
+    }, function () {
+      if (navigator.onLine === false) { setSticky('No internet connection'); }
+    });
+  }
+  window.addEventListener('offline', confirmOffline);
   window.addEventListener('online', function () {
     setSticky('');
     notice('Back online', 1800);
   });
 
   onReady(function () {
-    if (navigator.onLine === false) { setSticky('No internet connection'); }
     whenNativeReady(function () {
       callNativeQuiet('pageReady', { host: window.location.hostname });
       reportTheme();

@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#FFFFFF">
   <title>BWP Billing</title>
+  <link rel="preconnect" href="https://bill.bwpexperts.com">
   <link rel="stylesheet" href="shell.css">
 </head>
 <body data-mode="error">
@@ -21,6 +22,8 @@
       <section class="state" id="state-loading">
         <div class="spinner" role="progressbar" aria-label="Loading"></div>
         <p class="hint" id="loading-text">Loading your dashboard...</p>
+        <p class="slow" id="slow-text" hidden>Still loading. The connection or the server is slow - please wait.</p>
+        <button class="link" type="button" data-action="retry" id="slow-retry" hidden>Try again</button>
       </section>
 
       <section class="state" id="state-offline">
@@ -48,6 +51,7 @@
         <p class="note" data-role="note"></p>
       </section>
     </div>
+    <p class="detail" id="error-detail" hidden></p>
   </main>
   <script src="shell.js"></script>
 </body>
