@@ -21,6 +21,9 @@ concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   ios:
     runs-on: macos-26
@@ -117,6 +120,65 @@ jobs:
           cp "$RUNNER_TEMP"/signed/*.ipa "$GITHUB_WORKSPACE/out/BWP-Billing.ipa"
           rm -f "$KEY_FILE"
 
+      - name: Verify the IPA and write the build report
+        if: always()
+        run: |
+          R=out/REPORT-ios.md
+          {
+            echo "## iOS build #$BUILD_NUMBER"
+            echo ""
+            echo "Commit: \`$GITHUB_SHA\`"
+            echo ""
+            echo '```'
+            xcodebuild -version
+            echo "signing secrets present: $HAS_SIGNING"
+            for f in out/*.ipa; do if [ -f "$f" ]; then echo "$(basename "$f")  $(stat -f%z "$f") bytes  sha256 $(shasum -a 256 "$f" | cut -d' ' -f1)"; fi; done
+            echo '```'
+          } > "$R"
+          if [ -f out/BWP-Billing-unsigned.ipa ]; then
+            rm -rf "$RUNNER_TEMP/verify" && mkdir -p "$RUNNER_TEMP/verify" && unzip -q out/BWP-Billing-unsigned.ipa -d "$RUNNER_TEMP/verify"
+            APP="$RUNNER_TEMP/verify/Payload/App.app"
+            PB=/usr/libexec/PlistBuddy
+            {
+              echo ""
+              echo "### Info.plist"
+              echo '```'
+              for k in CFBundleIdentifier CFBundleDisplayName CFBundleShortVersionString CFBundleVersion MinimumOSVersion NSCameraUsageDescription NSPhotoLibraryUsageDescription UIFileSharingEnabled ITSAppUsesNonExemptEncryption; do
+                echo "$k = $($PB -c "Print :$k" "$APP/Info.plist" 2>/dev/null || echo MISSING)"
+              done
+              echo '```'
+              echo "### App bundle"
+              echo '```'
+              ls "$APP" || true
+              echo "--- public/"
+              ls "$APP/public" || true
+              echo "--- Frameworks/"
+              ls "$APP/Frameworks" 2>/dev/null || echo "(none - statically linked)"
+              echo "--- BwpNativePlugin symbols in binary: $(strings "$APP/App" | grep -c BwpNativePlugin || true)"
+              echo "--- AppIcon files: $(ls "$APP" | grep -c AppIcon || true)"
+              echo "--- code signature: $(codesign -dv "$APP" 2>&1 | head -1 || true)"
+              echo '```'
+              echo "### capacitor.config.json (inside the app)"
+              echo '```json'
+              cat "$APP/capacitor.config.json" || true
+              echo ""
+              echo '```'
+            } >> "$R"
+          fi
+          {
+            echo "### Compiler messages for the BWP plugin"
+            echo '```'
+            grep -hE "BwpNativePlugin\.swift:[0-9]+:[0-9]+: (warning|error)" out/logs/*.log 2>/dev/null | sed -E 's#^.*/(BwpNativePlugin\.swift)#\1#' | sort -u | head -40 || true
+            echo "(end)"
+            echo '```'
+            echo "### Errors"
+            echo '```'
+            grep -hE "error:" out/logs/*.log 2>/dev/null | sort -u | head -40 || true
+            echo "(end)"
+            echo '```'
+          } >> "$R"
+          cat "$R"
+
       - name: Package the generated Xcode project
         if: always()
         run: |
@@ -128,3 +190,15 @@ jobs:
           name: bwp-billing-ios
           path: out/
           if-no-files-found: warn
+
+      # Direct download links: https://github.com/<owner>/<repo>/releases/tag/ios-latest
+      - name: Publish to the "ios-latest" release
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ios-latest --cleanup-tag --yes 2>/dev/null || true
+          sleep 3
+          FILES=$(ls out/*.ipa out/ios-xcode-project.zip 2>/dev/null || true)
+          gh release create ios-latest $FILES --target "$GITHUB_SHA" \
+            --title "BWP Billing - iOS build #$BUILD_NUMBER" --notes-file out/REPORT-ios.md --prerelease

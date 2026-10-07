@@ -21,12 +21,16 @@ concurrency:
   group: android-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   android:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
       HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+      BUILD_NUMBER: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
 
@@ -69,11 +73,16 @@ jobs:
 
       - name: Build debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/out/logs"
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee "$GITHUB_WORKSPACE/out/logs/debug-build.log"
 
       - name: Build release APK and AAB
         working-directory: android
-        run: ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace 2>&1 | tee "$GITHUB_WORKSPACE/out/logs/release-build.log"
 
       - name: Collect outputs
         if: always()
@@ -85,9 +94,84 @@ jobs:
           if [ -d android ]; then zip -qry out/android-studio-project.zip android -x "android/.gradle/*" "android/build/*" "android/app/build/*" "android/local.properties"; fi
           ls -la out
 
+      - name: Verify the APK and write the build report
+        if: always()
+        run: |
+          R=out/REPORT-android.md
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          APK=out/app-debug.apk
+          {
+            echo "## Android build #$BUILD_NUMBER"
+            echo ""
+            echo "Commit: \`$GITHUB_SHA\`"
+            echo ""
+            echo '```'
+            echo "release signing secrets present: $HAS_SIGNING"
+            for f in out/*.apk out/*.aab; do if [ -f "$f" ]; then echo "$(basename "$f")  $(stat -c%s "$f") bytes  sha256 $(sha256sum "$f" | cut -d' ' -f1)"; fi; done
+            echo '```'
+          } > "$R"
+          if [ -f "$APK" ]; then
+            {
+              echo "### app-debug.apk"
+              echo '```'
+              "$BT/aapt2" dump badging "$APK" | grep -E "^package:|^sdkVersion|^targetSdkVersion|^minSdkVersion|^application-label:|^uses-permission|^launchable-activity" || true
+              echo "--- signature"
+              "$BT/apksigner" verify --print-certs "$APK" 2>&1 | head -3 || true
+              echo "--- web assets"
+              unzip -l "$APK" | grep -E "assets/(public/|capacitor)" | awk '{print $4}' || true
+              echo "--- classes of the BWP plugin in dex: $(unzip -p "$APK" 'classes*.dex' | strings | grep -c 'com/bwpexperts/billing/nativeplugin' || true)"
+              echo "--- launcher icons: $(unzip -l "$APK" | grep -c 'ic_launcher' || true)"
+              echo '```'
+              echo "### Manifest checks"
+              echo '```'
+              "$BT/aapt2" dump xmltree --file AndroidManifest.xml "$APK" > "$RUNNER_TEMP/manifest.txt" || true
+              grep -E "allowBackup|networkSecurityConfig|usesCleartextTraffic|android:host|autoVerify|bwpfiles|windowSoftInputMode" "$RUNNER_TEMP/manifest.txt" | sed 's/^ *//' || true
+              echo '```'
+              echo "### capacitor.plugins.json"
+              echo '```json'
+              unzip -p "$APK" assets/capacitor.plugins.json || true
+              echo ""
+              echo '```'
+              echo "### capacitor.config.json (inside the app)"
+              echo '```json'
+              unzip -p "$APK" assets/capacitor.config.json || true
+              echo ""
+              echo '```'
+            } >> "$R"
+          fi
+          {
+            echo "### SDK levels (android/variables.gradle)"
+            echo '```'
+            grep -E "SdkVersion" android/variables.gradle || true
+            echo '```'
+            echo "### Compiler messages for the BWP plugin"
+            echo '```'
+            grep -hE "nativeplugin/[A-Za-z]+\.java:[0-9]+: (warning|error)|uses or overrides a deprecated|unchecked" out/logs/*.log 2>/dev/null | sed -E 's#^.*/nativeplugin/##' | sort -u | head -40 || true
+            echo "(end)"
+            echo '```'
+            echo "### Errors"
+            echo '```'
+            grep -hE "^e: |error:|FAILED|What went wrong" out/logs/*.log 2>/dev/null | sort -u | head -40 || true
+            echo "(end)"
+            echo '```'
+          } >> "$R"
+          cat "$R"
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: bwp-billing-android
           path: out/
           if-no-files-found: warn
+
+      # Direct download links: https://github.com/<owner>/<repo>/releases/tag/android-latest
+      - name: Publish to the "android-latest" release
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-latest --cleanup-tag --yes 2>/dev/null || true
+          sleep 3
+          FILES=$(ls out/*.apk out/*.aab out/android-studio-project.zip 2>/dev/null || true)
+          gh release create android-latest $FILES --target "$GITHUB_SHA" \
+            --title "BWP Billing - Android build #$BUILD_NUMBER" --notes-file out/REPORT-android.md --prerelease
