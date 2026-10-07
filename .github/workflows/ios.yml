@@ -207,11 +207,17 @@ jobs:
         run: |
           # A cancelled or failed run must not replace the last good download.
           if ! ls out/*.ipa >/dev/null 2>&1; then echo "No IPA was built - keeping the previous release."; exit 0; fi
-          gh release delete ios-latest --cleanup-tag --yes 2>/dev/null || true
-          sleep 3
           FILES=$(ls out/*.ipa out/ios-xcode-project.zip 2>/dev/null || true)
-          gh release create ios-latest $FILES --target "$GITHUB_SHA" \
-            --title "BWP Billing - iOS build #$BUILD_NUMBER" --notes-file out/REPORT-ios.md --prerelease
+          # Update the existing release in place (no gap in the download links); create it the first time.
+          publish() {
+            if gh release view ios-latest >/dev/null 2>&1; then
+              gh release upload ios-latest $FILES --clobber && \
+              gh release edit ios-latest --title "BWP Billing - iOS build #$BUILD_NUMBER" --notes-file out/REPORT-ios.md --prerelease
+            else
+              gh release create ios-latest $FILES --target "$GITHUB_SHA" --title "BWP Billing - iOS build #$BUILD_NUMBER" --notes-file out/REPORT-ios.md --prerelease
+            fi
+          }
+          publish || { sleep 20; publish; } || { sleep 60; publish; }
 
       # Screenshots of the smoke test go to the "ci-smoke-ios" branch (replaced on every build).
       - name: Publish smoke test screenshots

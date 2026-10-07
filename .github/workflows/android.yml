@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   android:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
@@ -172,17 +172,23 @@ jobs:
         run: |
           # A cancelled or failed run must not replace the last good download.
           if ! ls out/*.apk >/dev/null 2>&1; then echo "No APK was built - keeping the previous release."; exit 0; fi
-          gh release delete android-latest --cleanup-tag --yes 2>/dev/null || true
-          sleep 3
           FILES=$(ls out/*.apk out/*.aab out/android-studio-project.zip 2>/dev/null || true)
-          gh release create android-latest $FILES --target "$GITHUB_SHA" \
-            --title "BWP Billing - Android build #$BUILD_NUMBER" --notes-file out/REPORT-android.md --prerelease
+          # Update the existing release in place (no gap in the download links); create it the first time.
+          publish() {
+            if gh release view android-latest >/dev/null 2>&1; then
+              gh release upload android-latest $FILES --clobber && \
+              gh release edit android-latest --title "BWP Billing - Android build #$BUILD_NUMBER" --notes-file out/REPORT-android.md --prerelease
+            else
+              gh release create android-latest $FILES --target "$GITHUB_SHA" --title "BWP Billing - Android build #$BUILD_NUMBER" --notes-file out/REPORT-android.md --prerelease
+            fi
+          }
+          publish || { sleep 20; publish; } || { sleep 60; publish; }
 
   # Starts the debug APK on an emulator and drives it: launch, site load, download dialog, print,
   # share, Back button, pull-to-refresh, keyboard, offline / reconnect. Never logs in.
   smoke:
     needs: android
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
       BUILD_NUMBER: ${{ github.run_number }}

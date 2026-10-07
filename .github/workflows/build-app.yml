@@ -45,7 +45,7 @@ env:
 
 jobs:
   start:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       ios: ${{ steps.plan.outputs.ios }}
@@ -130,7 +130,7 @@ jobs:
   android:
     needs: start
     if: needs.start.outputs.android == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -188,7 +188,7 @@ jobs:
   finish:
     needs: [start, ios, android]
     if: always() && needs.start.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       IOS_RESULT: ${{ needs.ios.result }}
