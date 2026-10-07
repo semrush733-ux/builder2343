@@ -114,5 +114,76 @@ for src in scripts:
         say('- hosts mentioned: ' + ', '.join(hosts[:30]))
 say()
 
+# ----------------------------------------------------------------------------- browser check
+# If the host answers with its "Checking your browser" page (HTTP 403 + script), find out
+# whether a real browser engine gets through, and whether looking like an in-app web view
+# (the "; wv" marker and the X-Requested-With header Android adds) makes a difference.
+def browser_check():
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as exc:  # noqa: BLE001
+        say('browser check skipped: %r' % exc)
+        return
+    challenge = pages['app (Android WebView)'][2]
+    say('## The "checking your browser" page')
+    say('status as plain request: %s' % pages['app (Android WebView)'][0])
+    text = re.sub(r'<(script|style)[^>]*>.*?</\1>', ' ', challenge, flags=re.S | re.I)
+    say('visible text: ' + re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', text)).strip()[:400])
+    for chunk in re.findall(r'<script(?![^>]*src=)[^>]*>(.*?)</script>', challenge, re.S | re.I):
+        say('inline script (%d chars): %s' % (len(chunk), re.sub(r'[A-Za-z0-9+/=_-]{24,}', '<long-value>', re.sub(r'\s+', ' ', chunk))[:700]))
+    say()
+    variants = [
+        ('in-app web view as it is today ("; wv" + X-Requested-With)', AGENTS['app (Android WebView)'], {'X-Requested-With': 'com.bwpexperts.billing'}),
+        ('in-app web view without the X-Requested-With header', AGENTS['app (Android WebView)'], {}),
+        ('same engine presenting itself as Chrome', AGENTS['Chrome on Android'], {}),
+    ]
+    say('## Does a real browser engine get through?')
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        for label, agent, extra in variants:
+            ctx = browser.new_context(user_agent=agent, extra_http_headers=extra, viewport={'width': 412, 'height': 900}, is_mobile=True, has_touch=True)
+            page = ctx.new_page()
+            statuses = []
+            page.on('response', lambda r: statuses.append((r.status, r.url.replace(SITE, '').split('?')[0])) if r.request.is_navigation_request() or 'hcdn-cgi' in r.url else None)
+            try:
+                page.goto(SITE + '/login', wait_until='domcontentloaded', timeout=45000)
+            except Exception as exc:  # noqa: BLE001
+                say('%s: navigation error %r' % (label, exc))
+            title = ''
+            for _ in range(25):
+                try:
+                    title = page.title()
+                except Exception:  # noqa: BLE001
+                    title = '(navigating)'
+                if title and 'Checking your browser' not in title and title != '(navigating)':
+                    break
+                page.wait_for_timeout(1000)
+            inputs = 0
+            post = ''
+            try:
+                inputs = page.locator('input:not([type=hidden])').count()
+                # A background request like the ones the login form makes (GET only, nothing is submitted).
+                post = page.evaluate("fetch('/login', {credentials: 'include', cache: 'no-store'}).then(function (r) { return 'HTTP ' + r.status; }, function (e) { return 'failed ' + e; })")
+            except Exception as exc:  # noqa: BLE001
+                post = repr(exc)[:80]
+            cookies = sorted(c['name'] for c in ctx.cookies())
+            say('- %s' % label)
+            say('    responses: %s' % statuses[:8])
+            say('    ends on: "%s" | inputs: %d | background request: %s | cookies: %s' % (title[:60], inputs, post, cookies))
+            ctx.close()
+        browser.close()
+    say()
+
+
+if pages['app (Android WebView)'][0] == 403 or 'Checking your browser' in pages['app (Android WebView)'][2]:
+    try:
+        browser_check()
+    except Exception as exc:  # noqa: BLE001
+        say('browser check failed: %r' % exc)
+else:
+    say('## Browser check')
+    say('This machine was not asked to pass the "checking your browser" page (plain requests got HTTP %s), so there was nothing to test.' % pages['app (Android WebView)'][0])
+    say()
+
 with open('probe-output.md', 'w', encoding='utf-8') as f:
     f.write('\n'.join(out) + '\n')

@@ -16,6 +16,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Install a browser engine for the check
+        run: |
+          pip install --quiet playwright
+          python3 -m playwright install --with-deps chromium > /dev/null
       - name: Read the login page
         run: python3 scripts/ci/site_probe.py > /dev/null || true
       - name: Publish the result
