@@ -1,0 +1,5 @@
+2026-10-07 16:41:23.908 App[18684:56179] DiskCookieStorage changing policy from 2 to 0, cookie file: file:///Users/runner/Library/Developer/CoreSimulator/Devices/22452A91-4697-4369-8812-53ADB77EB73B/data/Containers/Data/Application/CD2A806E-BC82-4B64-BADB-C1D5C4CDB383/Library/Cookies/com.bwpexperts.billing.binarycookies
+2026-10-07 16:41:24.324 App[18684:56179] KeyboardPlugin: resize mode - native
+2026-10-07 16:41:24.328 App[18684:56179] BwpNative: ready (bridge script installed)
+2026-10-07 16:42:14.474 App[18684:56179] BwpNative: page ready (bill.bwpexperts.com)
+2026-10-07 16:42:14.577 App[18684:59050] Accessory bar visible change 1
