@@ -14,7 +14,7 @@ name: iOS build (IPA)
 on:
   push:
     branches: [main, bwp-billing-app]
-    paths-ignore: ['**.md', 'docs/**', 'wordpress-plugin/**', '.github/workflows/android.yml', '.github/workflows/build-app.yml']
+    paths-ignore: ['**.md', 'docs/**', 'wordpress-plugin/**', 'scripts/ci/site_probe.py', '.github/workflows/android.yml', '.github/workflows/build-app.yml', '.github/workflows/site-probe.yml']
   workflow_dispatch:
 
 concurrency:

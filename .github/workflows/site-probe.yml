@@ -1,0 +1,30 @@
+name: Site probe (diagnostic)
+
+# Run by hand only. Reads the public login page of the site and the scripts it loads, to find
+# out how the login flow behaves inside the app. It never logs in and never posts a form.
+# The result is written to the branch "ci-probe".
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the login page
+        run: python3 scripts/ci/site_probe.py > /dev/null || true
+      - name: Publish the result
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -f probe-output.md ] || echo "no output" > probe-output.md
+          D="$RUNNER_TEMP/probe"; mkdir -p "$D"; cp probe-output.md "$D"/
+          cd "$D"
+          git init -q && git checkout -q -b ci-probe && git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -q -m "Site probe output"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-probe
