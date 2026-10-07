@@ -205,6 +205,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # A cancelled or failed run must not replace the last good download.
+          if ! ls out/*.ipa >/dev/null 2>&1; then echo "No IPA was built - keeping the previous release."; exit 0; fi
           gh release delete ios-latest --cleanup-tag --yes 2>/dev/null || true
           sleep 3
           FILES=$(ls out/*.ipa out/ios-xcode-project.zip 2>/dev/null || true)

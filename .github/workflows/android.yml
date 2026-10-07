@@ -170,6 +170,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # A cancelled or failed run must not replace the last good download.
+          if ! ls out/*.apk >/dev/null 2>&1; then echo "No APK was built - keeping the previous release."; exit 0; fi
           gh release delete android-latest --cleanup-tag --yes 2>/dev/null || true
           sleep 3
           FILES=$(ls out/*.apk out/*.aab out/android-studio-project.zip 2>/dev/null || true)
