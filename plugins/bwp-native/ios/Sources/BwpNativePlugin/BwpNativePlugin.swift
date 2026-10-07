@@ -17,7 +17,6 @@ import Capacitor
   - print (AirPrint dialog) and share sheet
   - Universal Links (https://bill.bwpexperts.com/...)
 
- NOTE: this file has not been compiled yet - it needs a Mac with Xcode. See README, "iOS build".
  */
 @objc(BwpNativePlugin)
 public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDataSource {
@@ -111,7 +110,8 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
         }
         isSetUp = true
 
-        installBridgeScript(webView)
+        let scriptInstalled = installBridgeScript(webView)
+        CAPLog.print("BwpNative: ready (bridge script \(scriptInstalled ? "installed" : "MISSING"))")
 
         // Native navigation feel: swipe from the left edge goes back.
         webView.allowsBackForwardNavigationGestures = true
@@ -140,13 +140,14 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
 
     // MARK: - Bridge script
 
-    private func installBridgeScript(_ webView: WKWebView) {
+    @discardableResult
+    private func installBridgeScript(_ webView: WKWebView) -> Bool {
         guard
             let file = Bundle.main.url(forResource: "bwp-bridge", withExtension: "js", subdirectory: "public"),
             let source = try? String(contentsOf: file, encoding: .utf8)
         else {
             CAPLog.print("BwpNative: public/bwp-bridge.js not found in the app bundle. Run: npx cap sync ios")
-            return
+            return false
         }
         let config: [String: Any] = [
             "platform": "ios",
@@ -168,6 +169,7 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
             forMainFrameOnly: true
         )
         webView.configuration.userContentController.addUserScript(script)
+        return true
     }
 
     // MARK: - Status bar strip (safe area)

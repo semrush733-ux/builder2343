@@ -71,6 +71,7 @@ jobs:
           set -o pipefail
           xcodebuild $XC_TARGET -scheme App -configuration Debug \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
             CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$GITHUB_WORKSPACE/out/logs/simulator-build.log" | grep -E "error:|warning: unre|BUILD|\*\*" || true
           grep -q "BUILD SUCCEEDED" "$GITHUB_WORKSPACE/out/logs/simulator-build.log"
 
@@ -119,6 +120,12 @@ jobs:
           grep -q "EXPORT SUCCEEDED" "$GITHUB_WORKSPACE/out/logs/export.log"
           cp "$RUNNER_TEMP"/signed/*.ipa "$GITHUB_WORKSPACE/out/BWP-Billing.ipa"
           rm -f "$KEY_FILE"
+
+      - name: Simulator smoke test (start the app, load the site, screenshots)
+        if: success()
+        continue-on-error: true
+        timeout-minutes: 15
+        run: bash scripts/ci/ios_smoke.sh "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app"
 
       - name: Verify the IPA and write the build report
         if: always()
@@ -177,6 +184,7 @@ jobs:
             echo "(end)"
             echo '```'
           } >> "$R"
+          if [ -f out/smoke/SMOKE-ios.md ]; then { echo ""; cat out/smoke/SMOKE-ios.md; } >> "$R"; fi
           cat "$R"
 
       - name: Package the generated Xcode project
@@ -202,3 +210,19 @@ jobs:
           FILES=$(ls out/*.ipa out/ios-xcode-project.zip 2>/dev/null || true)
           gh release create ios-latest $FILES --target "$GITHUB_SHA" \
             --title "BWP Billing - iOS build #$BUILD_NUMBER" --notes-file out/REPORT-ios.md --prerelease
+
+      # Screenshots of the smoke test go to the "ci-smoke-ios" branch (replaced on every build).
+      - name: Publish smoke test screenshots
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls out/smoke/*.png >/dev/null 2>&1 || exit 0
+          D="$RUNNER_TEMP/smoke-branch"; rm -rf "$D"; mkdir -p "$D"
+          for f in out/smoke/*.png; do sips -Z 1100 "$f" --out "$D/$(basename "$f")" >/dev/null 2>&1 || cp "$f" "$D/"; done
+          cp out/smoke/*.md out/smoke/*.log "$D"/ 2>/dev/null || true
+          cd "$D"
+          git init -q && git checkout -q -b ci-smoke-ios && git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -q -m "iOS smoke test output (build $BUILD_NUMBER)"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-smoke-ios

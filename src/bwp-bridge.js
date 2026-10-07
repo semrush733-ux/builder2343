@@ -521,6 +521,8 @@
   onReady(function () {
     if (navigator.onLine === false) { setSticky('No internet connection'); }
     whenNativeReady(function () {
+      // Visible only in debug builds (Capacitor forwards the console to the native log).
+      try { console.debug('[BWP] bridge ready'); } catch (e) { /* no console */ }
       callNativeQuiet('pageReady', {});
       reportTheme();
       applyScreenSecurity();
