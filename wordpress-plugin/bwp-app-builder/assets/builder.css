@@ -1,0 +1,95 @@
+/* BWP App Builder - form styles. Everything is scoped to .bwpab so it does not touch the theme. */
+.bwpab {
+  --bwpab-ink: #111827;
+  --bwpab-soft: #5b6472;
+  --bwpab-line: #d5dae1;
+  --bwpab-accent: #014f4a;
+  --bwpab-accent-ink: #ffffff;
+  --bwpab-bg: #ffffff;
+  --bwpab-danger: #b42318;
+  max-width: 560px;
+  margin: 1.5em auto;
+  padding: 24px;
+  border: 1px solid var(--bwpab-line);
+  border-radius: 14px;
+  background: var(--bwpab-bg);
+  color: var(--bwpab-ink);
+  font-size: 16px;
+  line-height: 1.45;
+  box-sizing: border-box;
+}
+.bwpab *, .bwpab *::before, .bwpab *::after { box-sizing: border-box; }
+.bwpab [hidden] { display: none !important; }
+
+.bwpab-field { margin: 0 0 18px; padding: 0; border: 0; min-width: 0; }
+.bwpab-field > label, .bwpab-field > legend { display: block; margin: 0 0 6px; padding: 0; font-weight: 600; font-size: 15px; }
+.bwpab-field input[type="text"],
+.bwpab-field input[type="url"] {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--bwpab-line);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--bwpab-ink);
+  font: inherit;
+}
+.bwpab-field input[type="file"] { width: 100%; font: inherit; font-size: 14px; }
+.bwpab-field input[type="color"] { width: 64px; height: 40px; padding: 2px; border: 1px solid var(--bwpab-line); border-radius: 8px; background: #fff; }
+.bwpab-field input:focus-visible, .bwpab-button:focus-visible, .bwpab-link:focus-visible, .bwpab-more summary:focus-visible {
+  outline: 3px solid rgba(1, 79, 74, 0.35);
+  outline-offset: 2px;
+}
+.bwpab-hint { margin: 6px 0 0; font-size: 13px; color: var(--bwpab-soft); }
+
+.bwpab-choice label { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-weight: 400; font-size: 15px; min-height: 30px; }
+.bwpab-more { margin: 0 0 18px; }
+.bwpab-more summary { cursor: pointer; font-weight: 600; font-size: 15px; padding: 6px 0; color: var(--bwpab-accent); }
+.bwpab-more[open] summary { margin-bottom: 12px; }
+.bwpab-colors { display: flex; flex-wrap: wrap; gap: 8px 28px; }
+
+.bwpab-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--bwpab-accent);
+  color: var(--bwpab-accent-ink);
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.bwpab-button:hover { filter: brightness(1.08); color: var(--bwpab-accent-ink); }
+.bwpab-button[disabled] { opacity: 0.6; cursor: default; }
+
+.bwpab-error { margin: 0 0 14px; padding: 10px 12px; border-radius: 9px; background: #fef3f2; color: var(--bwpab-danger); font-size: 14px; }
+
+.bwpab-progress { text-align: center; }
+.bwpab-title { margin: 0 0 4px; font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
+.bwpab-status { margin: 0 0 6px; }
+.bwpab[data-state="failed"] .bwpab-status { color: var(--bwpab-danger); }
+.bwpab-time { margin: 0 0 12px; font-size: 14px; color: var(--bwpab-soft); font-variant-numeric: tabular-nums; }
+.bwpab-spinner {
+  width: 38px;
+  height: 38px;
+  margin: 4px auto 16px;
+  border-radius: 50%;
+  border: 4px solid rgba(1, 79, 74, 0.16);
+  border-top-color: var(--bwpab-accent);
+  animation: bwpab-spin 0.9s linear infinite;
+}
+.bwpab-downloads { display: grid; gap: 10px; margin: 16px 0 0; }
+.bwpab-notes { margin: 16px 0 0; padding: 0 0 0 18px; text-align: left; font-size: 14px; color: var(--bwpab-soft); }
+.bwpab-notes:empty { display: none; }
+.bwpab-notes li { margin: 0 0 6px; }
+.bwpab-link { margin: 18px 0 0; padding: 8px 10px; border: 0; background: none; color: var(--bwpab-accent); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+
+@keyframes bwpab-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .bwpab-spinner { animation-duration: 2.5s; } }
+@media (max-width: 480px) { .bwpab { padding: 18px; border-radius: 12px; } }

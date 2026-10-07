@@ -50,6 +50,18 @@ Developer account, add the secrets from section 9 and the build produces a signe
 
 ---
 
+## App builder for any website (WordPress plugin)
+
+`wordpress-plugin/bwp-app-builder/` is a WordPress plugin that puts a form on a site
+(shortcode `[bwp_app_builder]`): app name, website address, logo, one button. It starts the
+workflow `.github/workflows/build-app.yml` in this repository through the GitHub API and gives the
+user download buttons for an unsigned IPA and a test APK a few minutes later.
+Setup steps are in `wordpress-plugin/bwp-app-builder/readme.txt`.
+
+The same workflow can be started by hand: Actions tab > "App builder" > Run workflow, with
+`build_id` (any 8-40 lowercase letters/digits) and `config`, for example
+`{"appName":"My Shop","homeUrl":"https://example.com/"}`.
+
 ## 1. Project overview
 
 ```
@@ -71,7 +83,8 @@ bwp-billing-app/
   native-config/             release-signing Gradle file, keystore example, deep-link templates
   docs/                      push notifications, deep links, test checklist
   tests/                     browser test for src/ (optional, needs Python + Playwright)
-  .github/workflows/         cloud builds (android.yml, ios.yml)
+  .github/workflows/         cloud builds (android.yml, ios.yml) and the app builder (build-app.yml)
+  wordpress-plugin/          BWP App Builder - WordPress plugin that starts builds for any website
   android/                   created by the build / "npm run setup"  (Android Studio project, not committed)
   ios/                       created by the build / "npm run setup"  (Xcode project, not committed)
 ```
