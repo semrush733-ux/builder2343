@@ -5,7 +5,7 @@ import QuickLook
 import Capacitor
 
 /**
- BWP Billing - native features for iOS.
+ Native features for iOS (BWP app shell).
 
  Everything that makes the app more than a plain web view lives in this plugin, so the
  generated Capacitor project (AppDelegate, storyboard) stays untouched:
@@ -37,6 +37,7 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
     ]
 
     // Configuration (capacitor.config.ts -> plugins.BwpNative)
+    private var appName = (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String) ?? "App"
     private var homeUrl = "https://bill.bwpexperts.com/login"
     private var allowedHosts: [String] = ["bill.bwpexperts.com"]
     private var brandColor = UIColor(red: 1 / 255, green: 79 / 255, blue: 74 / 255, alpha: 1)
@@ -77,6 +78,9 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
     private func readConfig() {
         let config = getConfig()
         homeUrl = config.getString("homeUrl", homeUrl) ?? homeUrl
+        if let name = config.getString("appName"), !name.isEmpty {
+            appName = name
+        }
         pullToRefresh = config.getBoolean("pullToRefresh", true)
         if let value = config.getString("brandColor"), let color = BwpNativePlugin.color(fromHex: value) {
             brandColor = color
@@ -156,6 +160,7 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
         }
         let config: [String: Any] = [
             "platform": "ios",
+            "appName": appName,
             "homeUrl": homeUrl,
             "allowedHosts": allowedHosts,
             "pullToRefresh": pullToRefresh,
@@ -390,7 +395,7 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
         }
         let info = UIPrintInfo(dictionary: nil)
         info.outputType = .general
-        info.jobName = args["title"] as? String ?? "BWP Billing"
+        info.jobName = args["title"] as? String ?? appName
         let controller = UIPrintInteractionController.shared
         controller.printInfo = info
         controller.printFormatter = webView.viewPrintFormatter()

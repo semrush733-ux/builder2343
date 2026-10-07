@@ -23,6 +23,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const app = JSON.parse(readFileSync(join(root, 'src', 'app-config.json'), 'utf8'));
 const hosts = Array.isArray(app.allowedHosts) && app.allowedHosts.length ? app.allowedHosts : ['bill.bwpexperts.com'];
 const background = /^#[0-9a-f]{6}$/i.test(app.backgroundColor || '') ? app.backgroundColor : '#FFFFFF';
+const xml = (text) => String(text).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+const appName = xml(app.appName || 'this app');
 
 const done = [];
 const manual = [];
@@ -67,7 +69,7 @@ function configureAndroid() {
       const start = manifest.lastIndexOf('\n', manifest.indexOf(marker)) + 1;
       const end = manifest.indexOf(markerEnd) + markerEnd.length;
       manifest = manifest.slice(0, start) + filter + manifest.slice(end);
-    } else if (/android:name="(\.|com\.bwpexperts\.billing\.)MainActivity"/.test(manifest) && manifest.includes('</activity>')) {
+    } else if (/android:name="[\w.]*\.?MainActivity"/.test(manifest) && manifest.includes('</activity>')) {
       const at = manifest.indexOf('</activity>');
       const lineStart = manifest.lastIndexOf('\n', at) + 1;
       manifest = manifest.slice(0, lineStart) + filter + '\n' + manifest.slice(lineStart);
@@ -134,10 +136,10 @@ function configureIos() {
   }
   let plist = read(plistFile);
   const entries = [
-    ['NSCameraUsageDescription', '<string>Take a photo of a receipt, payment proof or document to attach it in BWP Billing.</string>'],
-    ['NSPhotoLibraryUsageDescription', '<string>Choose a photo of a receipt, payment proof or document to attach it in BWP Billing.</string>'],
-    ['NSPhotoLibraryAddUsageDescription', '<string>Save invoices and receipts from BWP Billing to your photo library.</string>'],
-    ['NSMicrophoneUsageDescription', '<string>Used only if you record a video to attach in BWP Billing.</string>'],
+    ['NSCameraUsageDescription', `<string>Take a photo to attach it in ${appName}.</string>`],
+    ['NSPhotoLibraryUsageDescription', `<string>Choose a photo or document to attach it in ${appName}.</string>`],
+    ['NSPhotoLibraryAddUsageDescription', `<string>Save images and documents from ${appName} to your photo library.</string>`],
+    ['NSMicrophoneUsageDescription', `<string>Used only if you record a video to attach in ${appName}.</string>`],
     ['UIFileSharingEnabled', '<true/>'],
     ['LSSupportsOpeningDocumentsInPlace', '<true/>'],
     ['ITSAppUsesNonExemptEncryption', '<false/>'],

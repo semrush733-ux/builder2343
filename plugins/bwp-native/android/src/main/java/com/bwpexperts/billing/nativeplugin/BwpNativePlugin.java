@@ -72,7 +72,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * BWP Billing - native features for Android.
+ * Native features for Android (BWP app shell).
  *
  * Everything that makes the app more than a plain web view lives in this plugin, so the
  * generated Capacitor project (MainActivity etc.) stays untouched:
@@ -102,6 +102,7 @@ public class BwpNativePlugin extends Plugin {
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
 
     // Configuration (capacitor.config.ts -> plugins.BwpNative)
+    private String appName = "";
     private String homeUrl = "https://bill.bwpexperts.com/login";
     private final Set<String> allowedHosts = new HashSet<>();
     private int brandColor = Color.parseColor("#014F4A");
@@ -195,6 +196,15 @@ public class BwpNativePlugin extends Plugin {
         shellColor = parseColor(getConfig().getString("backgroundColor", null), shellColor);
         pullToRefresh = getConfig().getBoolean("pullToRefresh", true);
         exitMessage = getConfig().getString("exitMessage", exitMessage);
+        appName = getConfig().getString("appName", "");
+        if (appName == null || appName.trim().isEmpty()) {
+            // Fall back to the name shown under the launcher icon.
+            try {
+                appName = getContext().getApplicationInfo().loadLabel(getContext().getPackageManager()).toString();
+            } catch (Exception e) {
+                appName = "App";
+            }
+        }
         topColor = shellColor;
         bottomColor = shellColor;
     }
@@ -476,6 +486,7 @@ public class BwpNativePlugin extends Plugin {
         try {
             JSONObject json = new JSONObject();
             json.put("platform", "android");
+            json.put("appName", appName);
             json.put("homeUrl", homeUrl);
             json.put("allowedHosts", new JSONArray(new ArrayList<>(allowedHosts)));
             json.put("pullToRefresh", pullToRefresh);
@@ -863,7 +874,13 @@ public class BwpNativePlugin extends Plugin {
         }
     }
 
-    /** Android 10+: copy into the public "Download/BWP Billing" folder. No storage permission needed. */
+    /** Folder inside the public Downloads folder, named after the app. */
+    private String downloadFolderName() {
+        String folder = safeFileName(appName).replace('.', ' ').trim();
+        return folder.isEmpty() ? "App" : folder;
+    }
+
+    /** Android 10+: copy into the public "Download/<app name>" folder. No storage permission needed. */
     private boolean copyToDownloads(File file, String name, String mime) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             return false;
@@ -874,7 +891,7 @@ public class BwpNativePlugin extends Plugin {
             ContentValues values = new ContentValues();
             values.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
             values.put(MediaStore.MediaColumns.MIME_TYPE, mime);
-            values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/BWP Billing");
+            values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/" + downloadFolderName());
             values.put(MediaStore.MediaColumns.IS_PENDING, 1);
             target = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
             if (target == null) {
@@ -912,7 +929,7 @@ public class BwpNativePlugin extends Plugin {
         if (activity == null || activity.isFinishing()) {
             return;
         }
-        String message = savedToDownloads ? "Saved to Downloads / BWP Billing." : "The file is ready.";
+        String message = savedToDownloads ? "Saved to Downloads / " + downloadFolderName() + "." : "The file is ready.";
         new AlertDialog.Builder(activity)
             .setTitle(name)
             .setMessage(message)
@@ -1018,7 +1035,7 @@ public class BwpNativePlugin extends Plugin {
     // ------------------------------------------------------------------ methods called from bwp-bridge.js
 
     private void doPrintPage(final NativeCall call) {
-        final String title = call.getString("title", "BWP Billing");
+        final String title = call.getString("title", appName);
         getActivity().runOnUiThread(() -> {
             try {
                 PrintManager manager = (PrintManager) getActivity().getSystemService(Context.PRINT_SERVICE);

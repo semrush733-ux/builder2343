@@ -468,7 +468,7 @@
   try {
     var originalPrint = window.print;
     window.print = function () {
-      callNative('printPage', { title: document.title || 'BWP Billing' }).then(null, function () {
+      callNative('printPage', { title: document.title || cfg.appName || 'Document' }).then(null, function () {
         try { originalPrint.call(window); } catch (e) { /* nothing else to try */ }
       });
     };

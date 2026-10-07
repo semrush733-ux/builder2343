@@ -1,5 +1,6 @@
 {
   "appName": "BWP Billing",
+  "appId": "com.bwpexperts.billing",
   "company": "BWP Experts",
   "homeUrl": "https://bill.bwpexperts.com/login",
   "allowedHosts": ["bill.bwpexperts.com"],

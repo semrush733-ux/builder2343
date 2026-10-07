@@ -3,9 +3,9 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 /**
- * BWP Billing - Capacitor configuration.
+ * Capacitor configuration.
  *
- * The production URL, allowed hosts and brand colours live in ONE place:
+ * App name, app ID, production URL, allowed hosts and brand colours live in ONE place:
  *   src/app-config.json
  * That file is read here (for the native projects), by src/shell.js (launch and
  * error screens) and is handed to the injected bridge script by the native plugin.
@@ -29,7 +29,7 @@ function loadAppConfig(): any {
 const app = loadAppConfig();
 
 const config: CapacitorConfig = {
-  appId: 'com.bwpexperts.billing',
+  appId: app.appId || 'com.bwpexperts.billing',
   appName: app.appName,
   webDir: 'src',
   backgroundColor: app.backgroundColor,
@@ -88,6 +88,7 @@ const config: CapacitorConfig = {
     },
     // Read by plugins/bwp-native (Android + iOS).
     BwpNative: {
+      appName: app.appName,
       homeUrl: app.homeUrl,
       allowedHosts: app.allowedHosts,
       brandColor: app.brandColor,

@@ -102,7 +102,12 @@
     var company = document.getElementById('app-company');
     var loading = document.getElementById('loading-text');
     if (name) { name.textContent = cfg.appName; }
-    if (company) { company.textContent = 'by ' + cfg.company; }
+    if (company) {
+      company.textContent = cfg.company ? 'by ' + cfg.company : '';
+      company.hidden = !cfg.company;
+    }
+    var unreachable = document.getElementById('unreachable-title');
+    if (unreachable) { unreachable.textContent = "We couldn't connect to " + cfg.appName + '.'; }
     if (loading) { loading.textContent = cfg.loadingText; }
     var hex = /^#[0-9a-f]{6}$/i;
     if (cfg.brandColor && hex.test(cfg.brandColor)) {
