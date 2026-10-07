@@ -192,13 +192,21 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
             strip.bottomAnchor.constraint(equalTo: webView.safeAreaLayoutGuide.topAnchor)
         ])
         statusStrip = strip
-        applyTheme(top: shellColor)
+        applyTheme(top: shellColor, bottom: shellColor)
     }
 
-    private func applyTheme(top: UIColor) {
+    /// top    = colour behind the status bar (notch / Dynamic Island area)
+    /// bottom = colour behind the page, visible in the home-indicator area and when the page bounces
+    private func applyTheme(top: UIColor, bottom: UIColor) {
         statusStrip?.backgroundColor = top
         // Dark icons on a light strip, light icons on a dark strip.
         bridge?.statusBarStyle = BwpNativePlugin.isLight(top) ? .darkContent : .lightContent
+        if let webView = bridge?.webView {
+            webView.backgroundColor = bottom
+            webView.scrollView.backgroundColor = bottom
+            webView.underPageBackgroundColor = bottom
+        }
+        refreshControl?.tintColor = BwpNativePlugin.isLight(bottom) ? brandColor : UIColor.white
     }
 
     private func urlChanged(_ url: URL?) {
@@ -207,7 +215,7 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
             lastUrl = url.absoluteString
         } else if url.host == nil || url.host == "localhost" {
             // Local launch / error screen.
-            applyTheme(top: shellColor)
+            applyTheme(top: shellColor, bottom: shellColor)
         }
     }
 
@@ -417,7 +425,8 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
         // Ignore late answers from a page that is no longer showing.
         if let top = BwpNativePlugin.color(fromHex: args["top"] as? String ?? ""),
            let url = bridge?.webView?.url, isAllowed(url) {
-            applyTheme(top: top)
+            let bottom = BwpNativePlugin.color(fromHex: args["bottom"] as? String ?? "") ?? top
+            applyTheme(top: top, bottom: bottom)
         }
         done([:], nil)
     }
