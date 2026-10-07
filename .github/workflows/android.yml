@@ -14,7 +14,7 @@ name: Android build (APK + AAB)
 on:
   push:
     branches: [main, bwp-billing-app]
-    paths-ignore: ['**.md', 'docs/**', '.github/workflows/ios.yml']
+    paths-ignore: ['**.md', 'docs/**', 'wordpress-plugin/**', '.github/workflows/ios.yml', '.github/workflows/build-app.yml']
   workflow_dispatch:
 
 concurrency:
