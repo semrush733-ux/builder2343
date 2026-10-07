@@ -34,15 +34,17 @@ if [ -z "$UDID" ]; then
   echo "### Simulator smoke test (iOS)" > "$R"; echo "" >> "$R"; echo "No iPhone simulator available on the build machine." >> "$R"; exit 0
 fi
 
+# Every simulator command gets a time limit, so a stuck simulator cannot hang the build.
+limited() { perl -e 'alarm shift; exec @ARGV' "$@"; }
 xcrun simctl boot "$UDID" 2>/dev/null || true
-xcrun simctl bootstatus "$UDID" -b >/dev/null 2>&1 || true
-xcrun simctl install "$UDID" "$APP"
+limited 300 xcrun simctl bootstatus "$UDID" -b >/dev/null 2>&1 || note "simulator boot was slow or did not finish"
+limited 120 xcrun simctl install "$UDID" "$APP"
 INSTALLED=$?
 check "app installs on the simulator" "$([ $INSTALLED -eq 0 ] && echo 1 || echo 0)" "exit $INSTALLED"
 
 LOG="$PWD/$OUT/ios-app.log"
 : > "$LOG"
-xcrun simctl launch --stdout="$LOG" --stderr="$LOG" "$UDID" "$BUNDLE" > "$OUT/ios-launch.txt" 2>&1
+limited 90 xcrun simctl launch --stdout="$LOG" --stderr="$LOG" "$UDID" "$BUNDLE" > "$OUT/ios-launch.txt" 2>&1
 note "launch: $(tr '\n' ' ' < "$OUT/ios-launch.txt" | cut -c1-120)"
 sleep 12
 xcrun simctl io "$UDID" screenshot "$OUT/ios-01-starting.png" >/dev/null 2>&1 || true

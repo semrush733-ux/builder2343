@@ -121,12 +121,6 @@ jobs:
           cp "$RUNNER_TEMP"/signed/*.ipa "$GITHUB_WORKSPACE/out/BWP-Billing.ipa"
           rm -f "$KEY_FILE"
 
-      - name: Simulator smoke test (start the app, load the site, screenshots)
-        if: success()
-        continue-on-error: true
-        timeout-minutes: 15
-        run: bash scripts/ci/ios_smoke.sh "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app"
-
       - name: Verify the IPA and write the build report
         if: always()
         run: |
@@ -184,7 +178,6 @@ jobs:
             echo "(end)"
             echo '```'
           } >> "$R"
-          if [ -f out/smoke/SMOKE-ios.md ]; then { echo ""; cat out/smoke/SMOKE-ios.md; } >> "$R"; fi
           cat "$R"
 
       - name: Package the generated Xcode project
@@ -218,6 +211,26 @@ jobs:
             fi
           }
           publish || { sleep 20; publish; } || { sleep 60; publish; }
+
+      # The app is already published above; the simulator test only adds its result afterwards,
+      # so a slow or stuck simulator can never delay the download.
+      - name: Simulator smoke test (start the app, load the site, screenshots)
+        if: success()
+        continue-on-error: true
+        timeout-minutes: 12
+        run: bash scripts/ci/ios_smoke.sh "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app"
+
+      - name: Add the smoke test result to the release notes
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -f out/smoke/SMOKE-ios.md ] || exit 0
+          gh release view ios-latest --json body -q .body > "$RUNNER_TEMP/body.md"
+          grep -q "iOS build #$BUILD_NUMBER" "$RUNNER_TEMP/body.md" || exit 0
+          { echo ""; cat out/smoke/SMOKE-ios.md; } >> "$RUNNER_TEMP/body.md"
+          gh release edit ios-latest --notes-file "$RUNNER_TEMP/body.md"
 
       # Screenshots of the smoke test go to the "ci-smoke-ios" branch (replaced on every build).
       - name: Publish smoke test screenshots
