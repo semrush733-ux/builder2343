@@ -10,7 +10,8 @@ import Capacitor
  Everything that makes the app more than a plain web view lives in this plugin, so the
  generated Capacitor project (AppDelegate, storyboard) stays untouched:
 
-  - injects src/bwp-bridge.js into the billing website
+  - injects src/bwp-bridge.js into the billing website and answers its requests through an
+    own message handler ("bwpNative"), accepted only from the allowed https hosts
   - pull-to-refresh and the swipe-back gesture
   - status-bar strip that follows the page colour (notch / Dynamic Island safe)
   - downloads: preview with Share / Save to Files / Print (Quick Look)
@@ -19,7 +20,7 @@ import Capacitor
 
  */
 @objc(BwpNativePlugin)
-public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDataSource {
+public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDataSource, WKScriptMessageHandlerWithReply {
 
     public let identifier = "BwpNativePlugin"
     public let jsName = "BwpNative"
@@ -109,6 +110,10 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
             return
         }
         isSetUp = true
+
+        // Capacitor's own bridge is meant for the local pages; the billing website talks to this
+        // plugin through this handler: webkit.messageHandlers.bwpNative.postMessage({method, args})
+        webView.configuration.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: "bwpNative")
 
         let scriptInstalled = installBridgeScript(webView)
         CAPLog.print("BwpNative: ready (bridge script \(scriptInstalled ? "installed" : "MISSING"))")
@@ -243,36 +248,121 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
         }
     }
 
-    // MARK: - Methods called from bwp-bridge.js
+    // MARK: - Channel between the website and this plugin
 
-    /// Saves a downloaded file and shows it in Quick Look (preview + Share / Save to Files / Print).
-    @objc func saveFile(_ call: CAPPluginCall) {
+    private typealias Done = ([String: Any]?, String?) -> Void
+
+    /// Messages from the billing website. Only the main frame of an allowed https host is answered.
+    public func userContentController(
+        _ userContentController: WKUserContentController,
+        didReceive message: WKScriptMessage,
+        replyHandler: @escaping (Any?, String?) -> Void
+    ) {
+        let origin = message.frameInfo.securityOrigin
         guard
-            let encoded = call.getString("data"),
-            let data = Data(base64Encoded: encoded, options: .ignoreUnknownCharacters)
+            message.frameInfo.isMainFrame,
+            origin.`protocol`.lowercased() == "https",
+            allowedHosts.contains(origin.host.lowercased()),
+            let body = message.body as? [String: Any],
+            let method = body["method"] as? String
         else {
-            call.reject("No file data")
+            replyHandler(nil, "Not allowed")
             return
         }
-        let name = BwpNativePlugin.safeFileName(call.getString("name") ?? "download")
+        let args = body["args"] as? [String: Any] ?? [:]
+        handle(method, args) { result, error in
+            if let error = error {
+                replyHandler(nil, error)
+            } else {
+                replyHandler(result ?? [:], nil)
+            }
+        }
+    }
+
+    /// The same methods through the Capacitor bridge (used by the local launch / error screens).
+    private func fromCapacitor(_ method: String, _ call: CAPPluginCall) {
+        var args: [String: Any] = [:]
+        if let options = call.options {
+            for (key, value) in options {
+                if let name = key as? String {
+                    args[name] = value
+                }
+            }
+        }
+        handle(method, args) { result, error in
+            if let error = error {
+                call.reject(error)
+            } else {
+                call.resolve(result ?? [:])
+            }
+        }
+    }
+
+    @objc func saveFile(_ call: CAPPluginCall) { fromCapacitor("saveFile", call) }
+    @objc func printPage(_ call: CAPPluginCall) { fromCapacitor("printPage", call) }
+    @objc func share(_ call: CAPPluginCall) { fromCapacitor("share", call) }
+    @objc func setTheme(_ call: CAPPluginCall) { fromCapacitor("setTheme", call) }
+    @objc func setRefreshAllowed(_ call: CAPPluginCall) { fromCapacitor("setRefreshAllowed", call) }
+    @objc func pageReady(_ call: CAPPluginCall) { fromCapacitor("pageReady", call) }
+    @objc func setScreenSecure(_ call: CAPPluginCall) { fromCapacitor("setScreenSecure", call) }
+    @objc func openExternal(_ call: CAPPluginCall) { fromCapacitor("openExternal", call) }
+    @objc func getLastUrl(_ call: CAPPluginCall) { fromCapacitor("getLastUrl", call) }
+
+    private func handle(_ method: String, _ args: [String: Any], _ done: @escaping Done) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else {
+                done(nil, "The app is not ready")
+                return
+            }
+            switch method {
+            case "saveFile": self.doSaveFile(args, done)
+            case "printPage": self.doPrintPage(args, done)
+            case "share": self.doShare(args, done)
+            case "setTheme": self.doSetTheme(args, done)
+            case "pageReady": self.doPageReady(args, done)
+            case "openExternal": self.doOpenExternal(args, done)
+            case "getLastUrl": done(["url": self.lastUrl ?? self.homeUrl], nil)
+            case "setRefreshAllowed":
+                // iOS only triggers the refresh control from the top of the main page, so the
+                // guard that Android needs is not required here.
+                done([:], nil)
+            case "setScreenSecure":
+                // Screenshot protection hook. iOS has no public switch to block screenshots; this
+                // is the single place to add a privacy cover for sensitive screens later.
+                done([:], nil)
+            default: done(nil, "Unknown method: \(method)")
+            }
+        }
+    }
+
+    // MARK: - Native features (always called on the main thread)
+
+    /// Saves a downloaded file and shows it in Quick Look (preview + Share / Save to Files / Print).
+    private func doSaveFile(_ args: [String: Any], _ done: @escaping Done) {
+        guard
+            let encoded = args["data"] as? String,
+            let data = Data(base64Encoded: encoded, options: .ignoreUnknownCharacters)
+        else {
+            done(nil, "No file data")
+            return
+        }
+        let name = BwpNativePlugin.safeFileName(args["name"] as? String ?? "download")
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("bwp-downloads", isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: nil)
             let file = folder.appendingPathComponent(name)
             try data.write(to: file, options: .atomic)
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self, let presenter = self.bridge?.viewController else {
-                    call.reject("The app is not ready to show the file")
-                    return
-                }
-                self.previewFile = file
-                let preview = QLPreviewController()
-                preview.dataSource = self
-                presenter.present(preview, animated: true, completion: nil)
-                call.resolve(["name": name])
+            guard let presenter = bridge?.viewController else {
+                done(nil, "The app is not ready to show the file")
+                return
             }
+            previewFile = file
+            let preview = QLPreviewController()
+            preview.dataSource = self
+            presenter.present(preview, animated: true, completion: nil)
+            done(["name": name], nil)
         } catch {
-            call.reject("Could not save the file", nil, error)
+            done(nil, "Could not save the file")
         }
     }
 
@@ -285,102 +375,71 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
         return file as NSURL
     }
 
-    @objc func printPage(_ call: CAPPluginCall) {
-        let title = call.getString("title") ?? "BWP Billing"
-        DispatchQueue.main.async { [weak self] in
-            guard let webView = self?.bridge?.webView else {
-                call.reject("Nothing to print")
-                return
-            }
-            let info = UIPrintInfo(dictionary: nil)
-            info.outputType = .general
-            info.jobName = title
-            let controller = UIPrintInteractionController.shared
-            controller.printInfo = info
-            controller.printFormatter = webView.viewPrintFormatter()
-            controller.present(animated: true, completionHandler: nil)
-            call.resolve()
-        }
-    }
-
-    @objc func share(_ call: CAPPluginCall) {
-        var items: [Any] = []
-        if let text = call.getString("text"), !text.isEmpty {
-            items.append(text)
-        }
-        if let text = call.getString("url"), !text.isEmpty, let url = URL(string: text) {
-            items.append(url)
-        }
-        guard !items.isEmpty else {
-            call.reject("Nothing to share")
+    private func doPrintPage(_ args: [String: Any], _ done: @escaping Done) {
+        guard let webView = bridge?.webView else {
+            done(nil, "Nothing to print")
             return
         }
-        DispatchQueue.main.async { [weak self] in
-            guard let presenter = self?.bridge?.viewController else {
-                call.reject("The app is not ready to share")
-                return
-            }
-            let sheet = UIActivityViewController(activityItems: items, applicationActivities: nil)
-            // iPad shows the sheet as a popover and needs an anchor.
-            if let popover = sheet.popoverPresentationController {
-                popover.sourceView = presenter.view
-                popover.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 0, height: 0)
-                popover.permittedArrowDirections = []
-            }
-            presenter.present(sheet, animated: true, completion: nil)
-            call.resolve()
+        let info = UIPrintInfo(dictionary: nil)
+        info.outputType = .general
+        info.jobName = args["title"] as? String ?? "BWP Billing"
+        let controller = UIPrintInteractionController.shared
+        controller.printInfo = info
+        controller.printFormatter = webView.viewPrintFormatter()
+        controller.present(animated: true, completionHandler: nil)
+        done([:], nil)
+    }
+
+    private func doShare(_ args: [String: Any], _ done: @escaping Done) {
+        var items: [Any] = []
+        if let text = args["text"] as? String, !text.isEmpty {
+            items.append(text)
         }
-    }
-
-    @objc func setTheme(_ call: CAPPluginCall) {
-        let top = BwpNativePlugin.color(fromHex: call.getString("top") ?? "")
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            // Ignore late answers from a page that is no longer showing.
-            if let top = top, let url = self.bridge?.webView?.url, self.isAllowed(url) {
-                self.applyTheme(top: top)
-            }
-            call.resolve()
+        if let text = args["url"] as? String, !text.isEmpty, let url = URL(string: text) {
+            items.append(url)
         }
-    }
-
-    @objc func setRefreshAllowed(_ call: CAPPluginCall) {
-        // iOS only triggers the refresh control from the top of the main page, so the
-        // guard that Android needs is not required here.
-        call.resolve()
-    }
-
-    @objc func pageReady(_ call: CAPPluginCall) {
-        DispatchQueue.main.async { [weak self] in
-            self?.refreshControl?.endRefreshing()
-            call.resolve()
+        guard !items.isEmpty, let presenter = bridge?.viewController else {
+            done(nil, "Nothing to share")
+            return
         }
+        let sheet = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        // iPad shows the sheet as a popover and needs an anchor.
+        if let popover = sheet.popoverPresentationController {
+            popover.sourceView = presenter.view
+            popover.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        presenter.present(sheet, animated: true, completion: nil)
+        done([:], nil)
     }
 
-    /// Screenshot protection hook. iOS has no public switch to block screenshots; this is the
-    /// single place to add a privacy cover for sensitive screens later. Off by default.
-    @objc func setScreenSecure(_ call: CAPPluginCall) {
-        call.resolve()
+    private func doSetTheme(_ args: [String: Any], _ done: @escaping Done) {
+        // Ignore late answers from a page that is no longer showing.
+        if let top = BwpNativePlugin.color(fromHex: args["top"] as? String ?? ""),
+           let url = bridge?.webView?.url, isAllowed(url) {
+            applyTheme(top: top)
+        }
+        done([:], nil)
     }
 
-    @objc func openExternal(_ call: CAPPluginCall) {
+    private func doPageReady(_ args: [String: Any], _ done: @escaping Done) {
+        refreshControl?.endRefreshing()
+        CAPLog.print("BwpNative: page ready (\(args["host"] as? String ?? "?"))")
+        done([:], nil)
+    }
+
+    private func doOpenExternal(_ args: [String: Any], _ done: @escaping Done) {
         guard
-            let text = call.getString("url"),
+            let text = args["url"] as? String,
             let url = URL(string: text),
             let scheme = url.scheme?.lowercased(),
             ["https", "http", "tel", "mailto", "sms", "whatsapp", "maps"].contains(scheme)
         else {
-            call.reject("This kind of link is not allowed")
+            done(nil, "This kind of link is not allowed")
             return
         }
-        DispatchQueue.main.async {
-            UIApplication.shared.open(url, options: [:], completionHandler: nil)
-            call.resolve()
-        }
-    }
-
-    @objc func getLastUrl(_ call: CAPPluginCall) {
-        call.resolve(["url": lastUrl ?? homeUrl])
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
+        done([:], nil)
     }
 
     // MARK: - Helpers

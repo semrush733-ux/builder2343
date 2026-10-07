@@ -17,22 +17,35 @@ around the website that adds what a browser tab cannot do.
 
 ## Build status - read this first
 
-This project was written in an environment that could **not** download Capacitor or the Android SDK,
-and no Mac was available. So:
+Builds are made in the cloud by GitHub Actions (`.github/workflows/`): Android on Linux, iOS on a
+Mac with Xcode. No Mac or Android Studio of your own is needed for a build.
 
 | Part | Status |
 |---|---|
-| Launch / offline / error screens (`src/`) | Tested in a browser (Chromium, phone-sized viewport) |
-| Bridge script (`src/bwp-bridge.js`): downloads, print, share, links, refresh guard, offline banner | Tested in a browser against a mock HTTPS site with login cookie and redirects (36 checks passed) |
-| `capacitor.config.ts`, `scripts/*.mjs` | Loaded / run successfully (configure script tested against mock projects, twice, idempotent) |
-| Icons and splash source images | Generated from the supplied logo and checked visually |
-| **Android native code** (`plugins/bwp-native/android`) | **Written, syntax-checked only. Not compiled, not run on a device.** |
-| **iOS native code** (`plugins/bwp-native/ios`) | **Written. Not compiled - needs a Mac with Xcode.** |
-| `android/` and `ios/` projects, APK, AAB, IPA | **Not generated yet** - created by `npm run setup` on your computer |
-| Any flow on the real website (login, sales, refunds, uploads...) | **Not tested** - the real site was not reachable from the build environment |
+| Android: debug APK, release APK, release AAB | **Built in CI.** Release files are unsigned until a keystore is added (section 6) |
+| iOS: Xcode project, simulator build, device archive, IPA | **Built in CI.** The IPA is unsigned until Apple signing is added (section 9) |
+| Android app on an emulator | Smoke-tested in CI on every build (`scripts/ci/android_smoke.py`), result in the release notes |
+| iOS app on a simulator | Smoke-tested in CI on every build (`scripts/ci/ios_smoke.sh`), result in the release notes |
+| Launch / offline / error screens and bridge script (`src/`) | Tested in a browser against a mock site (`tests/`, 36 checks) |
+| **Real phone** (Android or iPhone) | **Not tested** |
+| **Logged-in flows** on the real site (sales, refunds, expenses, uploads, invoices...) | **Not tested** - the tests never log in. Use `docs/TEST_CHECKLIST.md` |
 
-The first real build on a PC may need small fixes to the native code. `docs/TEST_CHECKLIST.md`
-lists every flow to test on a device.
+### Where the builds are
+
+Every push to `main` builds both apps and replaces these two releases of the repository:
+
+- `.../releases/tag/android-latest` - `app-debug.apk`, `app-release-unsigned.apk` (or signed `app-release.apk`), `app-release.aab`, `android-studio-project.zip`
+- `.../releases/tag/ios-latest` - `BWP-Billing-unsigned.ipa` (or signed `BWP-Billing.ipa`), `ios-xcode-project.zip`
+
+The release notes contain the build report (versions, permissions, bundle contents) and the smoke
+test result. Screenshots from the smoke tests are on the branches `ci-smoke-android` and `ci-smoke-ios`.
+
+### Installing the unsigned IPA on your own iPhone
+
+An unsigned IPA cannot be installed directly. Use a sideloading tool on a PC, for example
+Sideloadly or AltStore: give it the IPA and your Apple ID and it signs and installs the app.
+With a free Apple ID the app runs for 7 days and then has to be installed again; with a paid Apple
+Developer account, add the secrets from section 9 and the build produces a signed IPA instead.
 
 ---
 
@@ -57,8 +70,9 @@ bwp-billing-app/
   native-config/             release-signing Gradle file, keystore example, deep-link templates
   docs/                      push notifications, deep links, test checklist
   tests/                     browser test for src/ (optional, needs Python + Playwright)
-  android/                   created by "npm run setup"  (Android Studio project)
-  ios/                       created by "npm run setup"  (Xcode project)
+  .github/workflows/         cloud builds (android.yml, ios.yml)
+  android/                   created by the build / "npm run setup"  (Android Studio project, not committed)
+  ios/                       created by the build / "npm run setup"  (Xcode project, not committed)
 ```
 
 How it works:
@@ -183,6 +197,11 @@ Output: `android/app/build/outputs/apk/release/app-release.apk`
 
 Before each store upload raise `versionCode` (and `versionName`) in `android/app/build.gradle`.
 
+**Signed builds in the cloud:** add these repository secrets (Settings > Secrets and variables >
+Actions) and the Android workflow signs the release APK and AAB:
+`ANDROID_KEYSTORE_BASE64` (the `.jks` file as one base64 line), `ANDROID_KEYSTORE_PASSWORD`,
+`ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+
 ## 7. AAB generation
 
 ```bash
@@ -207,8 +226,8 @@ In Xcode choose an iPhone simulator or a connected iPhone and press Run.
 usage texts (required for upload fields), Files-app visibility of downloads, and the
 export-compliance flag.
 
-Because the iOS code has never been compiled, expect to fix a few compiler errors in
-`plugins/bwp-native/ios/Sources/BwpNativePlugin/BwpNativePlugin.swift` on the first build.
+The same steps run in the cloud in `.github/workflows/ios.yml` (Xcode 26), where the project
+compiles and archives without errors.
 
 ## 9. Xcode signing
 
@@ -223,6 +242,12 @@ In Xcode select the **App** project > target **App** > **Signing & Capabilities*
 
 The App ID `com.bwpexperts.billing` must exist in your Apple Developer account (Xcode creates it
 with automatic signing). Display name, version and build number are on the **General** tab.
+
+**Signed IPA in the cloud (no Mac):** add these repository secrets and the iOS workflow archives
+with automatic signing and exports `BWP-Billing.ipa` for TestFlight / App Store:
+`APPLE_TEAM_ID`, `APPSTORE_API_KEY_ID`, `APPSTORE_API_ISSUER_ID`, `APPSTORE_API_KEY_P8`
+(App Store Connect > Users and Access > Integrations > App Store Connect API, role Admin or App Manager).
+This signed path has not been exercised yet because no Apple account was available.
 
 ## 10. IPA / TestFlight process
 

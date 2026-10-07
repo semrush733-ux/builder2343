@@ -40,7 +40,10 @@ xcrun simctl install "$UDID" "$APP"
 INSTALLED=$?
 check "app installs on the simulator" "$([ $INSTALLED -eq 0 ] && echo 1 || echo 0)" "exit $INSTALLED"
 
-( xcrun simctl launch --console-pty "$UDID" "$BUNDLE" > "$OUT/ios-app.log" 2>&1 ) &
+LOG="$PWD/$OUT/ios-app.log"
+: > "$LOG"
+xcrun simctl launch --stdout="$LOG" --stderr="$LOG" "$UDID" "$BUNDLE" > "$OUT/ios-launch.txt" 2>&1
+note "launch: $(tr '\n' ' ' < "$OUT/ios-launch.txt" | cut -c1-120)"
 sleep 12
 xcrun simctl io "$UDID" screenshot "$OUT/ios-01-starting.png" >/dev/null 2>&1 || true
 sleep 40
@@ -52,15 +55,21 @@ check "app is still running after 50 seconds (no crash)" "$([ "${RUNNING:-0}" -g
 CRASHES=$(ls "$HOME/Library/Logs/DiagnosticReports" 2>/dev/null | grep -ciE "^App[-_.]" || true)
 check "no crash report written" "$([ "${CRASHES:-0}" -eq 0 ] && echo 1 || echo 0)" "$CRASHES report(s)"
 
+ls "$HOME/Library/Logs/DiagnosticReports" 2>/dev/null | grep -iE "^App" | head -3 | while IFS= read -r f; do note "crash report: $f"; sed -n '1,40p' "$HOME/Library/Logs/DiagnosticReports/$f" | grep -iE "exception|termination|crashed|reason|^[0-9]+ +(App|Capacitor|BwpNative)" | cut -c1-200 | head -14 | while IFS= read -r l; do note "   $l"; done; done
+
 READY=$(grep -c "BwpNative: ready" "$OUT/ios-app.log" 2>/dev/null || true)
 check "native plugin started and installed the bridge script" "$([ "${READY:-0}" -ge 1 ] && echo 1 || echo 0)" "log line missing"
 MISSING=$(grep -c "bwp-bridge.js not found" "$OUT/ios-app.log" 2>/dev/null || true)
 check "bridge script found in the app bundle" "$([ "${MISSING:-0}" -eq 0 ] && echo 1 || echo 0)"
-BRIDGE=$(grep -c "\[BWP\] bridge ready" "$OUT/ios-app.log" 2>/dev/null || true)
-check "bridge script running on the billing website" "$([ "${BRIDGE:-0}" -ge 1 ] && echo 1 || echo 0)" "no '[BWP] bridge ready' in the app log"
+BRIDGE=$(grep -c "BwpNative: page ready (bill.bwpexperts.com)" "$OUT/ios-app.log" 2>/dev/null || true)
+check "website loaded and its bridge script reached the native plugin" "$([ "${BRIDGE:-0}" -ge 1 ] && echo 1 || echo 0)" "no 'page ready' message from the website"
 
 note "app log (filtered):"
-while IFS= read -r l; do note "  $l"; done < <(grep -iE "BwpNative|\[BWP\]|Loading app at|WebView loaded|error|fail" "$OUT/ios-app.log" 2>/dev/null | cut -c1-220 | head -25)
+while IFS= read -r l; do note "  $l"; done < <(grep -iE "BwpNative|Loading app at|WebView loaded|error|fail|fatal|exception" "$OUT/ios-app.log" 2>/dev/null | cut -c1-220 | head -25)
+if [ "${RUNNING:-0}" -lt 1 ]; then
+  note "system log for the app (last lines):"
+  while IFS= read -r l; do note "  $l"; done < <(xcrun simctl spawn "$UDID" log show --last 3m --style compact --predicate 'process == "App" OR eventMessage CONTAINS "com.bwpexperts.billing"' 2>/dev/null | grep -iE "crash|exception|fatal|terminat|killed|denied|error" | cut -c1-230 | tail -20)
+fi
 
 xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true
 xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true

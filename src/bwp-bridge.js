@@ -4,6 +4,7 @@
  * The native plugin (plugins/bwp-native) injects this file into every page of the
  * billing website at document start. It connects the website to native features:
  *
+ *   - a message channel to the native plugin (window.bwpNative / webkit.messageHandlers.bwpNative)
  *   - file downloads (PDF invoices, receipts, CSV/Excel reports, blob: and data: files)
  *   - Print  (window.print -> native print dialog, which can also save as PDF)
  *   - Share  (navigator.share -> native share sheet, on Android)
@@ -35,32 +36,90 @@
 
   /* ------------------------------------------------------------------ native calls */
 
+  // Capacitor does not inject its own bridge into remote websites, so the native plugin exposes
+  // a channel of its own, restricted to the allowed origins:
+  //   Android : window.bwpNative            (WebMessageListener; old WebViews: window.bwpNativeLegacy)
+  //   iOS     : webkit.messageHandlers.bwpNative (answers with a Promise)
+  var pending = {};
+  var sequence = 0;
+  var channelHooked = false;
+
   function nativePlugin(name) {
     var cap = window.Capacitor;
     return cap && cap.Plugins && cap.Plugins[name] ? cap.Plugins[name] : null;
   }
 
+  function iosChannel() {
+    var w = window.webkit;
+    return w && w.messageHandlers && w.messageHandlers.bwpNative ? w.messageHandlers.bwpNative : null;
+  }
+
+  function androidChannel() {
+    var c = window.bwpNative;
+    if (c && typeof c.postMessage === 'function') { return c; }
+    c = window.bwpNativeLegacy;
+    return c && typeof c.postMessage === 'function' ? c : null;
+  }
+
+  function onNativeReply(raw) {
+    var message;
+    try { message = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (e) { return; }
+    if (!message || !pending[message.id]) { return; }
+    var entry = pending[message.id];
+    delete pending[message.id];
+    clearTimeout(entry.timer);
+    if (message.ok) { entry.resolve(message.result || {}); } else { entry.reject(new Error(message.error || 'Native call failed')); }
+  }
+
+  function sendToAndroid(channel, method, args) {
+    return new Promise(function (resolve, reject) {
+      sequence += 1;
+      var id = 'c' + sequence;
+      var timer = setTimeout(function () {
+        if (pending[id]) { delete pending[id]; reject(new Error('Native call timed out')); }
+      }, 60000);
+      pending[id] = { resolve: resolve, reject: reject, timer: timer };
+      if (!channelHooked && channel === window.bwpNative) {
+        channelHooked = true;
+        channel.onmessage = function (event) { onNativeReply(event && event.data); };
+      }
+      try {
+        channel.postMessage(JSON.stringify({ id: id, method: method, args: args || {} }));
+      } catch (e) {
+        clearTimeout(timer);
+        delete pending[id];
+        reject(e);
+      }
+    });
+  }
+
+  function nativeAvailable() {
+    return !!(iosChannel() || androidChannel() || nativePlugin('BwpNative'));
+  }
+
   function callNative(method, args) {
-    var plugin = nativePlugin('BwpNative');
-    if (!plugin || typeof plugin[method] !== 'function') {
-      return Promise.reject(new Error('BwpNative.' + method + ' is not available'));
-    }
     try {
-      return Promise.resolve(plugin[method](args || {}));
+      var ios = iosChannel();
+      if (ios) { return Promise.resolve(ios.postMessage({ method: method, args: args || {} })); }
+      var android = androidChannel();
+      if (android) { return sendToAndroid(android, method, args); }
+      var plugin = nativePlugin('BwpNative');
+      if (plugin && typeof plugin[method] === 'function') { return Promise.resolve(plugin[method](args || {})); }
     } catch (e) {
       return Promise.reject(e);
     }
+    return Promise.reject(new Error('BwpNative.' + method + ' is not available'));
   }
 
   function callNativeQuiet(method, args) {
     return callNative(method, args).then(null, function () {});
   }
 
-  // The Capacitor bridge is injected by the app as well; wait briefly if it is not there yet.
+  // The channel exists from document start; the short wait only covers unusual load orders.
   function whenNativeReady(fn) {
     var tries = 0;
     (function check() {
-      if (nativePlugin('BwpNative')) { fn(); return; }
+      if (nativeAvailable()) { fn(); return; }
       tries += 1;
       if (tries < 50) { setTimeout(check, 100); }
     })();
@@ -521,9 +580,7 @@
   onReady(function () {
     if (navigator.onLine === false) { setSticky('No internet connection'); }
     whenNativeReady(function () {
-      // Visible only in debug builds (Capacitor forwards the console to the native log).
-      try { console.debug('[BWP] bridge ready'); } catch (e) { /* no console */ }
-      callNativeQuiet('pageReady', {});
+      callNativeQuiet('pageReady', { host: window.location.hostname });
       reportTheme();
       applyScreenSecurity();
       if (isIOS) {
@@ -546,8 +603,12 @@
     applyScreenSecurity();
   });
 
+  // Used by the old-WebView fallback channel to deliver answers.
+  window.__bwpNativeReply = onNativeReply;
+
   window.__bwp = {
     version: '1.0.0',
+    call: callNative,
     download: download,
     reportTheme: function () { lastTheme = ''; reportTheme(); }
   };

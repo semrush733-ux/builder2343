@@ -251,6 +251,38 @@ with sync_playwright() as p:
     check('links: normal internal link untouched', page.url == SITE + '/customers')
     ctx.close()
 
+    # ---------------- native channel transports (Android WebMessageListener / iOS message handler)
+    ANDROID_CHANNEL = """
+    window.__sent = [];
+    window.bwpNative = { postMessage: function (raw) { var m = JSON.parse(raw); window.__sent.push(m); var self = this;
+      setTimeout(function () { self.onmessage && self.onmessage({ data: JSON.stringify(m.method === 'fail' ? { id: m.id, ok: false, error: 'nope' } : { id: m.id, ok: true, result: { echo: m.method, args: m.args } }) }); }, 5); } };
+    """
+    ctx = browser.new_context(ignore_https_errors=True, viewport={'width': 390, 'height': 800})
+    ctx.add_init_script(ANDROID_CHANNEL); ctx.add_init_script(BRIDGE)
+    page = ctx.new_page(); page.goto(SITE + '/login'); page.goto(SITE + '/'); page.wait_for_timeout(600)
+    r = page.evaluate("window.__bwp.call('getLastUrl', {a: 1})")
+    check('android channel: request / reply round trip', r == {'echo': 'getLastUrl', 'args': {'a': 1}}, r)
+    r = page.evaluate("window.__bwp.call('fail', {}).then(function(){return 'resolved'}, function(e){return 'rejected: ' + e.message})")
+    check('android channel: native error rejects the promise', r == 'rejected: nope', r)
+    sent = page.evaluate("window.__sent.map(function(m){return m.method})")
+    check('android channel: page start calls go through it (pageReady, setTheme)', 'pageReady' in sent and 'setTheme' in sent, sent)
+    page.click('#pdf'); page.wait_for_timeout(700)
+    sent = page.evaluate("window.__sent.filter(function(m){return m.method === 'saveFile'}).map(function(m){return m.args.name})")
+    check('android channel: PDF download delivered as saveFile', sent == ['INV-000123.pdf'], sent)
+    ctx.close()
+
+    IOS_CHANNEL = """
+    window.__sent = [];
+    window.webkit = { messageHandlers: { bwpNative: { postMessage: function (m) { window.__sent.push(m); return Promise.resolve({ echo: m.method }); } } } };
+    """
+    ctx = browser.new_context(ignore_https_errors=True, viewport={'width': 390, 'height': 800})
+    ctx.add_init_script(IOS_CHANNEL); ctx.add_init_script(BRIDGE.replace('"platform": "android"', '"platform": "ios"'))
+    page = ctx.new_page(); page.goto(SITE + '/login'); page.goto(SITE + '/'); page.wait_for_timeout(600)
+    r = page.evaluate("window.__bwp.call('getLastUrl', {})")
+    sent = page.evaluate("window.__sent.map(function(m){return m.method})")
+    check('ios channel: request / reply round trip', r == {'echo': 'getLastUrl'} and 'pageReady' in sent, (r, sent))
+    ctx.close()
+
     # ---------------- bridge must stay out of other websites
     ctx = new_ctx(); page = ctx.new_page()
     page.goto('https://example.org/'); page.wait_for_timeout(300)

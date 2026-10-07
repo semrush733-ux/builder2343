@@ -23,6 +23,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.MimeTypeMap;
 import android.webkit.URLUtil;
 import android.webkit.WebBackForwardList;
@@ -40,6 +41,7 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+import androidx.webkit.JavaScriptReplyProxy;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 
@@ -66,6 +68,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * BWP Billing - native features for Android.
@@ -73,7 +77,8 @@ import java.util.Set;
  * Everything that makes the app more than a plain web view lives in this plugin, so the
  * generated Capacitor project (MainActivity etc.) stays untouched:
  *
- *  - injects src/bwp-bridge.js into the billing website
+ *  - injects src/bwp-bridge.js into the billing website and answers its requests through an
+ *    origin-restricted message channel ("bwpNative")
  *  - Android Back button: go back in history, "press back again to exit" on the first page
  *  - pull-to-refresh
  *  - safe areas (status bar, cut-out, navigation bar, keyboard) and status-bar colour
@@ -94,6 +99,7 @@ public class BwpNativePlugin extends Plugin {
     private static final long DOWNLOAD_MAX_AGE_MS = 24L * 60L * 60L * 1000L;
 
     private final Handler main = new Handler(Looper.getMainLooper());
+    private final ExecutorService worker = Executors.newSingleThreadExecutor();
 
     // Configuration (capacitor.config.ts -> plugins.BwpNative)
     private String homeUrl = "https://bill.bwpexperts.com/";
@@ -131,6 +137,7 @@ public class BwpNativePlugin extends Plugin {
         // The keyboard must resize the page, never cover the focused field.
         activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
 
+        step("native channel", () -> installNativeChannel(webView));
         step("bridge script", () -> installBridgeScript(webView));
         step("pull to refresh", () -> installContainer(activity, webView));
         step("safe areas", () -> installInsetsHandling(activity));
@@ -192,6 +199,262 @@ public class BwpNativePlugin extends Plugin {
         bottomColor = shellColor;
     }
 
+    // ------------------------------------------------------------------ channel between the website and this plugin
+
+    /** Answers one message of the channel with a JSON string. */
+    private interface ReplySink {
+        void send(String json);
+    }
+
+    private Set<String> allowedOrigins() {
+        Set<String> origins = new HashSet<>();
+        for (String host : allowedHosts) {
+            origins.add("https://" + host);
+        }
+        return origins;
+    }
+
+    /**
+     * Capacitor only injects its own JavaScript bridge into the local pages, not into remote
+     * websites. The billing website therefore talks to this plugin through its own channel,
+     * which Android exposes ONLY to the allowed https origins (window.bwpNative).
+     */
+    private void installNativeChannel(final WebView webView) {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            WebViewCompat.addWebMessageListener(webView, "bwpNative", allowedOrigins(), (view, message, sourceOrigin, isMainFrame, replyProxy) -> {
+                if (!isMainFrame) {
+                    return;
+                }
+                final JavaScriptReplyProxy proxy = replyProxy;
+                handleMessage(message.getData(), json -> main.post(() -> {
+                    try {
+                        proxy.postMessage(json);
+                    } catch (Throwable t) {
+                        Log.w(TAG, "Could not answer the page", t);
+                    }
+                }));
+            });
+        } else {
+            // Very old WebView: classic interface, with the page origin checked on every message.
+            webView.addJavascriptInterface(new LegacyChannel(), "bwpNativeLegacy");
+        }
+    }
+
+    private class LegacyChannel {
+
+        @JavascriptInterface
+        public void postMessage(final String data) {
+            main.post(() -> {
+                final WebView webView = getBridge().getWebView();
+                if (!isAllowedUrl(webView.getUrl())) {
+                    return;
+                }
+                handleMessage(data, json -> main.post(() ->
+                    webView.evaluateJavascript("window.__bwpNativeReply && window.__bwpNativeReply(" + JSONObject.quote(json) + ");", null)
+                ));
+            });
+        }
+    }
+
+    private void handleMessage(String data, final ReplySink sink) {
+        final String id;
+        final String method;
+        final JSONObject args;
+        try {
+            JSONObject message = new JSONObject(data == null ? "{}" : data);
+            id = message.optString("id", "");
+            method = message.optString("method", "");
+            JSONObject given = message.optJSONObject("args");
+            args = given != null ? given : new JSONObject();
+        } catch (Exception e) {
+            return;
+        }
+        dispatch(method, new NativeCall() {
+            private boolean answered = false;
+
+            private synchronized void answer(boolean ok, JSONObject result, String error) {
+                if (answered) {
+                    return;
+                }
+                answered = true;
+                try {
+                    JSONObject reply = new JSONObject();
+                    reply.put("id", id);
+                    reply.put("ok", ok);
+                    if (result != null) {
+                        reply.put("result", result);
+                    }
+                    if (error != null) {
+                        reply.put("error", error);
+                    }
+                    sink.send(reply.toString());
+                } catch (Exception ignored) {
+                    // nothing to answer with
+                }
+            }
+
+            @Override
+            public String getString(String key) {
+                return args.isNull(key) ? null : args.optString(key, null);
+            }
+
+            @Override
+            public String getString(String key, String fallback) {
+                return args.isNull(key) ? fallback : args.optString(key, fallback);
+            }
+
+            @Override
+            public boolean getBoolean(String key, boolean fallback) {
+                return args.optBoolean(key, fallback);
+            }
+
+            @Override
+            public void resolve() {
+                answer(true, new JSONObject(), null);
+            }
+
+            @Override
+            public void resolve(JSObject result) {
+                answer(true, result, null);
+            }
+
+            @Override
+            public void reject(String message) {
+                answer(false, null, message);
+            }
+
+            @Override
+            public void reject(String message, Exception cause) {
+                answer(false, null, message);
+            }
+        });
+    }
+
+    private void dispatch(String method, final NativeCall call) {
+        try {
+            switch (method == null ? "" : method) {
+                case "saveFile":
+                    worker.execute(() -> doSaveFile(call));
+                    break;
+                case "printPage":
+                    doPrintPage(call);
+                    break;
+                case "share":
+                    doShare(call);
+                    break;
+                case "setTheme":
+                    doSetTheme(call);
+                    break;
+                case "setRefreshAllowed":
+                    doSetRefreshAllowed(call);
+                    break;
+                case "pageReady":
+                    doPageReady(call);
+                    break;
+                case "setScreenSecure":
+                    doSetScreenSecure(call);
+                    break;
+                case "openExternal":
+                    doOpenExternal(call);
+                    break;
+                case "getLastUrl":
+                    doGetLastUrl(call);
+                    break;
+                default:
+                    call.reject("Unknown method: " + method);
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Native call failed: " + method, t);
+            call.reject("Native call failed");
+        }
+    }
+
+    /** The same methods through the Capacitor bridge (used by the local launch / error screens). */
+    private void fromCapacitor(String method, final PluginCall call) {
+        dispatch(method, new NativeCall() {
+            @Override
+            public String getString(String key) {
+                return call.getString(key);
+            }
+
+            @Override
+            public String getString(String key, String fallback) {
+                return call.getString(key, fallback);
+            }
+
+            @Override
+            public boolean getBoolean(String key, boolean fallback) {
+                Boolean value = call.getBoolean(key, fallback);
+                return value != null ? value : fallback;
+            }
+
+            @Override
+            public void resolve() {
+                call.resolve();
+            }
+
+            @Override
+            public void resolve(JSObject result) {
+                call.resolve(result);
+            }
+
+            @Override
+            public void reject(String message) {
+                call.reject(message);
+            }
+
+            @Override
+            public void reject(String message, Exception cause) {
+                call.reject(message, cause);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void saveFile(PluginCall call) {
+        fromCapacitor("saveFile", call);
+    }
+
+    @PluginMethod
+    public void printPage(PluginCall call) {
+        fromCapacitor("printPage", call);
+    }
+
+    @PluginMethod
+    public void share(PluginCall call) {
+        fromCapacitor("share", call);
+    }
+
+    @PluginMethod
+    public void setTheme(PluginCall call) {
+        fromCapacitor("setTheme", call);
+    }
+
+    @PluginMethod
+    public void setRefreshAllowed(PluginCall call) {
+        fromCapacitor("setRefreshAllowed", call);
+    }
+
+    @PluginMethod
+    public void pageReady(PluginCall call) {
+        fromCapacitor("pageReady", call);
+    }
+
+    @PluginMethod
+    public void setScreenSecure(PluginCall call) {
+        fromCapacitor("setScreenSecure", call);
+    }
+
+    @PluginMethod
+    public void openExternal(PluginCall call) {
+        fromCapacitor("openExternal", call);
+    }
+
+    @PluginMethod
+    public void getLastUrl(PluginCall call) {
+        fromCapacitor("getLastUrl", call);
+    }
+
     // ------------------------------------------------------------------ bridge script
 
     private void installBridgeScript(WebView webView) {
@@ -204,11 +467,7 @@ public class BwpNativePlugin extends Plugin {
 
         // Preferred: run at document start on the billing website only.
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-            Set<String> origins = new HashSet<>();
-            for (String host : allowedHosts) {
-                origins.add("https://" + host);
-            }
-            WebViewCompat.addDocumentStartJavaScript(webView, bridgeScript, origins);
+            WebViewCompat.addDocumentStartJavaScript(webView, bridgeScript, allowedOrigins());
         }
         // Older WebViews are covered in the page listener (script is idempotent).
     }
@@ -573,8 +832,7 @@ public class BwpNativePlugin extends Plugin {
         });
     }
 
-    @PluginMethod
-    public void saveFile(final PluginCall call) {
+    private void doSaveFile(final NativeCall call) {
         String data = call.getString("data");
         if (data == null) {
             call.reject("No file data");
@@ -759,8 +1017,7 @@ public class BwpNativePlugin extends Plugin {
 
     // ------------------------------------------------------------------ methods called from bwp-bridge.js
 
-    @PluginMethod
-    public void printPage(final PluginCall call) {
+    private void doPrintPage(final NativeCall call) {
         final String title = call.getString("title", "BWP Billing");
         getActivity().runOnUiThread(() -> {
             try {
@@ -778,8 +1035,7 @@ public class BwpNativePlugin extends Plugin {
         });
     }
 
-    @PluginMethod
-    public void share(final PluginCall call) {
+    private void doShare(final NativeCall call) {
         String title = call.getString("title", "");
         String text = call.getString("text", "");
         String url = call.getString("url", "");
@@ -814,8 +1070,7 @@ public class BwpNativePlugin extends Plugin {
         });
     }
 
-    @PluginMethod
-    public void setTheme(final PluginCall call) {
+    private void doSetTheme(final NativeCall call) {
         final int top = parseColor(call.getString("top"), topColor);
         final int bottom = parseColor(call.getString("bottom"), bottomColor);
         getActivity().runOnUiThread(() -> {
@@ -827,14 +1082,12 @@ public class BwpNativePlugin extends Plugin {
         });
     }
 
-    @PluginMethod
-    public void setRefreshAllowed(PluginCall call) {
+    private void doSetRefreshAllowed(final NativeCall call) {
         refreshAllowedByPage = call.getBoolean("allowed", true);
         call.resolve();
     }
 
-    @PluginMethod
-    public void pageReady(PluginCall call) {
+    private void doPageReady(final NativeCall call) {
         main.removeCallbacks(stopRefreshing);
         main.post(stopRefreshing);
         call.resolve();
@@ -844,8 +1097,7 @@ public class BwpNativePlugin extends Plugin {
      * Screenshot / screen-recording protection. Off by default.
      * To protect specific screens, list their path prefixes in src/app-config.json -> secureScreenPaths.
      */
-    @PluginMethod
-    public void setScreenSecure(final PluginCall call) {
+    private void doSetScreenSecure(final NativeCall call) {
         final boolean enabled = call.getBoolean("enabled", false);
         getActivity().runOnUiThread(() -> {
             Window window = getActivity().getWindow();
@@ -858,8 +1110,7 @@ public class BwpNativePlugin extends Plugin {
         });
     }
 
-    @PluginMethod
-    public void openExternal(PluginCall call) {
+    private void doOpenExternal(final NativeCall call) {
         String url = call.getString("url", "");
         Uri uri = url == null ? null : Uri.parse(url);
         String scheme = uri == null || uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
@@ -879,8 +1130,7 @@ public class BwpNativePlugin extends Plugin {
         call.resolve();
     }
 
-    @PluginMethod
-    public void getLastUrl(PluginCall call) {
+    private void doGetLastUrl(final NativeCall call) {
         JSObject result = new JSObject();
         result.put("url", lastUrl != null ? lastUrl : homeUrl);
         call.resolve(result);
