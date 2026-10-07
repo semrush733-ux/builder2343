@@ -116,7 +116,7 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
         webView.configuration.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: "bwpNative")
 
         let scriptInstalled = installBridgeScript(webView)
-        CAPLog.print("BwpNative: ready (bridge script \(scriptInstalled ? "installed" : "MISSING"))")
+        BwpNativePlugin.debugLog("BwpNative: ready (bridge script \(scriptInstalled ? "installed" : "MISSING"))")
 
         // Native navigation feel: swipe from the left edge goes back.
         webView.allowsBackForwardNavigationGestures = true
@@ -424,7 +424,7 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
 
     private func doPageReady(_ args: [String: Any], _ done: @escaping Done) {
         refreshControl?.endRefreshing()
-        CAPLog.print("BwpNative: page ready (\(args["host"] as? String ?? "?"))")
+        BwpNativePlugin.debugLog("BwpNative: page ready (\(args["host"] as? String ?? "?"))")
         done([:], nil)
     }
 
@@ -443,6 +443,13 @@ public class BwpNativePlugin: CAPPlugin, CAPBridgedPlugin, QLPreviewControllerDa
     }
 
     // MARK: - Helpers
+
+    /// Debug builds only. Release builds log nothing.
+    private static func debugLog(_ message: String) {
+        #if DEBUG
+        NSLog("%@", message)
+        #endif
+    }
 
     private static func safeFileName(_ name: String) -> String {
         let forbidden = CharacterSet(charactersIn: "\\/:*?\"<>|").union(.controlCharacters)

@@ -82,6 +82,8 @@ How it works:
    localStorage, sessionStorage, AJAX and CSRF tokens work exactly as in a browser, because the
    website runs unchanged in the system web view (Android System WebView / WKWebView).
 3. The native plugin injects `bwp-bridge.js` into the website and provides the native features.
+   The website talks to the plugin through a channel that the plugin opens only for the hosts in
+   `allowedHosts` over https (`window.bwpNative` on Android, `webkit.messageHandlers.bwpNative` on iOS).
 4. If a page cannot load, Capacitor shows `src/error.html` instead of the browser error.
 
 Native features:
@@ -295,6 +297,8 @@ Everything is in **`src/app-config.json`**:
 }
 ```
 
+- `homeUrl` - the page the app opens first. It must be a page a logged-out user can use
+  (the login page, or a page that redirects to it).
 - `allowedHosts` - hosts that load **inside** the app. Everything else opens in the phone's browser
   or the matching app. If login or payment redirects through another domain that must stay in the
   app, add it here.

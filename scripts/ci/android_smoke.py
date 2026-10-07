@@ -156,6 +156,27 @@ def run(name, fn):
 
 # ----------------------------------------------------------------------------- tests
 
+def t_probe():
+    """Plain requests from the build machine (not the app): what does the site serve to a logged-out visitor?"""
+    import urllib.error
+    agent = 'Mozilla/5.0 (Linux; Android 15; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36'
+    for path in ['/', '/wp-login.php', '/login/', '/dashboard/', '/my-account/']:
+        try:
+            req = urllib.request.Request(SITE + path, headers={'User-Agent': agent})
+            with urllib.request.urlopen(req, timeout=25) as res:
+                body = res.read(300000).decode('utf-8', 'replace')
+                title = re.search(r'<title[^>]*>(.*?)</title>', body, re.S | re.I)
+                visible = re.sub(r'<(script|style)[^>]*>.*?</\1>', ' ', body, flags=re.S | re.I)
+                visible = re.sub(r'<[^>]+>', ' ', visible)
+                visible = re.sub(r'\s+', ' ', visible).strip()
+                note('site %s -> %s %s | title: %s | <input>: %d | text: %s' % (
+                    path, res.status, res.geturl(), (title.group(1).strip() if title else '')[:60], body.count('<input'), visible[:140]))
+        except urllib.error.HTTPError as exc:
+            note('site %s -> HTTP %s' % (path, exc.code))
+        except Exception as exc:  # noqa: BLE001
+            note('site %s -> %r' % (path, exc))
+
+
 def t_launch():
     note('install: ' + adb('install', '-r', APK, timeout=180).strip().replace('\n', ' ')[-120:])
     adb('logcat', '-c')
@@ -231,7 +252,7 @@ def t_download():
     note('saveFile result: %s | dialog texts: %s' % (res, tx[:8]))
     check('download: file saved to Downloads', isinstance(res, str) and '"savedToDownloads":true' in res, res)
     check('download: dialog with Open / Share shown', 'bwp-smoke-test.txt' in tx and 'open' in tx and 'share' in tx, tx[:8])
-    listing = adb('shell', 'ls', '/sdcard/Download/BWP Billing/').strip()
+    listing = adb('shell', "ls '/sdcard/Download/BWP Billing/'").strip()
     check('download: file exists in Download/BWP Billing', 'bwp-smoke-test' in listing, listing)
     back()
     time.sleep(1)
@@ -352,7 +373,7 @@ def t_logs():
     check('no errors logged by the BWP plugin', not ours, [x[-160:] for x in ours[:4]])
 
 
-for label, test in [('launch', t_launch), ('keyboard', t_keyboard), ('download', t_download), ('print', t_print),
+for label, test in [('site probe', t_probe), ('launch', t_launch), ('keyboard', t_keyboard), ('download', t_download), ('print', t_print),
                     ('share', t_share), ('refresh', t_refresh), ('back', t_back), ('offline session', t_offline_session),
                     ('offline start', t_offline_start), ('logs', t_logs)]:
     run(label, test)

@@ -1,15 +1,18 @@
 # Test checklist
 
-Status when this project was handed over:
+Status legend:
 
-- **B** = checked in a desktop browser against a mock site (not on a phone, not on the real site)
-- **-** = not tested yet. Needs a built app on a device with a real BWP Billing account.
+- **E** = checked automatically on an Android emulator in every cloud build (`scripts/ci/android_smoke.py`)
+- **S** = checked automatically on an iPhone simulator in every cloud build (`scripts/ci/ios_smoke.sh`)
+- **B** = checked in a desktop browser against a mock site (`tests/shell_and_bridge_test.py`)
+- **-** = not tested. Needs a real phone and a real BWP Billing account.
 
-Nothing below has been tested on a real phone or against the real website so far.
+The automatic tests never log in, so everything behind the login is untested. Nothing has been
+tested on a real phone.
 
 | # | Flow | Status | What to check |
 |---|---|---|---|
-| 1 | App launch | B (launch screen only) | Splash, then "Loading your dashboard...", then the site. No white flash, no URL bar |
+| 1 | App launch | E, S | Splash, then "Loading your dashboard...", then the site. No crash, no URL bar |
 | 2 | Login | - | Normal website login works |
 | 3 | Session persistence | - | Close the app from recents, reopen: still logged in |
 | 4 | Logout | - | Returns to the login page, no reload loop |
@@ -26,22 +29,22 @@ Nothing below has been tested on a real phone or against the real website so far
 | 15 | Modals | - | Fit the screen, scroll inside, pull-to-refresh does not fire inside them |
 | 16 | File upload | - | Gallery / Files / PDF |
 | 17 | Camera upload | - | Take a photo from the upload field |
-| 18 | PDF invoice | B (hand-over to native) | Android: saved + Open/Share dialog. iOS: preview |
-| 19 | Download (CSV / Excel / image) | B (hand-over to native) | File appears in `Downloads/BWP Billing` (Android) |
-| 20 | Share | B (hand-over to native) | Share sheet opens from the download dialog / preview |
-| 21 | Print invoice / receipt | B (hand-over to native) | Native print dialog with a correct preview |
+| 18 | PDF invoice | E (test file), B | Android: saved + Open/Share dialog. iOS: preview |
+| 19 | Download (CSV / Excel / image) | E (test file + page-generated file), B | File appears in `Downloads/BWP Billing` (Android) |
+| 20 | Share | E, B | Share sheet opens |
+| 21 | Print invoice / receipt | E (dialog opens), B | Native print dialog with a correct preview of a real invoice |
 | 22 | External URLs | - | Other websites open in the browser, not in the app |
 | 23 | WhatsApp link | - | Opens WhatsApp. Also `tel:` and `mailto:` |
-| 24 | Internet disconnected | B | Airplane mode: "No Internet Connection" + Retry, never a browser error |
-| 25 | Internet restored | B | Reconnects by itself; Retry reopens the page that failed |
+| 24 | Internet disconnected | E, B | Airplane mode: "No Internet Connection" + Retry, never a browser error |
+| 25 | Internet restored | E, B | Reconnects by itself and reopens the page that failed |
 | 26 | Server unreachable | B (screen only) | "We couldn't connect to BWP Billing." + Retry |
-| 27 | Android Back button | - | Goes back page by page; on the first page "Press back again to exit" |
-| 28 | App background / resume | - | Same page, still logged in, no restart |
+| 27 | Android Back button | E | Goes back page by page; on the first page "Press back again to exit" |
+| 28 | App background / resume | E | Same page, no restart. Still logged in: not tested |
 | 29 | Session expired | B (download case) | Server redirects to login, no loop |
 | 30 | Keyboard / forms | - | Focused input always visible, also inside modals |
-| 31 | Portrait mode | - | Small phone and large phone |
-| 32 | Pull-to-refresh | B (guard logic) | Refreshes at the top of a page only |
-| 33 | Status bar colour | B (colour detection) | Matches the page header; icons readable |
+| 31 | Portrait mode | E, S (one screen size each) | Small phone and large phone |
+| 32 | Pull-to-refresh | E | Refreshes at the top of a page only |
+| 33 | Status bar / safe areas | E, S | Content below the status bar and above the navigation bar; icons readable |
 | 34 | Release build | - | Signed APK / AAB installs; web view debugging is off |
 
 Known limits to verify on the real site:
