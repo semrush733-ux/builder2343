@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data' show BytesBuilder;
 
 import 'package:archive/archive.dart' show GZipDecoder;
 import 'package:flutter/foundation.dart' show compute;
