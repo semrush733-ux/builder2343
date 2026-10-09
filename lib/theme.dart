@@ -22,7 +22,7 @@ ThemeData buildTheme() {
     // No page animations: route changes stay instant on slow TV sticks.
     pageTransitionsTheme: const PageTransitionsTheme(builders: {
       TargetPlatform.android: _NoTransitions(),
-      TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.iOS: _NoTransitions(),
     }),
     textTheme: base.textTheme.apply(bodyColor: C.text, displayColor: C.text),
   );
