@@ -278,6 +278,26 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       if (!widget.live) set('hr-seek', 'no'),
       set('audio-channels', 'stereo'),
       set('sub-auto', 'no'),
+      // Let the TV's own video chip decode every format it knows (older films are often MPEG-2,
+      // MPEG-4 / DivX or VC-1, which the engine would otherwise decode on the slow processor).
+      set('hwdec-codecs', 'all'),
+      // When a film still has to be decoded on the processor: use every core, take the quick
+      // paths, and drop a frame rather than let the picture fall behind the sound.
+      set('vd-lavc-threads', '0'),
+      set('vd-lavc-fast', 'yes'),
+      set('vd-lavc-skiploopfilter', 'nonkey'),
+      set('framedrop', 'decoder+vo'),
+      // Light picture processing: TV chips are far weaker than a computer's graphics card.
+      set('scale', 'bilinear'),
+      set('dscale', 'bilinear'),
+      set('cscale', 'bilinear'),
+      set('dither', 'no'),
+      set('deband', 'no'),
+      set('correct-downscaling', 'no'),
+      set('linear-downscaling', 'no'),
+      set('sigmoid-upscaling', 'no'),
+      set('hdr-compute-peak', 'no'),
+      set('interpolation', 'no'),
       if (_direct) set('hwdec', 'mediacodec'),
     ]);
   }
@@ -367,13 +387,13 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _wantStart = start;
     log('open index=$_index format=$format try=$_fails');
     try {
-      // The old engine shuts down while the new one starts up; only the connection to the server
-      // waits until the old one is really gone (most accounts allow a single connection).
-      final closed = _closePlayer();
+      // The old engine is closed completely before the new one starts: most accounts allow a
+      // single connection, and one engine at a time is what has proved reliable on TV boxes.
+      await _closePlayer();
+      if (generation != _generation || !mounted) return;
       final player = _createPlayer();
       setState(() {}); // show the new engine's picture surface
       await _configure(player);
-      await closed;
       if (generation != _generation || !mounted) return;
       await player.open(
         Media(url, httpHeaders: const {'User-Agent': kUserAgent}, start: start > Duration.zero ? start : null),
@@ -667,6 +687,39 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     log('speed=$speed');
   }
 
+  /// What the engine is doing right now, for the Quality panel (and for support).
+  Future<List<String>> _streamFacts() async {
+    final platform = _player?.platform;
+    if (platform is! NativePlayer) return const [];
+    Future<String> read(String name) async {
+      try {
+        return (await platform.getProperty(name)).trim();
+      } catch (_) {
+        return '';
+      }
+    }
+
+    final values = await Future.wait([
+      read('video-format'),
+      read('hwdec-current'),
+      read('container-fps'),
+      read('frame-drop-count'),
+      read('decoder-frame-drop-count'),
+      read('audio-codec-name'),
+    ]);
+    final fps = double.tryParse(values[2]) ?? 0;
+    final hardware = values[1].isNotEmpty && values[1] != 'no';
+    final dropped = (int.tryParse(values[3]) ?? 0) + (int.tryParse(values[4]) ?? 0);
+    final facts = <String>[
+      if (values[0].isNotEmpty) 'Video: ${values[0].toUpperCase()}${fps > 0 ? ', ${fps.toStringAsFixed(fps == fps.roundToDouble() ? 0 : 2)} pictures a second' : ''}',
+      hardware ? 'Decoded by the video chip (${values[1]})' : 'Decoded by the processor (slower)',
+      if (values[5].isNotEmpty) 'Sound: ${values[5].toUpperCase()}',
+      'Pictures skipped so far: $dropped',
+    ];
+    log('facts video=${values[0]} hwdec=${values[1]} fps=${values[2]} dropped=$dropped mode=${_direct ? 'direct' : 'gpu'}');
+    return facts;
+  }
+
   String _variantLabel(VideoTrack track, int number) {
     final height = track.h ?? 0;
     final rate = track.bitrate ?? 0;
@@ -688,6 +741,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     final variants = _videoTracks.length > 1 ? _videoTracks : const <VideoTrack>[];
     log('panel=quality versions=${versions.length} variants=${variants.length}');
     final now = _videoHeight > 0 ? '${qualityOfHeight(_videoHeight)}  ($_videoSize)' : 'Unknown';
+    final facts = await _streamFacts();
+    if (!mounted) {
+      _panelOpen = false;
+      return;
+    }
     final picked = await showDialog<int>(
       context: context,
       barrierColor: const Color(0x66000000),
@@ -698,6 +756,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
           children: [
             const _PanelHeading('Playing now'),
             _PanelNote(now),
+            for (final fact in facts) _PanelNote(fact),
             if (variants.isNotEmpty) ...[
               const _PanelHeading('Quality of this stream'),
               _PanelRow(

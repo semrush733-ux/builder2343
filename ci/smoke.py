@@ -90,12 +90,30 @@ def wait_log(pattern, since, timeout):
     return None
 
 
+class OutOfTime(Exception):
+    pass
+
+
+START = time.time()
+LIMIT = 24 * 60  # seconds; stop in good time so the results are always published
+
+
+def write_summary(note=''):
+    failed = [r for r in results if r.startswith('FAIL')]
+    with open('%s/SMOKE.md' % OUT, 'w') as f:
+        f.write('### Emulator test (remote-control keys, mock IPTV server)\n\n')
+        f.write('%d checks, %d failed%s\n\n```\n%s\n```\n' % (len(results), len(failed), note, '\n'.join(results)))
+
+
 def check(name, ok, detail=''):
     line = '%s  %s' % ('PASS' if ok else 'FAIL', name)
     if detail not in ('', None):
         line += '  [%s]' % str(detail)[:200]
     results.append(line)
     print(line, flush=True)
+    write_summary('  (still running)')
+    if time.time() - START > LIMIT:
+        raise OutOfTime()
     return ok
 
 
@@ -118,8 +136,12 @@ def main():
     server_log = open('%s/mock-server.log' % OUT, 'w')
     server = subprocess.Popen([sys.executable, 'ci/mock_server.py', '8787'], stdout=server_log, stderr=subprocess.STDOUT)
     time.sleep(2)
+    note = ''
     try:
         run()
+    except OutOfTime:
+        note = '  - STOPPED after %d minutes: the test ran far too slowly, the remaining steps were not run' % (LIMIT // 60)
+        results.append('FAIL  the whole test finishes in time')
     finally:
         server.terminate()
         server_log.close()
@@ -127,10 +149,7 @@ def main():
             f.write(adb('logcat', '-d', timeout=60))
         with open('%s/app-log.txt' % OUT, 'w') as f:
             f.write('\n'.join(app_log()) + '\n')
-        failed = [r for r in results if r.startswith('FAIL')]
-        with open('%s/SMOKE.md' % OUT, 'w') as f:
-            f.write('### Emulator test (remote-control keys, mock IPTV server)\n\n')
-            f.write('%d checks, %d failed\n\n```\n%s\n```\n' % (len(results), len(failed), '\n'.join(results)))
+        write_summary(note)
         print(open('%s/SMOKE.md' % OUT).read())
 
 
