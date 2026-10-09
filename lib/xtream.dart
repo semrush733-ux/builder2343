@@ -94,6 +94,7 @@ class XItem {
     this.rating = '',
     this.num = 0,
     this.url = '',
+    this.epgId = '',
   });
 
   final XKind kind;
@@ -107,6 +108,10 @@ class XItem {
 
   /// Direct stream address. Only set for items that come from an M3U playlist.
   final String url;
+
+  /// TV guide id of a playlist channel (the tvg-id from the M3U), used to look
+  /// the channel up in an XMLTV guide. Empty when the playlist names none.
+  final String epgId;
 
   static XItem? fromApi(XKind kind, Map m) {
     final id = str(kind == XKind.series ? m['series_id'] : m['stream_id']);
@@ -134,6 +139,7 @@ class XItem {
         'r': rating,
         'num': num,
         if (url.isNotEmpty) 'u': url,
+        if (epgId.isNotEmpty) 'g': epgId,
       };
 
   static XItem? fromJson(dynamic j) {
@@ -151,6 +157,7 @@ class XItem {
       rating: str(j['r']),
       num: toInt(j['num']),
       url: str(j['u']),
+      epgId: str(j['g']),
     );
   }
 }

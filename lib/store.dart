@@ -24,6 +24,9 @@ class Store {
   /// Address of the M3U playlist when the app is used with a playlist link.
   static String get m3uUrl => _p.getString('m3u_url') ?? '';
 
+  /// XMLTV guide address for that playlist (set on the website, may be empty).
+  static String get m3uEpgUrl => _p.getString('m3u_epg_url') ?? '';
+
   /// True when the saved login is an M3U playlist link, false for Xtream Codes.
   static bool get isM3u => _p.getString('mode') == 'm3u';
 
@@ -65,10 +68,11 @@ class Store {
     await _p.setString('identity', 'xtream|$server|$username');
   }
 
-  static Future<void> saveM3uSession(String url) async {
+  static Future<void> saveM3uSession(String url, {String epgUrl = ''}) async {
     await _switchAccount('m3u|$url');
     await _p.setString('mode', 'm3u');
     await _p.setString('m3u_url', url);
+    await _p.setString('m3u_epg_url', epgUrl);
     await _p.setBool('logged_in', true);
   }
 

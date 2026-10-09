@@ -14,7 +14,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 /// The screen the app opens on: home with the saved login, or the sign-in screen.
 Widget startScreen() {
   if (!Store.loggedIn) return const LoginScreen();
-  if (Store.isM3u) return HomeScreen(api: M3uSource(Store.m3uUrl));
+  if (Store.isM3u) return HomeScreen(api: M3uSource(Store.m3uUrl, epgUrl: Store.m3uEpgUrl));
   var server = Store.server;
   // A customer who signed in with username and password only follows the website: when the
   // server address is changed there, the app uses the new one from its next start.

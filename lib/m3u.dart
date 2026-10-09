@@ -1,16 +1,22 @@
 import 'dart:convert';
 
+import 'package:archive/archive.dart' show GZipDecoder;
+import 'package:flutter/foundation.dart' show compute;
 import 'package:http/http.dart' as http;
 
 import 'config.dart';
+import 'theme.dart' show log;
 import 'xtream.dart';
 
 /// Everything found in one M3U playlist, sorted into Live TV, Movies and Series.
 class M3uData {
-  M3uData(this.items, this.categories);
+  M3uData(this.items, this.categories, {this.epgUrl = ''});
 
   final Map<XKind, List<XItem>> items;
   final Map<XKind, List<XCategory>> categories;
+
+  /// TV guide address named by the playlist itself (#EXTM3U url-tvg="...").
+  final String epgUrl;
 
   int count(XKind kind) => items[kind]?.length ?? 0;
   int get total => count(XKind.live) + count(XKind.vod) + count(XKind.series);
@@ -40,14 +46,27 @@ class M3uParser {
   String? _name;
   String _logo = '';
   String _group = '';
+  String _tvgId = '';
+  String _epgUrl = '';
   int _total = 0;
 
   void add(String raw) {
     final line = raw.trim();
     if (line.isEmpty) return;
+    if (line.startsWith('#EXTM3U')) {
+      // The playlist header may name its own TV guide: url-tvg / x-tvg-url.
+      for (final m in _attribute.allMatches(line)) {
+        final key = m.group(1)!.toLowerCase();
+        if ((key == 'url-tvg' || key == 'x-tvg-url') && _epgUrl.isEmpty) {
+          _epgUrl = m.group(2)!.trim().split(',').first.trim();
+        }
+      }
+      return;
+    }
     if (line.startsWith('#EXTINF')) {
       _logo = '';
       _group = '';
+      _tvgId = '';
       var nameFrom = 0;
       String tvgName = '';
       for (final m in _attribute.allMatches(line)) {
@@ -56,6 +75,7 @@ class M3uParser {
         if (key == 'tvg-logo') _logo = value;
         if (key == 'group-title') _group = value;
         if (key == 'tvg-name') tvgName = value;
+        if (key == 'tvg-id') _tvgId = value;
         nameFrom = m.end;
       }
       final comma = line.indexOf(',', nameFrom);
@@ -73,9 +93,11 @@ class M3uParser {
     final name = _name;
     final logo = _logo;
     final group = _group;
+    final tvgId = _tvgId;
     _name = null;
     _logo = '';
     _group = '';
+    _tvgId = '';
     if (!line.startsWith('http://') && !line.startsWith('https://')) return;
     if (_total >= _maxItems) return;
     final kind = kindOfUrl(line);
@@ -89,6 +111,7 @@ class M3uParser {
       categoryId: group.isEmpty ? 'Other' : group,
       num: list.length + 1,
       url: line,
+      epgId: kind == XKind.live ? tvgId : '',
     ));
   }
 
@@ -102,7 +125,7 @@ class M3uParser {
       }
       categories[kind] = list;
     }
-    return M3uData(_items, categories);
+    return M3uData(_items, categories, epgUrl: _epgUrl);
   }
 }
 
@@ -117,10 +140,16 @@ M3uData parseM3u(String text) {
 /// An M3U playlist link as the source of channels, movies and series.
 /// The list is downloaded once per app start and kept in memory.
 class M3uSource implements Source {
-  M3uSource(this.url);
+  M3uSource(this.url, {this.epgUrl = ''});
 
   final String url;
+
+  /// XMLTV guide address from the website (playlist settings). When empty,
+  /// the address named inside the playlist itself (url-tvg) is used.
+  final String epgUrl;
+
   Future<M3uData>? _loading;
+  Future<Map<String, List<XEpg>>>? _guideLoading;
 
   @override
   String get label {
@@ -205,9 +234,78 @@ class M3uSource implements Source {
   @override
   Future<XMovieInfo> movieInfo(XItem item) async => XMovieInfo(cover: item.icon);
 
-  /// A playlist carries no TV guide.
+  /// Now/next from the XMLTV guide; [streamId] is the channel's tvg-id.
   @override
-  Future<List<XEpg>> shortEpg(String streamId) async => const [];
+  Future<List<XEpg>> shortEpg(String streamId) async {
+    if (streamId.isEmpty) return const [];
+    final guide = await _guide();
+    final list = guide[streamId] ?? guide[streamId.toLowerCase()] ?? const <XEpg>[];
+    final now = DateTime.now();
+    return list.where((e) => e.end.isAfter(now)).take(4).toList();
+  }
+
+  /// Downloads and parses the XMLTV guide once per app start. Best effort:
+  /// any problem simply means "no guide", never an error on screen.
+  Future<Map<String, List<XEpg>>> _guide() {
+    final running = _guideLoading;
+    if (running != null) return running;
+    final future = _downloadGuide();
+    _guideLoading = future;
+    future.then((_) {}, onError: (Object _) {
+      if (identical(_guideLoading, future)) _guideLoading = null;
+    });
+    return future;
+  }
+
+  Future<Map<String, List<XEpg>>> _downloadGuide() async {
+    try {
+      var address = epgUrl.trim();
+      if (address.isEmpty) address = (await _load()).epgUrl;
+      if (address.isEmpty) return const {};
+      final uri = Uri.tryParse(address);
+      if (uri == null || !(uri.scheme == 'http' || uri.scheme == 'https')) return const {};
+
+      final client = http.Client();
+      List<int> bytes;
+      try {
+        final request = http.Request('GET', uri);
+        request.headers['User-Agent'] = kUserAgent;
+        final response = await client.send(request).timeout(const Duration(seconds: 30));
+        if (response.statusCode != 200) return const {};
+        // TV sticks have little memory: stop after 24 MB and use what arrived
+        // (the regex parser only reads complete <programme> blocks anyway).
+        const cap = 24 * 1024 * 1024;
+        final buffer = BytesBuilder(copy: false);
+        await for (final chunk in response.stream.timeout(const Duration(seconds: 60))) {
+          buffer.add(chunk);
+          if (buffer.length >= cap) break;
+        }
+        bytes = buffer.takeBytes();
+      } finally {
+        client.close();
+      }
+
+      // .gz guides are common; gzip starts with 1f 8b.
+      if (bytes.length > 2 && bytes[0] == 0x1f && bytes[1] == 0x8b) {
+        try {
+          bytes = GZipDecoder().decodeBytes(bytes);
+        } catch (_) {
+          return const {};
+        }
+        if (bytes.length > 160 * 1024 * 1024) return const {};
+      }
+
+      final xml = utf8.decode(bytes, allowMalformed: true);
+      final guide = xml.length > 200000
+          ? await compute(parseXmltv, xml)
+          : parseXmltv(xml);
+      log('epg guide channels=${guide.length}');
+      return guide;
+    } catch (e) {
+      log('epg guide failed: ${e.runtimeType}');
+      return const {};
+    }
+  }
 
   @override
   List<String> liveUrlsFor(XItem item, String preferredFormat) {
@@ -229,3 +327,63 @@ class M3uSource implements Source {
   @override
   String episodeUrlFor(XEpisode episode) => episode.id;
 }
+
+/// Parses an XMLTV guide into channel-id -> programmes (today and tomorrow).
+/// Top level so it can run in a background isolate via [compute].
+Map<String, List<XEpg>> parseXmltv(String xml) {
+  final programme = RegExp(
+      r'<programme[^>]*?start="([^"]+)"[^>]*?(?:stop="([^"]+)")?[^>]*?channel="([^"]+)"[^>]*>(.*?)</programme>',
+      dotAll: true);
+  final titleTag = RegExp(r'<title[^>]*>(.*?)</title>', dotAll: true);
+
+  final now = DateTime.now();
+  final from = now.subtract(const Duration(hours: 3));
+  final to = now.add(const Duration(hours: 36));
+  final out = <String, List<XEpg>>{};
+
+  for (final m in programme.allMatches(xml)) {
+    final start = xmltvTime(m.group(1) ?? '');
+    if (start == null || start.isAfter(to)) continue;
+    final end = xmltvTime(m.group(2) ?? '') ?? start.add(const Duration(hours: 1));
+    if (end.isBefore(from)) continue;
+    final channel = (m.group(3) ?? '').trim();
+    if (channel.isEmpty) continue;
+    final body = m.group(4) ?? '';
+    final title = _xmlText(titleTag.firstMatch(body)?.group(1) ?? '');
+    if (title.isEmpty) continue;
+    final list = out.putIfAbsent(channel, () => <XEpg>[]);
+    if (list.length >= 60) continue;
+    list.add(XEpg(title, start, end));
+  }
+  for (final list in out.values) {
+    list.sort((a, b) => a.start.compareTo(b.start));
+  }
+  return out;
+}
+
+/// XMLTV time: "20261010020000 +0500" style -> local DateTime.
+DateTime? xmltvTime(String s) {
+  s = s.trim();
+  if (s.length < 12) return null;
+  int? part(int a, int b) => int.tryParse(s.substring(a, b));
+  final y = part(0, 4), mo = part(4, 6), d = part(6, 8), h = part(8, 10), mi = part(10, 12);
+  if (y == null || mo == null || d == null || h == null || mi == null) return null;
+  final se = s.length >= 14 ? (part(12, 14) ?? 0) : 0;
+  var utc = DateTime.utc(y, mo, d, h, mi, se);
+  final offset = RegExp(r'([+-])(\d{2})(\d{2})').firstMatch(s.length > 14 ? s.substring(14) : '');
+  if (offset != null) {
+    final shift = Duration(hours: int.parse(offset.group(2)!), minutes: int.parse(offset.group(3)!));
+    utc = offset.group(1) == '-' ? utc.add(shift) : utc.subtract(shift);
+  }
+  return utc.toLocal();
+}
+
+String _xmlText(String s) => s
+    .replaceAll(RegExp(r'<[^>]*>'), ' ')
+    .replaceAll('&amp;', '&')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&apos;', "'")
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();

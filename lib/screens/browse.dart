@@ -27,6 +27,30 @@ String kindTitle(XKind kind) {
   }
 }
 
+/// Name of the "everything" entry at the top of the category list.
+String allTitle(XKind kind) {
+  switch (kind) {
+    case XKind.live:
+      return 'All Live Channels';
+    case XKind.vod:
+      return 'All Movies';
+    case XKind.series:
+      return 'All Series';
+  }
+}
+
+/// What one entry of this kind is called, for the counts ("312 channels").
+String countLabel(XKind kind, int n) {
+  switch (kind) {
+    case XKind.live:
+      return n == 1 ? 'channel' : 'channels';
+    case XKind.vod:
+      return n == 1 ? 'movie' : 'movies';
+    case XKind.series:
+      return n == 1 ? 'series' : 'series';
+  }
+}
+
 /// Categories on the left, channels / titles on the right.
 class BrowseScreen extends StatefulWidget {
   const BrowseScreen({super.key, required this.api, required this.kind});
@@ -75,18 +99,20 @@ class _BrowseScreenState extends State<BrowseScreen> {
       if (!mounted) return;
       setState(() => _cats = cats);
       log('browse ${widget.kind.name} categories=${cats.length}');
-      if (cats.isNotEmpty) {
-        _select(cats.first.id, cats.first.name);
-      } else {
-        _select(_allId, 'All');
-      }
+      // Everything in one list first; the single categories stay below it.
+      _select(_allId, allTitle(widget.kind));
     } catch (e) {
       if (!mounted) return;
       setState(() => _catsError = friendlyError(e));
     }
   }
 
-  Future<List<XItem>> _loadAll() async => _all ??= await widget.api.items(widget.kind);
+  Future<List<XItem>> _loadAll() async {
+    final all = _all ??= await widget.api.items(widget.kind);
+    // The "All ..." row shows the total once it is known.
+    if (mounted) setState(() {});
+    return all;
+  }
 
   Future<void> _select(String id, String name) async {
     _focusTimer?.cancel();
@@ -199,8 +225,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
           PlayEntry(
             title: i.name,
             urls: api.liveUrlsFor(i, format),
-            // Playlist entries (direct address) have no TV guide.
-            epgId: i.url.isEmpty ? i.id : null,
+            // Xtream channels use their stream id; playlist channels use the
+            // tvg-id from the M3U (shown when an XMLTV guide is set).
+            epgId: i.url.isEmpty ? i.id : (i.epgId.isEmpty ? null : i.epgId),
             logo: i.icon,
             item: i,
           ),
@@ -268,7 +295,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
                           ),
                         ),
                         if (_items != null)
-                          Text('${_items!.length}', style: const TextStyle(color: C.dim, fontSize: 14)),
+                          Text('${_items!.length} ${countLabel(widget.kind, _items!.length)}',
+                              style: const TextStyle(color: C.dim, fontSize: 14)),
                       ],
                     ),
                   ),
@@ -288,7 +316,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     if (cats == null) return const Loading();
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 16),
-      itemCount: cats.length + 2,
+      itemCount: cats.length + 3,
       itemExtent: 42,
       itemBuilder: (context, index) {
         if (index == 0) {
@@ -304,16 +332,26 @@ class _BrowseScreenState extends State<BrowseScreen> {
             icon: Icons.star_rounded,
             name: 'Favourites',
             selected: _selected == _favId,
-            autofocus: cats.isEmpty,
             onTap: () => _select(_favId, 'Favourites'),
             onFocus: () => _focusCategory(_favId, 'Favourites'),
           );
         }
-        final cat = cats[index - 2];
+        if (index == 2) {
+          final total = _all?.length;
+          final title = allTitle(widget.kind);
+          return _CategoryRow(
+            icon: Icons.apps_rounded,
+            name: total == null ? title : '$title  ($total)',
+            selected: _selected == _allId,
+            autofocus: true,
+            onTap: () => _select(_allId, title),
+            onFocus: () => _focusCategory(_allId, title),
+          );
+        }
+        final cat = cats[index - 3];
         return _CategoryRow(
           name: cat.name,
           selected: _selected == cat.id,
-          autofocus: index == 2,
           onTap: () => _select(cat.id, cat.name),
           onFocus: () => _focusCategory(cat.id, cat.name),
         );

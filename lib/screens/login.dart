@@ -147,6 +147,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   /// Signs in with a playlist that was added on the website.
+  /// TV guide address of the server playlist being signed in with.
+  String _pendingEpgUrl = '';
+
   Future<void> _useServerPlaylist(BPlaylist pl) async {
     if (_busy) return;
     log('login server-playlist id=${pl.id} type=${pl.type}');
@@ -161,6 +164,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await _loginXtream();
     } else {
       _m3u.text = pl.url;
+      _pendingEpgUrl = pl.epgUrl;
       setState(() {
         _mode = _m3uLink;
         _modeChosen = true;
@@ -255,6 +259,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _loginM3u() async {
     if (_busy) return;
+    final epgUrl = _pendingEpgUrl;
+    _pendingEpgUrl = '';
     final typed = _m3u.text.trim();
     if (typed.isEmpty) {
       setState(() => _error = 'Please enter your playlist link.');
@@ -284,9 +290,9 @@ class _LoginScreenState extends State<LoginScreen> {
           // Not an Xtream panel after all: read the link as a plain playlist.
         }
       }
-      final source = M3uSource(url);
+      final source = M3uSource(url, epgUrl: epgUrl);
       final account = await source.login();
-      await Store.saveM3uSession(url);
+      await Store.saveM3uSession(url, epgUrl: epgUrl);
       log('login ok mode=m3u ${account.note}');
       _enter(source, account);
     } catch (e) {
