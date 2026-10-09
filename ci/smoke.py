@@ -285,6 +285,19 @@ def run():
     shot('movie-details')
     check('the movie details page shows plot, cast and trailer from the server',
           info is not None and info.groups() == ('true', 'true', 'true'), info.group(0) if info else '')
+    extra = wait_log(r'tmdb cast=(\d+) stills=(\d+)', m, 20)
+    time.sleep(2)
+    shot('movie-details-with-cast-photos')
+    check('cast photos and stills are added from the film database',
+          extra is not None and extra.group(1) == '4' and extra.group(2) == '3', extra.group(0) if extra else '')
+    key(DOWN)
+    time.sleep(1)
+    shot('movie-details-cast-row')
+    key(DOWN)
+    time.sleep(1)
+    shot('movie-details-media-row')
+    key(UP)
+    key(UP)
     m = mark()
     key(OK)  # "Watch now"
     ready = wait_log(r'ready index=0 format=mp4', m, 90)
@@ -324,7 +337,7 @@ def run():
     check('audio language and subtitles can be changed with the remote', audio is not None and subs is not None)
     check('the movie keeps playing after the change', after > before, '%ss -> %ss' % (before, after))
 
-    key(BACK, pause=1.5)  # puts the button bar away; Left / Right now jump directly
+    # (the button bar has hidden itself again by now, so Left / Right jump directly)
     m = mark()
     for _ in range(6):
         key(RIGHT, pause=0.25)
@@ -499,7 +512,8 @@ def run():
         key(DOWN, pause=0.4)  # down to the last row: Video mode
     shot('video-mode-row')
     m3 = mark()
-    key(RIGHT)
+    key(LEFT)  # "Standard"
+    key(RIGHT)  # "Direct"
     key(OK)
     chosen = wait_log(r'video mode=direct', m3, 10)
     ready = wait_log(r'ready index=0 format=mp4 video=\d+x\d+ mode=direct', m3, 60)

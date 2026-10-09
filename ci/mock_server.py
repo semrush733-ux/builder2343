@@ -204,6 +204,25 @@ class Handler(BaseHTTPRequestHandler):
         path = url.path
         if path == '/player_api.php':
             return self.api(q)
+        # A stand-in for TMDB (the test build is pointed here instead of themoviedb.org).
+        if path == '/3/search/movie':
+            hit = 'test movie' in q.get('query', '').lower()
+            return self.send_json({'results': [{'id': 555, 'title': 'Test Movie'}] if hit else []})
+        if path == '/3/movie/555':
+            return self.send_json({
+                'id': 555, 'title': 'Test Movie', 'overview': 'From the film database.', 'runtime': 138,
+                'release_date': '2026-03-14', 'vote_average': 6.4, 'backdrop_path': '/back.jpg',
+                'genres': [{'id': 1, 'name': 'Action'}],
+                'credits': {'cast': [
+                    {'name': 'Ali Khan', 'character': 'Shivam', 'profile_path': '/p1.jpg'},
+                    {'name': 'Sara Ahmed', 'character': 'Zara', 'profile_path': '/p2.jpg'},
+                    {'name': 'John Smith', 'character': 'The Tester', 'profile_path': None},
+                    {'name': 'Maria Lopez', 'character': 'Engineer', 'profile_path': '/p4.jpg'}]},
+                'images': {'backdrops': [{'file_path': '/s1.jpg'}, {'file_path': '/s2.jpg'}, {'file_path': '/s3.jpg'}]},
+                'videos': {'results': [{'site': 'YouTube', 'type': 'Trailer', 'key': 'TESTtrailer'}]},
+            })
+        if path.startswith('/t/p/'):
+            return self.send_file('poster.jpg', 'image/jpeg')
         if path == '/playlist.m3u':
             return self.send_text(PLAYLIST, 'audio/x-mpegurl')
         if path in ('/logo.png', '/poster.jpg'):

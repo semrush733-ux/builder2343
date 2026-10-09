@@ -5,6 +5,9 @@ name: B1G TV app
 # Result: release "b1g-latest" of this repository with B1G.apk
 #   https://github.com/<owner>/<repo>/releases/tag/b1g-latest
 #
+# Cast photos: add the secret TMDB_API_KEY (your key from themoviedb.org) and the movie details page
+# shows cast photos, stills and trailers. Without it the page shows what the IPTV server knows.
+#
 # Signing: with the secrets ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and
 # ANDROID_KEY_PASSWORD the APK is signed with your own key. Without them it is signed with a
 # throw-away key: it installs, but a later build cannot update it (uninstall first).
@@ -79,7 +82,7 @@ jobs:
         run: |
           set -o pipefail
           flutter build apk --release --target-platform android-x64 \
-            --dart-define=B1G_VERBOSE=true --dart-define=B1G_NO_AUTO_DIRECT=true --dart-define=B1G_PREFILL_SERVER=http://10.0.2.2:8787 --dart-define=B1G_PREFILL_USER=demo --dart-define=B1G_PREFILL_PASS=demo \
+            --dart-define=B1G_VERBOSE=true --dart-define=B1G_NO_AUTO_DIRECT=true --dart-define=B1G_TMDB_KEY=test --dart-define=B1G_TMDB_BASE=http://10.0.2.2:8787/3 --dart-define=B1G_TMDB_IMAGES=http://10.0.2.2:8787/t/p --dart-define=B1G_PREFILL_SERVER=http://10.0.2.2:8787 --dart-define=B1G_PREFILL_USER=demo --dart-define=B1G_PREFILL_PASS=demo \
             2>&1 | tee out/logs/build-test.log
           mkdir -p out-smoke
           cp build/app/outputs/flutter-apk/app-release.apk out-smoke/b1g-smoke.apk
@@ -87,13 +90,16 @@ jobs:
       - name: Build B1G.apk
         env:
           B1G_ABIS: armeabi-v7a,arm64-v8a
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: |
           set -o pipefail
           SERVER="$(tr -d ' \r\n' < config/server.txt)"
           echo "locked server address: ${SERVER:-(none - customers type it)}"
+          if [ -n "$TMDB_API_KEY" ]; then echo "TMDB key: set (cast photos on)"; else echo "TMDB key: not set (cast photos off)"; fi
+          echo "TMDB_KEY_SET=$([ -n "$TMDB_API_KEY" ] && echo true || echo false)" >> "$GITHUB_ENV"
           flutter build apk --release --target-platform android-arm,android-arm64 \
             --build-name "1.0.$BUILD_NUMBER" --build-number "$BUILD_NUMBER" \
-            --dart-define=B1G_SERVER="$SERVER" \
+            --dart-define=B1G_SERVER="$SERVER" --dart-define=B1G_TMDB_KEY="$TMDB_API_KEY" \
             2>&1 | tee out/logs/build.log
           cp build/app/outputs/flutter-apk/app-release.apk out/B1G.apk
 
@@ -126,6 +132,7 @@ jobs:
             echo ""
             echo '```'
             echo "signed with your own key: $HAS_SIGNING"
+            echo "TMDB key in this build (cast photos): ${TMDB_KEY_SET:-false}"
             if [ -f out/B1G.apk ]; then
               echo "B1G.apk  $(stat -c%s out/B1G.apk) bytes  sha256 $(sha256sum out/B1G.apk | cut -d' ' -f1)"
               "$BT/aapt2" dump badging out/B1G.apk | grep -E "^package:|^sdkVersion|^targetSdkVersion|^application-label:|^uses-permission|launchable-activity|^uses-feature|^native-code|^leanback" || true

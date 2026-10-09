@@ -19,3 +19,10 @@ const bool kVerbose = bool.fromEnvironment('B1G_VERBOSE');
 /// Test builds: stay in the standard picture mode even when it cannot draw (the emulator has no
 /// graphics chip), so the automated test can exercise every screen.
 const bool kNoAutoDirect = bool.fromEnvironment('B1G_NO_AUTO_DIRECT');
+
+/// TMDB (themoviedb.org) adds cast photos, stills and trailers to the movie details page.
+/// The key comes from the build (repository secret TMDB_API_KEY); without it the page shows
+/// only what the IPTV server itself knows.
+const String kTmdbKey = String.fromEnvironment('B1G_TMDB_KEY');
+const String kTmdbBase = String.fromEnvironment('B1G_TMDB_BASE', defaultValue: 'https://api.themoviedb.org/3');
+const String kTmdbImages = String.fromEnvironment('B1G_TMDB_IMAGES', defaultValue: 'https://image.tmdb.org/t/p');

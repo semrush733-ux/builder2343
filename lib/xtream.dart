@@ -196,7 +196,11 @@ class XMovieInfo {
     this.cover = '',
     this.trailer = '',
     this.country = '',
+    this.tmdbId = '',
   });
+
+  /// Id of the film at themoviedb.org, when the server knows it.
+  final String tmdbId;
 
   final String plot;
   final String cast;
@@ -267,6 +271,7 @@ XMovieInfo parseMovieInfo(dynamic data) {
     cover: _firstText([info['movie_image'], info['cover_big'], info['cover']]),
     trailer: trailer,
     country: _firstText([info['country']]),
+    tmdbId: toInt(info['tmdb_id']) > 0 ? '${toInt(info['tmdb_id'])}' : '',
   );
 }
 

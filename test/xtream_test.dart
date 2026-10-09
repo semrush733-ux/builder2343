@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:b1gtv/m3u.dart';
 import 'package:b1gtv/screens/player.dart';
 import 'package:b1gtv/store.dart';
+import 'package:b1gtv/tmdb.dart';
 import 'package:b1gtv/xtream.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -247,6 +248,59 @@ http://example.com:8080/bob/pw/103
       expect(parseMovieInfo({'info': []}).plot, '');
       expect(parseMovieInfo(null).duration, '');
       expect(parseMovieInfo({'info': {'duration_secs': 300, 'backdrop_path': ''}}).duration, '5 min');
+    });
+  });
+
+  group('film database (TMDB)', () {
+    test('list titles are cleaned before the search', () {
+      expect(cleanTitle('Sex Is Comedy (2002) [FRN]').title, 'Sex Is Comedy');
+      expect(cleanTitle('Sex Is Comedy (2002) [FRN]').year, '2002');
+      expect(cleanTitle('EN | Big Film (2024) [4K]').title, 'Big Film');
+      expect(cleanTitle('4K-EN - Awarapan 2').title, 'Awarapan 2');
+      expect(cleanTitle('Spider-Man - No Way Home').title, 'Spider-Man - No Way Home');
+      expect(cleanTitle('Blade Runner 2049').title, 'Blade Runner 2049');
+      expect(cleanTitle('Blade Runner 2049').year, '');
+      expect(cleanTitle('1917').title, '1917');
+    });
+
+    test('cast, stills and trailer are read', () {
+      final movie = parseTmdbMovie({
+        'overview': 'Plot',
+        'runtime': 138,
+        'release_date': '2026-03-14',
+        'vote_average': 6.4,
+        'backdrop_path': '/b.jpg',
+        'genres': [
+          {'name': 'Action'},
+          {'name': 'Drama'}
+        ],
+        'credits': {
+          'cast': [
+            {'name': 'A', 'character': 'Hero', 'profile_path': '/a.jpg'},
+            {'name': 'B', 'character': 'Friend', 'profile_path': null},
+          ]
+        },
+        'images': {
+          'backdrops': [
+            {'file_path': '/s1.jpg'}
+          ]
+        },
+        'videos': {
+          'results': [
+            {'site': 'YouTube', 'type': 'Teaser', 'key': 'teaser'},
+            {'site': 'YouTube', 'type': 'Trailer', 'key': 'trailer'},
+          ]
+        },
+      });
+      expect(movie.cast.length, 2);
+      expect(movie.cast.first.photo, endsWith('/w185/a.jpg'));
+      expect(movie.cast.last.photo, '');
+      expect(movie.stills.single, endsWith('/w780/s1.jpg'));
+      expect(movie.trailer, 'trailer');
+      expect(movie.duration, '2 h 18 min');
+      expect(movie.genre, 'Action, Drama');
+      expect(movie.year, '2026');
+      expect(parseTmdbMovie(null).cast, isEmpty);
     });
   });
 
