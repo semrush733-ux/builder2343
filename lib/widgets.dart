@@ -76,8 +76,8 @@ class _TvFocusState extends State<TvFocus> {
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(widget.radius);
     final Color fill = _focused
-        ? Color.alphaBlend(C.accent.withOpacity(0.20), widget.color)
-        : (widget.selected ? Color.alphaBlend(C.accent.withOpacity(0.08), widget.color) : widget.color);
+        ? Color.alphaBlend(C.accent.withValues(alpha: 0.20), widget.color)
+        : (widget.selected ? Color.alphaBlend(C.accent.withValues(alpha: 0.08), widget.color) : widget.color);
     return Focus(
       canRequestFocus: false,
       skipTraversal: true,
@@ -108,7 +108,7 @@ class _TvFocusState extends State<TvFocus> {
               color: fill,
               borderRadius: radius,
               border: Border.all(
-                color: _focused ? widget.focusBorder : (widget.selected ? C.accent.withOpacity(0.45) : Colors.transparent),
+                color: _focused ? widget.focusBorder : (widget.selected ? C.accent.withValues(alpha: 0.45) : Colors.transparent),
                 width: 2.5,
               ),
             ),
@@ -212,7 +212,7 @@ class NetImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final placeholder = Center(child: Icon(fallback, color: C.dim.withOpacity(0.5), size: 22));
+    final placeholder = Center(child: Icon(fallback, color: C.dim.withValues(alpha: 0.5), size: 22));
     if (!url.startsWith('http')) return placeholder;
     return Image.network(
       url,

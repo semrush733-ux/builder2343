@@ -211,6 +211,15 @@ http://example.com:8080/bob/pw/103
     });
   });
 
+  test('only stream formats the account allows are tried', () {
+    final api = XtreamApi('http://s', 'u', 'p');
+    const item = XItem(kind: XKind.live, id: '5', name: 'x');
+    expect(api.liveUrlsFor(item, 'ts'), ['http://s/live/u/p/5.ts', 'http://s/live/u/p/5.m3u8']);
+    api.formats = ['ts'];
+    expect(api.liveUrlsFor(item, 'ts'), ['http://s/live/u/p/5.ts']);
+    expect(api.liveUrlsFor(item, 'm3u8'), ['http://s/live/u/p/5.ts']);
+  });
+
   test('time format', () {
     expect(formatTime(const Duration(seconds: 65)), '1:05');
     expect(formatTime(const Duration(hours: 1, minutes: 2, seconds: 3)), '1:02:03');

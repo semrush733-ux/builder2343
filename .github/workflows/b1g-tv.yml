@@ -22,7 +22,6 @@ permissions:
   contents: write
 
 env:
-  FLUTTER_VERSION: '3.24.5'
   BUILD_NUMBER: ${{ github.run_number }}
 
 jobs:
@@ -41,7 +40,6 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
@@ -50,10 +48,15 @@ jobs:
       - name: Create the Android project
         run: |
           flutter --version
+          echo "FLUTTER_VERSION=$(flutter --version | head -1 | awk '{print $2}')" >> "$GITHUB_ENV"
           flutter create --no-pub --platforms=android --org com.b1g --project-name b1gtv "$RUNNER_TEMP/scaffold"
           cp -r "$RUNNER_TEMP/scaffold/android" android
           cp -r android_overlay/. android/
-          cat android_extra/app-build-extra.gradle >> android/app/build.gradle
+          if [ -f android/app/build.gradle.kts ]; then
+            cat android_extra/app-build-extra.gradle.kts >> android/app/build.gradle.kts
+          else
+            cat android_extra/app-build-extra.gradle >> android/app/build.gradle
+          fi
           mkdir -p out/logs
 
       - name: Get packages

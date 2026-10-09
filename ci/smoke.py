@@ -164,6 +164,12 @@ def run():
     check('channel 1 plays (.ts stream)', ready is not None and ready.group(1) == 'ts' and pos >= 5,
           '%s, position %ss' % (ready.group(0) if ready else 'not ready', pos))
     check('video picture is decoded', ready is not None and int(ready.group(2)) > 0, ready.group(0) if ready else '')
+    # The mock sends live TV like a real panel: short burst, then real-time speed, one connection only.
+    pos = wait_position(0, 25, m, 60)
+    opens = len([line for line in app_log()[m:] if 'open index=0' in line])
+    shot('live-after-25s')
+    check('live keeps playing for 25 s on a real-time stream without reconnecting', pos >= 25 and opens == 1,
+          'position %ss, opened %d time(s)' % (pos, opens))
 
     # 2b. panels inside the player: channel list (Left) and audio / subtitles (Right)
     m = mark()

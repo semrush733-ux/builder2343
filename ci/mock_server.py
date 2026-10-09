@@ -5,13 +5,18 @@ Mock IPTV server for the automated test. It answers like an Xtream Codes panel
 
     username / password: demo / demo
     channel 1  .ts works            channel 2  only .m3u8 works (tests the fallback)
+    Live .ts is sent like a real panel does it: a short burst, then at real-time speed, and only
+    ONE live connection at a time (a second one gets "403 max connections").
     channel 3  never works          movie 10, series 20 (episodes 31, 32)
 """
 import base64
 import json
 import os
 import re
+import select
+import socket
 import sys
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -57,6 +62,11 @@ PLAYLIST = '''#EXTM3U
 #EXTINF:-1 group-title="Shows",M3U Show S01 E01
 {b}/series/demo/demo/31.mp4
 '''.format(b=BASE)
+
+
+LIVE_SECONDS = 90.0  # length of ci/media/live.ts
+LIVE_LOCK = threading.Lock()
+LIVE_ACTIVE = [0]
 
 
 def b64(text):
@@ -140,6 +150,51 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
+    def client_gone(self):
+        try:
+            readable, _, _ = select.select([self.connection], [], [], 0)
+            return bool(readable) and self.connection.recv(1, socket.MSG_PEEK) == b''
+        except OSError:
+            return True
+
+    def send_live(self, name):
+        path = os.path.join(MEDIA, name)
+        with LIVE_LOCK:
+            busy = LIVE_ACTIVE[0] >= 1
+            if not busy:
+                LIVE_ACTIVE[0] += 1
+        if busy:
+            print('LIVE refused: max connections', flush=True)
+            return self.send_text('max connections reached', 'text/plain', 403)
+        print('LIVE open', flush=True)
+        sent = 0
+        try:
+            rate = os.path.getsize(path) / LIVE_SECONDS
+            burst = rate * 3
+            self.send_response(200)
+            self.send_header('Content-Type', 'video/mp2t')
+            self.send_header('Connection', 'close')
+            self.end_headers()
+            self.close_connection = True
+            start = time.time()
+            with open(path, 'rb') as f:
+                while not self.client_gone():
+                    chunk = f.read(16384)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    self.wfile.flush()
+                    sent += len(chunk)
+                    ahead = (sent - burst) / rate - (time.time() - start)
+                    if ahead > 0:
+                        time.sleep(min(ahead, 0.2))
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
+        finally:
+            with LIVE_LOCK:
+                LIVE_ACTIVE[0] -= 1
+            print('LIVE close after %d bytes' % sent, flush=True)
+
     def do_HEAD(self):
         self.do_GET()
 
@@ -162,7 +217,7 @@ class Handler(BaseHTTPRequestHandler):
         kind, sid, ext = m.group(1), m.group(2), m.group(3)
         if kind == 'live':
             if sid in ('1', '4') and ext == 'ts':
-                return self.send_file('live.ts', 'video/mp2t')
+                return self.send_live('live.ts')
             if sid in ('1', '2', '4') and ext == 'm3u8':
                 with open(os.path.join(MEDIA, 'hls', 'index.m3u8')) as f:
                     text = re.sub(r'^(seg\d+\.ts)$', r'/hls/\1', f.read(), flags=re.M)
