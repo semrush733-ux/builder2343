@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../backend.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../xtream.dart';
 import 'browse.dart';
+import 'device.dart';
 import 'login.dart';
 
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -57,6 +59,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _open(XKind kind) {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => BrowseScreen(api: widget.api, kind: kind)));
+  }
+
+  void _showDevice() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: C.panel,
+        title: const Text('My device'),
+        content: const DeviceCard(),
+        actions: [
+          TextButton(autofocus: true, onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close')),
+        ],
+      ),
+    );
   }
 
   Future<void> _logout() async {
@@ -170,6 +186,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Text('Hold OK on a channel or title to add it to Favourites.',
                     style: TextStyle(color: C.dim, fontSize: 13)),
                 const Spacer(),
+                TvFocus(
+                  onTap: _showDevice,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.qr_code_2_rounded, size: 17, color: C.dim),
+                        const SizedBox(width: 8),
+                        Text(
+                          Backend.statusLine.isEmpty ? 'My device' : 'My device  ·  ${Backend.statusLine}',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
                 TvFocus(
                   onTap: _logout,
                   child: const Padding(

@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../backend.dart';
 import '../config.dart';
 import '../m3u.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../xtream.dart';
+import 'device.dart';
 import 'home.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -35,6 +39,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _m3uMode = false;
   bool _busy = false;
   String? _error;
+  List<BPlaylist> _serverLists = const [];
+  Timer? _poll;
 
   /// A build that is locked to one server only asks for username and password.
   bool get _locked => kLockedServer.isNotEmpty;
@@ -49,6 +55,13 @@ class _LoginScreenState extends State<LoginScreen> {
     _m3uMode = !_locked && Store.isM3u && Store.m3uUrl.isNotEmpty;
     _error = widget.message;
     log('screen=login');
+    // Register with the B1G website and watch for playlists added online
+    // (by us for the client, or by the client through the QR link).
+    Backend.ensureRegistered().then((_) {
+      if (mounted) setState(() {});
+      _loadServerLists();
+    });
+    _poll = Timer.periodic(const Duration(seconds: 60), (_) => _loadServerLists());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (_m3uMode) {
@@ -65,8 +78,40 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
+  Future<void> _loadServerLists() async {
+    if (_busy || !mounted) return;
+    try {
+      final lists = await Backend.playlists();
+      if (!mounted) return;
+      final changed = lists.length != _serverLists.length ||
+          !List.generate(lists.length, (i) => lists[i].id == _serverLists[i].id && lists[i].url == _serverLists[i].url)
+              .every((same) => same);
+      if (changed) setState(() => _serverLists = lists);
+    } catch (_) {
+      // Quietly keep the manual sign-in; the next poll tries again.
+    }
+  }
+
+  /// Signs in with a playlist that was added on the website.
+  Future<void> _useServerPlaylist(BPlaylist pl) async {
+    if (_busy) return;
+    log('login server-playlist id=${pl.id} type=${pl.type}');
+    if (pl.isXtream) {
+      _server.text = pl.url;
+      _user.text = pl.username;
+      _pass.text = pl.password;
+      _m3uMode = false;
+      await _loginXtream();
+    } else {
+      _m3u.text = pl.url;
+      _m3uMode = true;
+      await _loginM3u();
+    }
+  }
+
   @override
   void dispose() {
+    _poll?.cancel();
     _server.dispose();
     _user.dispose();
     _pass.dispose();
@@ -228,19 +273,21 @@ class _LoginScreenState extends State<LoginScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 48),
               alignment: Alignment.centerLeft,
               // Scrollable so nothing breaks when the on-screen keyboard takes half the height.
-              child: const SingleChildScrollView(
-                padding: EdgeInsets.symmetric(vertical: 24),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Logo(size: 64),
-                    SizedBox(height: 26),
-                    Text('Live TV, movies and series\non your big screen.',
+                    const Logo(size: 64),
+                    const SizedBox(height: 22),
+                    const Text('Live TV, movies and series\non your big screen.',
                         style: TextStyle(fontSize: 24, height: 1.3, fontWeight: FontWeight.w700)),
-                    SizedBox(height: 14),
-                    Text('Sign in with the details from your provider.',
+                    const SizedBox(height: 10),
+                    const Text('Sign in with the details from your provider.',
                         style: TextStyle(fontSize: 15, color: C.dim)),
+                    const SizedBox(height: 22),
+                    const DeviceCard(compact: true),
                   ],
                 ),
               ),
@@ -259,6 +306,44 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       const Text('Sign in', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 14),
+                      if (_serverLists.isNotEmpty) ...[
+                        const Text('ON YOUR ACCOUNT',
+                            style: TextStyle(
+                                fontSize: 11, letterSpacing: 1.5, color: C.dim, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 8),
+                        for (final pl in _serverLists)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: TvFocus(
+                              radius: 10,
+                              color: C.card,
+                              onTap: () => _useServerPlaylist(pl),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.cloud_done_rounded, size: 18, color: C.accent),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        pl.name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
+                                      ),
+                                    ),
+                                    Text(pl.isXtream ? 'Xtream' : 'M3U',
+                                        style: const TextStyle(fontSize: 12, color: C.dim)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 6),
+                        const Text('Or sign in manually:',
+                            style: TextStyle(fontSize: 12.5, color: C.dim)),
+                        const SizedBox(height: 8),
+                      ],
                       if (!_locked) ...[
                         Row(
                           children: [

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 
+import 'backend.dart';
 import 'config.dart';
 import 'input_mode.dart';
 import 'm3u.dart';
+import 'screens/device.dart';
 import 'screens/home.dart';
 import 'screens/login.dart';
 import 'store.dart';
@@ -16,6 +18,7 @@ Future<void> main() async {
   MediaKit.ensureInitialized();
   InputMode.init();
   await Store.init();
+  await Backend.init();
   // Keep memory low on TV sticks with 1 GB of RAM.
   PaintingBinding.instance.imageCache.maximumSize = 300;
   PaintingBinding.instance.imageCache.maximumSizeBytes = 48 << 20;
@@ -45,7 +48,7 @@ class B1GApp extends StatelessWidget {
         onPointerDown: (_) => InputMode.remote = false,
         child: child,
       ),
-      home: home,
+      home: LicenseGate(child: home),
     );
   }
 }

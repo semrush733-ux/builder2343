@@ -85,6 +85,10 @@ def epg():
     return {'epg_listings': rows}
 
 
+SITE = '/wp-json/b1g/v1'
+SITE_LISTS = [False]
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
 
@@ -199,10 +203,36 @@ class Handler(BaseHTTPRequestHandler):
     def do_HEAD(self):
         self.do_GET()
 
+    # A stand-in for the B1G website (device registration, licence, playlists added online).
+    def site(self, path):
+        device = {'device_id': 'B1G-TEST01', 'pairing_code': '123456', 'status': 'trial',
+                  'licence_type': 'trial', 'days_left': 7}
+        if path in ('/device/register', '/device/status'):
+            return self.send_json({'success': True, 'device': device})
+        if path == '/device/playlists':
+            lists = [{'id': 1, 'name': 'My IPTV', 'type': 'xtream', 'url': BASE,
+                      'username': 'demo', 'password': 'demo'}] if SITE_LISTS[0] else []
+            return self.send_json({'success': True, 'device': device, 'playlists': lists})
+        return self.send_json({'success': False, 'message': 'Unknown route.'}, 404)
+
+    def do_POST(self):
+        length = int(self.headers.get('Content-Length') or 0)
+        if length:
+            self.rfile.read(length)
+        path = urlparse(self.path).path
+        if path.startswith(SITE):
+            return self.site(path[len(SITE):])
+        return self.send_text('not found', 'text/plain', 404)
+
     def do_GET(self):
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         path = url.path
+        if path.startswith(SITE):
+            return self.site(path[len(SITE):])
+        if path == '/test/site-lists-on':  # the test switches on "a playlist was added on the website"
+            SITE_LISTS[0] = True
+            return self.send_text('ok', 'text/plain')
         if path == '/player_api.php':
             return self.api(q)
         # A stand-in for TMDB (the test build is pointed here instead of themoviedb.org).

@@ -15,6 +15,7 @@ import re
 import subprocess
 import sys
 import time
+import urllib.request
 
 PKG = 'com.b1g.b1gtv'
 APK = 'out/smoke-apk/b1g-smoke.apk'
@@ -435,8 +436,18 @@ def run():
     key(BACK, pause=2)
     shot('end-home')
 
-    # 6b. sign out, wrong password, then type the right one with the remote + keyboard
+    # 6a. "My device": device ID, pairing code and QR code from the website
+    reg = wait_log(r'backend registered', 0, 5)
+    check('the app registers with the website', reg is not None)
     key(DOWN)
+    key(LEFT)  # the bottom row has two buttons: "My device" is the left one
+    shot('my-device-focused')
+    key(OK, pause=2)
+    shot('my-device-dialog')
+    key(BACK, pause=2)
+
+    # 6b. sign out, wrong password, then type the right one with the remote + keyboard
+    key(RIGHT)  # "Sign out"
     shot('sign-out-focused')
     key(OK, pause=2)
     shot('sign-out-dialog')
@@ -474,6 +485,7 @@ def run():
 
     # 6c. the same app with a plain M3U playlist link instead of an Xtream login
     key(DOWN)
+    key(RIGHT)  # "Sign out" is the right one of the two buttons
     key(OK, pause=2)
     m = mark()
     key(RIGHT)
@@ -561,6 +573,27 @@ def run():
     key(BACK, pause=2)
     key(BACK, pause=2)
     shot('m3u-end-home')
+
+    # 6d. a playlist added on the website shows up on the sign-in screen and signs in with one press
+    urllib.request.urlopen('http://127.0.0.1:8787/test/site-lists-on', timeout=10).read()
+    key(DOWN)
+    key(RIGHT)
+    key(OK, pause=2)
+    m = mark()
+    key(RIGHT)
+    key(OK)
+    ok = wait_log(r'screen=login', m, 30) is not None
+    time.sleep(6)
+    for _ in range(7):
+        key(UP, pause=0.5)  # up to the top of the form: the playlist from the website
+    shot('website-playlist-focused')
+    m = mark()
+    key(OK)
+    got = wait_log(r'login server-playlist id=1 type=xtream', m, 15)
+    home = wait_log(r'screen=home', m, 40) is not None
+    time.sleep(2)
+    shot('website-playlist-home')
+    check('a playlist added on the website signs in from the sign-in screen', ok and got is not None and home)
 
     # 7. the app must still be alive and must not have crashed
     logcat = adb('logcat', '-d', timeout=60)
