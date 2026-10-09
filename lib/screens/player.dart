@@ -258,7 +258,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Future<void> _configure(Player player) async {
     final platform = player.platform;
     if (platform is! NativePlayer) return;
-    final NativePlayer mpv = platform;
+    // dynamic: setProperty only exists in the Android/desktop NativePlayer, so a
+    // static call would break the web compile; the guard above never lets web get here.
+    final dynamic mpv = platform;
     Future<void> set(String name, String value) async {
       try {
         await mpv.setProperty(name, value);
@@ -694,9 +696,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Future<List<String>> _streamFacts() async {
     final platform = _player?.platform;
     if (platform is! NativePlayer) return const [];
+    // dynamic for the same reason as in _configure: keeps the web compile working.
+    final dynamic mpv = platform;
     Future<String> read(String name) async {
       try {
-        return (await platform.getProperty(name)).trim();
+        return ((await mpv.getProperty(name)) as String).trim();
       } catch (_) {
         return '';
       }
