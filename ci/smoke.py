@@ -168,7 +168,7 @@ def run():
     got = wait_log(r'browse live items=(\d+)', m, 60)
     time.sleep(2)
     shot('live-list')
-    check('Live TV shows categories and channels', got is not None and int(got.group(1)) == 3, got.group(0) if got else '')
+    check('Live TV shows categories and channels', got is not None and int(got.group(1)) == 4, got.group(0) if got else '')
     key(RIGHT)
     shot('live-channel-focused')
     m = mark()
@@ -200,6 +200,20 @@ def run():
     shot('live-options')
     key(BACK, pause=1.5)
     check('channel list and options open inside the live player', got is not None and got2 is not None)
+
+    # 2c. the Quality button: this channel exists as "FHD" and as "HD" on the mock server
+    key(OK)  # button bar, on "Channel list"
+    for _ in range(6):
+        key(RIGHT, pause=0.5)  # previous, next, audio, subtitles, picture, quality
+    shot('live-quality-button')
+    m3 = mark()
+    key(OK, pause=2)
+    quality = wait_log(r'panel=quality versions=(\d+) variants=(\d+)', m3, 10)
+    shot('live-quality-panel')
+    check('the Quality button lists the other version of the channel',
+          quality is not None and quality.group(1) == '1', quality.group(0) if quality else '')
+    key(BACK, pause=1.5)  # close the panel
+    key(BACK, pause=1.5)  # put the button bar away
 
     # 3. channel up: channel 2 has no .ts on the mock server, the app must fall back to .m3u8
     m = mark()

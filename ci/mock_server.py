@@ -28,9 +28,10 @@ BASE = 'http://10.0.2.2:%d' % PORT  # the host machine as seen from the emulator
 LIVE_CATS = [{'category_id': '1', 'category_name': 'UK Entertainment', 'parent_id': 0},
              {'category_id': '2', 'category_name': 'Sports', 'parent_id': 0}]
 LIVE = [
-    {'num': 1, 'name': 'Test One', 'stream_type': 'live', 'stream_id': 1, 'stream_icon': BASE + '/logo.png', 'epg_channel_id': 'one', 'category_id': '1'},
+    {'num': 1, 'name': 'Test One FHD', 'stream_type': 'live', 'stream_id': 1, 'stream_icon': BASE + '/logo.png', 'epg_channel_id': 'one', 'category_id': '1'},
     {'num': 2, 'name': 'Test Two (HLS only)', 'stream_type': 'live', 'stream_id': 2, 'stream_icon': '', 'epg_channel_id': 'two', 'category_id': '1'},
     {'num': 3, 'name': 'Offline channel', 'stream_type': 'live', 'stream_id': 3, 'stream_icon': '', 'epg_channel_id': None, 'category_id': '1'},
+    {'num': 5, 'name': 'Test One HD*', 'stream_type': 'live', 'stream_id': 5, 'stream_icon': BASE + '/logo.png', 'epg_channel_id': 'one', 'category_id': '1'},
     {'num': 4, 'name': 'Sports One', 'stream_type': 'live', 'stream_id': '4', 'stream_icon': BASE + '/logo.png', 'epg_channel_id': '', 'category_id': '2'},
 ]
 VOD_CATS = [{'category_id': '11', 'category_name': 'Action', 'parent_id': 0}]
@@ -235,7 +236,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_text('not found', 'text/plain', 404)
         kind, sid, ext = m.group(1), m.group(2), m.group(3)
         if kind == 'live':
-            if sid in ('1', '4') and ext == 'ts':
+            if sid in ('1', '4', '5') and ext == 'ts':
                 return self.send_live('live.ts')
             if sid in ('1', '2', '4') and ext == 'm3u8':
                 with open(os.path.join(MEDIA, 'hls', 'index.m3u8')) as f:

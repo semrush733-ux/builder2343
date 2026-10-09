@@ -8,6 +8,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../config.dart';
 import '../input_mode.dart';
 import '../lang.dart';
+import '../quality.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -149,6 +150,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
   List<AudioTrack> _audioTracks = const [];
   List<SubtitleTrack> _subtitleTracks = const [];
+  List<VideoTrack> _videoTracks = const [];
+  String _videoId = 'auto';
+  int _videoHeight = 0;
   String _audioId = '';
   String _subtitleId = 'no';
   bool _tracksApplied = false;
@@ -232,7 +236,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         s.cancel();
       }
       _subs.clear();
-      _closing = player.dispose().catchError((Object _) {});
+      final previous = _closing;
+      final mine = player.dispose().catchError((Object _) {});
+      // Keep waiting for an earlier close too, so two streams are never open at once.
+      _closing = previous == null ? mine : Future.wait<void>([previous, mine]).then((_) {});
     }
     final closing = _closing;
     if (closing != null) {
@@ -255,16 +262,24 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       } catch (_) {}
     }
 
-    await set('user-agent', kUserAgent);
-    await set('network-timeout', '20');
-    await set('stream-lavf-o', 'reconnect=1,reconnect_streamed=1,reconnect_delay_max=4');
-    await set('cache', 'yes');
-    await set('cache-pause-initial', 'no');
-    await set('cache-pause-wait', widget.live ? '1.5' : '2');
-    await set('demuxer-readahead-secs', widget.live ? '10' : '30');
-    await set('audio-channels', 'stereo');
-    await set('sub-auto', 'no');
-    if (_direct) await set('hwdec', 'mediacodec');
+    await Future.wait([
+      set('user-agent', kUserAgent),
+      set('network-timeout', '20'),
+      set('stream-lavf-o', 'reconnect=1,reconnect_streamed=1,reconnect_delay_max=4'),
+      set('cache', 'yes'),
+      // Start showing as soon as there is a picture instead of filling a buffer first...
+      set('cache-pause-initial', 'no'),
+      // ...and after a hiccup wait for only one second of video before carrying on.
+      set('cache-pause-wait', widget.live ? '1' : '2'),
+      set('demuxer-readahead-secs', widget.live ? '10' : '30'),
+      // Live: look at one second of the stream to learn what is in it (the default is up to five).
+      if (widget.live) set('demuxer-lavf-analyzeduration', '1'),
+      // Movies: jump to the nearest key picture, which is immediate on a network stream.
+      if (!widget.live) set('hr-seek', 'no'),
+      set('audio-channels', 'stereo'),
+      set('sub-auto', 'no'),
+      if (_direct) set('hwdec', 'mediacodec'),
+    ]);
   }
 
   @override
@@ -337,6 +352,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _tracksApplied = false;
     _audioTracks = const [];
     _subtitleTracks = const [];
+    _videoTracks = const [];
+    _videoId = 'auto';
+    _videoHeight = 0;
     _audioId = '';
     _subtitleId = 'no';
     _lastLoggedSecond = -1;
@@ -349,11 +367,13 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _wantStart = start;
     log('open index=$_index format=$format try=$_fails');
     try {
-      await _closePlayer();
-      if (generation != _generation || !mounted) return;
+      // The old engine shuts down while the new one starts up; only the connection to the server
+      // waits until the old one is really gone (most accounts allow a single connection).
+      final closed = _closePlayer();
       final player = _createPlayer();
       setState(() {}); // show the new engine's picture surface
       await _configure(player);
+      await closed;
       if (generation != _generation || !mounted) return;
       await player.open(
         Media(url, httpHeaders: const {'User-Agent': kUserAgent}, start: start > Duration.zero ? start : null),
@@ -381,7 +401,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _position = p;
     if (!_ready) {
       // "Ready" = the picture is really moving, not just "the address opened".
-      if ((p - first).inMilliseconds.abs() < 300) return;
+      if ((p - first).inMilliseconds.abs() < 120) return;
       _markReady();
     }
     _lastPosition = p;
@@ -426,6 +446,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     final w = player.state.width ?? 0;
     final h = player.state.height ?? 0;
     _videoSize = w > 0 && h > 0 ? '$w x $h' : '';
+    _videoHeight = h;
     log('ready index=$_index format=${formatOfUrl(url)} video=${w}x$h mode=${_direct ? 'direct' : 'gpu'}');
     _applyPreferredTracks();
     if (mounted) setState(() => _status = null);
@@ -585,6 +606,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     bool real(String id) => id != 'auto' && id != 'no';
     final audio = tracks.audio.where((t) => real(t.id)).toList();
     final subtitle = tracks.subtitle.where((t) => real(t.id)).toList();
+    _videoTracks = tracks.video.where((t) => real(t.id)).toList();
     if (audio.length == _audioTracks.length && subtitle.length == _subtitleTracks.length) return;
     _audioTracks = audio;
     _subtitleTracks = subtitle;
@@ -643,6 +665,90 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _speed = speed;
     _player?.setRate(speed);
     log('speed=$speed');
+  }
+
+  String _variantLabel(VideoTrack track, int number) {
+    final height = track.h ?? 0;
+    final rate = track.bitrate ?? 0;
+    final parts = <String>[
+      if (height > 0) qualityOfHeight(height) else 'Version $number',
+      if (rate > 0) '${(rate / 1000000).toStringAsFixed(1)} Mbit/s',
+    ];
+    return parts.join('  ·  ');
+  }
+
+  /// "Quality": the versions of this channel that the server lists, and the variants inside the
+  /// stream when it has several. A stream that exists in one quality only is shown as such.
+  Future<void> _openQuality() async {
+    if (_panelOpen) return;
+    _panelOpen = true;
+    _hideTimer?.cancel();
+    final names = [for (final e in widget.entries) e.title];
+    final versions = widget.live ? otherVersions(names, _index) : const <int>[];
+    final variants = _videoTracks.length > 1 ? _videoTracks : const <VideoTrack>[];
+    log('panel=quality versions=${versions.length} variants=${variants.length}');
+    final now = _videoHeight > 0 ? '${qualityOfHeight(_videoHeight)}  ($_videoSize)' : 'Unknown';
+    final picked = await showDialog<int>(
+      context: context,
+      barrierColor: const Color(0x66000000),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, refresh) => _SidePanel(
+          alignment: Alignment.centerRight,
+          title: 'Quality',
+          children: [
+            const _PanelHeading('Playing now'),
+            _PanelNote(now),
+            if (variants.isNotEmpty) ...[
+              const _PanelHeading('Quality of this stream'),
+              _PanelRow(
+                label: 'Automatic (best)',
+                selected: _videoId == 'auto',
+                autofocus: true,
+                onTap: () {
+                  _videoId = 'auto';
+                  _player?.setVideoTrack(VideoTrack.auto());
+                  log('quality=auto');
+                  refresh(() {});
+                },
+              ),
+              for (var i = 0; i < variants.length; i++)
+                _PanelRow(
+                  label: _variantLabel(variants[i], i + 1),
+                  selected: _videoId == variants[i].id,
+                  onTap: () {
+                    _videoId = variants[i].id;
+                    _player?.setVideoTrack(variants[i]);
+                    log('quality=${variants[i].h ?? variants[i].id}');
+                    refresh(() {});
+                  },
+                ),
+            ],
+            if (versions.isNotEmpty) ...[
+              const _PanelHeading('Other versions of this channel'),
+              for (var i = 0; i < versions.length; i++)
+                _PanelRow(
+                  label: '${qualityInName(names[versions[i]])}   ${names[versions[i]]}',
+                  selected: false,
+                  autofocus: variants.isEmpty && i == 0,
+                  onTap: () => Navigator.of(ctx).pop(versions[i]),
+                ),
+            ],
+            if (variants.isEmpty && versions.isEmpty)
+              const _PanelNote('The server sends this in one quality only, so there is nothing to switch to. '
+                  'A player cannot shrink a stream: the whole stream is downloaded either way.'),
+            if (variants.isEmpty && versions.isEmpty)
+              _PanelRow(label: 'OK', selected: false, autofocus: true, onTap: () => Navigator.of(ctx).pop()),
+          ],
+        ),
+      ),
+    );
+    _panelOpen = false;
+    if (!mounted) return;
+    if (picked != null && picked != _index) {
+      _tuneTo(picked);
+    } else {
+      _showOverlay();
+    }
   }
 
   /// Opens the same stream again at the same place (after a picture-mode change).
@@ -838,7 +944,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     // Open only after the remote has been still for a moment, so skimming
     // through channels does not start a stream for every key press.
     _zapTimer?.cancel();
-    _zapTimer = Timer(const Duration(milliseconds: 450), () {
+    _zapTimer = Timer(const Duration(milliseconds: 280), () {
       final next = _zapTarget;
       if (mounted && next != null) _tuneTo(next);
     });
@@ -1195,6 +1301,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _button(Icons.audiotrack_rounded, 'Audio language', _openOptions, node: widget.live && !many ? _mainButton : null),
       _button(Icons.closed_caption_rounded, 'Subtitles', _openOptions),
       _button(Icons.aspect_ratio_rounded, 'Picture: ${_fitNames[_fit]}', _cycleFit),
+      _button(Icons.high_quality_rounded, 'Quality', _openQuality),
       if (!widget.live) _button(Icons.speed_rounded, 'Speed ${_speed}x', _openOptions),
       if (widget.live && item != null)
         _button(favourite ? Icons.star_rounded : Icons.star_border_rounded,
@@ -1304,21 +1411,18 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                     const SizedBox(height: 4),
                     SizedBox(
                       height: 66,
-                      child: Stack(
-                        alignment: Alignment.center,
+                      child: Row(
                         children: [
-                          Align(
-                            alignment: Alignment.centerLeft,
+                          // Name of the button the remote is on.
+                          Expanded(
                             child: Text(_buttonLabel,
-                                maxLines: 1,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 13, color: C.dim)),
+                                style: const TextStyle(fontSize: 13, height: 1.2, color: C.dim)),
                           ),
-                          Row(mainAxisSize: MainAxisSize.min, children: centre),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Row(mainAxisSize: MainAxisSize.min, children: side),
-                          ),
+                          ...centre,
+                          const SizedBox(width: 22),
+                          ...side,
                         ],
                       ),
                     ),

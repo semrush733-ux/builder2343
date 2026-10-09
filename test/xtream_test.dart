@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:b1gtv/m3u.dart';
+import 'package:b1gtv/quality.dart';
 import 'package:b1gtv/screens/player.dart';
 import 'package:b1gtv/store.dart';
 import 'package:b1gtv/tmdb.dart';
@@ -301,6 +302,28 @@ http://example.com:8080/bob/pw/103
       expect(movie.genre, 'Action, Drama');
       expect(movie.year, '2026');
       expect(parseTmdbMovie(null).cast, isEmpty);
+    });
+  });
+
+  group('quality', () {
+    test('versions of one channel are recognised by name', () {
+      expect(channelBaseName('PK | GEO NEWS FHD'), 'pk geo news');
+      expect(channelBaseName('PK | Geo News HD*'), 'pk geo news');
+      expect(channelBaseName('PK | GEO TEZZ'), 'pk geo tezz');
+      final names = ['PK | GEO NEWS SD', 'PK | GEO TEZZ', 'PK | GEO NEWS FHD', 'PK | Geo News 4K', 'PK | GEO NEWS HD'];
+      expect(otherVersions(names, 4), [3, 2, 0]); // 4K, Full HD, SD
+      expect(otherVersions(names, 1), isEmpty);
+    });
+
+    test('labels', () {
+      expect(qualityInName('Sky Sports UHD'), '4K');
+      expect(qualityInName('Sky Sports FHD'), 'Full HD 1080p');
+      expect(qualityInName('Sky Sports HD'), 'HD 720p');
+      expect(qualityInName('Sky Sports'), 'Standard');
+      expect(qualityOfHeight(2160), '4K');
+      expect(qualityOfHeight(1080), 'Full HD 1080p');
+      expect(qualityOfHeight(576), 'SD 576p');
+      expect(qualityOfHeight(0), '');
     });
   });
 
