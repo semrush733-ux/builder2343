@@ -184,7 +184,7 @@ class Store {
   /// (the device's hardware decoder draws straight to the screen: lightest for weak TV sticks,
   /// and the fallback when the standard way cannot start on a device).
   static String get videoMode {
-    final v = _p.getString('video_mode');
+    final v = _p.getString('video_mode') ?? '';
     if (v == 'direct' || v == 'gpu') return v;
     // Direct by default: lightest for TV hardware and avoids slow/out-of-sync
     // video on big screens. Emulator test builds keep the standard mode.
