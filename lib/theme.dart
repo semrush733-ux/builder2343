@@ -47,17 +47,24 @@ class Logo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: size * 0.32, vertical: size * 0.06),
-      decoration: BoxDecoration(color: C.accent, borderRadius: BorderRadius.circular(size * 0.22)),
-      child: Text(
-        'B1G',
-        style: TextStyle(
-          color: Colors.black,
-          fontSize: size,
-          height: 1.15,
-          fontWeight: FontWeight.w900,
-          letterSpacing: size * 0.02,
+    // The brand logo (white-text variant for the dark UI). If the asset ever
+    // fails to load, the old wordmark appears instead of a blank space.
+    return Image.asset(
+      'assets/logo.png',
+      height: size * 1.3,
+      filterQuality: FilterQuality.medium,
+      errorBuilder: (_, __, ___) => Container(
+        padding: EdgeInsets.symmetric(horizontal: size * 0.32, vertical: size * 0.06),
+        decoration: BoxDecoration(color: C.accent, borderRadius: BorderRadius.circular(size * 0.22)),
+        child: Text(
+          'B1G',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: size,
+            height: 1.15,
+            fontWeight: FontWeight.w900,
+            letterSpacing: size * 0.02,
+          ),
         ),
       ),
     );
