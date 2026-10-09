@@ -168,7 +168,37 @@ Android until the old app is uninstalled.
 
 ---
 
-## 5. Optional, nice to have
+## 5. Registration: recognising a reinstalled app (app 1.0.22+)
+
+`POST /wp-json/b1g/v1/device/register` now carries the device's identifiers:
+
+```json
+{ "platform": "android-tv", "hwid": "9f8e7d6c5b4a3921", "mac": "A4:5E:60:C1:22:9F" }
+```
+
+| Field | Meaning |
+|---|---|
+| `hwid` | Android's `Settings.Secure.ANDROID_ID` (16 hex characters). Sent whenever Android provides it. |
+| `mac` | Wired (`eth0`) or else Wi-Fi (`wlan0`) address, upper case with colons. **Left out** when the system gives no real one — never the `02:00:00:00:00:00` placeholder, never a per-network privacy address. |
+
+The server looks the device up by `hwid`, then by `mac`; on a match it returns the **same**
+`device_id`, `pairing_code` and licence instead of creating a device with a new trial.
+
+Things to know when implementing the lookup:
+
+* The app sends them **only on registration** (first start after install). Devices registered
+  by an older app version have no `hwid` stored, so they cannot be matched after a reinstall.
+* From Android 8 the `hwid` belongs to *device + the key the APK is signed with*. It survives
+  uninstall / reinstall and updates as long as every APK is signed with the same key; it changes
+  after a factory reset.
+* From Android 11 the system hides network card addresses from apps, so on newer TVs `mac` is
+  usually missing and `hwid` is the only identifier. Treat `mac` as a bonus for older boxes.
+* Both values come from the client and can be forged; do not use them for anything beyond
+  "is this the same TV as before".
+
+---
+
+## 6. Optional, nice to have
 
 * On the QR page (`/upload-playlist/?device_id=…&pairing_code=…`): when a default server is
   set, offer a short form "Username + Password" that saves an `xtream` playlist with
@@ -178,7 +208,7 @@ Android until the old app is uninstalled.
 
 ---
 
-## 6. Quick test
+## 7. Quick test
 
 ```bash
 curl -s "https://YOURSITE/wp-json/b1g/v1/app/config?platform=android-tv&version_code=1" | python3 -m json.tool

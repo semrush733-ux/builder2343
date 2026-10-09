@@ -438,7 +438,8 @@ def run():
 
     # 6a. "My device": device ID, pairing code and QR code from the website
     reg = wait_log(r'backend registered', 0, 5)
-    check('the app registers with the website', reg is not None)
+    ids = wait_log(r'backend register hwid=yes', 0, 5)
+    check('the app registers with the website and sends its device ID', reg is not None and ids is not None)
     key(DOWN)
     key(LEFT)  # the bottom row has two buttons: "My device" is the left one
     shot('my-device-focused')

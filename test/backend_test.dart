@@ -2,6 +2,35 @@ import 'package:b1gtv/backend.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('identifiers sent with the registration', () {
+    test('a real network card address is accepted, placeholders and privacy addresses are not', () {
+      expect(isRealMac('A4:5E:60:C1:22:9F'), true);
+      expect(isRealMac('a4:5e:60:c1:22:9f'), true);
+      expect(isRealMac('02:00:00:00:00:00'), false); // Android's dummy
+      expect(isRealMac('00:00:00:00:00:00'), false);
+      expect(isRealMac('FF:FF:FF:FF:FF:FF'), false);
+      expect(isRealMac('DA:A1:19:3B:7C:01'), false); // made up per Wi-Fi network
+      expect(isRealMac(''), false);
+      expect(isRealMac('A4-5E-60-C1-22-9F'), false);
+    });
+
+    test('device ID always, the first real address only', () {
+      expect(
+        registrationIds({
+          'hwid': '9f8e7d6c5b4a3921',
+          'macs': ['02:00:00:00:00:00', 'a4:5e:60:c1:22:9f'],
+        }),
+        {'hwid': '9f8e7d6c5b4a3921', 'mac': 'A4:5E:60:C1:22:9F'},
+      );
+    });
+
+    test('no real address: the field is left out', () {
+      expect(registrationIds({'hwid': 'abc', 'macs': ['02:00:00:00:00:00']}), {'hwid': 'abc'});
+      expect(registrationIds({'hwid': '', 'macs': []}), isEmpty);
+      expect(registrationIds(null), isEmpty);
+    });
+  });
+
   group('update announced by the website', () {
     test('reads version, link, notes and the force switch', () {
       final u = BUpdate.fromJson({

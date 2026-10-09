@@ -79,6 +79,36 @@ class BPlaylist {
 String bareServer(String url) =>
     url.trim().toLowerCase().replaceFirst(RegExp(r'^https?://'), '').replaceFirst(RegExp(r'/+$'), '');
 
+/// True for a network card's own address. False for the "02:00:00:00:00:00" placeholder newer
+/// Android versions hand out, for empty or broadcast addresses, and for the made-up privacy
+/// addresses (locally administered) that differ from one Wi-Fi network to the next.
+bool isRealMac(String mac) {
+  final m = mac.trim().toUpperCase();
+  if (!RegExp(r'^([0-9A-F]{2}:){5}[0-9A-F]{2}$').hasMatch(m)) return false;
+  if (m == '02:00:00:00:00:00' || m == '00:00:00:00:00:00' || m == 'FF:FF:FF:FF:FF:FF') return false;
+  return (int.parse(m.substring(0, 2), radix: 16) & 0x02) == 0;
+}
+
+/// The identifiers sent once with the registration, so the website recognises the same TV after
+/// the app was removed and installed again (same device ID, pairing code and licence).
+Map<String, String> registrationIds(dynamic fromDevice) {
+  final out = <String, String>{};
+  if (fromDevice is! Map) return out;
+  final hwid = (fromDevice['hwid'] ?? '').toString().trim();
+  if (hwid.isNotEmpty) out['hwid'] = hwid;
+  final macs = fromDevice['macs'];
+  if (macs is List) {
+    for (final raw in macs) {
+      final mac = raw.toString().trim().toUpperCase();
+      if (isRealMac(mac)) {
+        out['mac'] = mac;
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 /// A newer version of the app, announced by the website.
 class BUpdate {
   BUpdate({
@@ -306,8 +336,16 @@ class Backend {
 
   static Future<bool> _register() async {
     try {
+      var ids = const <String, String>{};
+      try {
+        ids = registrationIds(await _device.invokeMethod<dynamic>('deviceIds'));
+      } catch (_) {
+        // Not available: register without them, as before.
+      }
+      log('backend register hwid=${ids.containsKey('hwid') ? 'yes' : 'no'} mac=${ids.containsKey('mac') ? 'yes' : 'no'}');
       final data = await _post('/device/register', {
         'platform': Platform.isAndroid ? 'android-tv' : Platform.operatingSystem,
+        ...ids,
       });
       final d = data['device'];
       if (d is! Map) return false;

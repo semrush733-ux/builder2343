@@ -108,7 +108,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Duration _wantStart = Duration.zero;
   bool _direct = false; // picture mode of the engine that is open now
   bool _pictureFailed = false;
-  final FocusNode _focus = FocusNode(debugLabel: 'player');
+  // Holds the remote while the button bar is hidden. Left / Right on the bar must only move
+  // between the buttons: without skipTraversal this screen-sized node counted as "the nearest
+  // thing to the right" of a button left of the middle, and the bar lost the remote.
+  final FocusNode _focus = FocusNode(debugLabel: 'player', skipTraversal: true);
   final FocusNode _mainButton = FocusNode(debugLabel: 'player-main-button');
   String _buttonLabel = '';
   String _videoSize = '';

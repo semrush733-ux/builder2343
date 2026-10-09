@@ -4,11 +4,13 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.core.content.FileProvider
 import java.io.File
+import java.net.NetworkInterface
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -36,6 +38,38 @@ class MainActivity : FlutterActivity() {
         val info = packageManager.getPackageInfo(packageName, 0)
         val code = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode.toInt() else info.versionCode
         return mapOf("code" to code, "name" to (info.versionName ?: ""))
+    }
+
+    /**
+     * What the website uses to recognise this TV after a reinstall: Android's device ID and the
+     * addresses of the wired and Wi-Fi network cards as far as this Android version shows them
+     * (newer versions hide them; the app then sends the device ID alone).
+     */
+    private fun deviceIds(): Map<String, Any> {
+        var hwid = ""
+        try {
+            hwid = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: ""
+        } catch (e: Exception) {
+        }
+        val macs = ArrayList<String>()
+        for (name in listOf("eth0", "wlan0")) {
+            var mac: String? = null
+            try {
+                val bytes = NetworkInterface.getByName(name)?.hardwareAddress
+                if (bytes != null && bytes.size == 6) {
+                    mac = bytes.joinToString(":") { String.format("%02X", it.toInt() and 0xFF) }
+                }
+            } catch (e: Exception) {
+            }
+            if (mac == null) {
+                try {
+                    mac = File("/sys/class/net/$name/address").readText().trim().uppercase()
+                } catch (e: Exception) {
+                }
+            }
+            if (!mac.isNullOrEmpty()) macs.add(mac)
+        }
+        return mapOf("hwid" to hwid, "macs" to macs)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -66,6 +100,8 @@ class MainActivity : FlutterActivity() {
                     } catch (e: Exception) {
                         result.success(null)
                     }
+                } else if (call.method == "deviceIds") {
+                    result.success(deviceIds())
                 } else if (call.method == "cacheDir") {
                     result.success(cacheDir.absolutePath)
                 } else if (call.method == "canInstall") {
