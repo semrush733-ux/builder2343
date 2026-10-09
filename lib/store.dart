@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'config.dart';
 import 'xtream.dart';
 
 /// Small on-device storage: login, favourites, resume positions.
@@ -13,6 +14,7 @@ class Store {
   static Future<void> init() async {
     _p = await SharedPreferences.getInstance();
     _fav.clear();
+    _recent.clear();
     _resume = null;
   }
 
@@ -41,9 +43,11 @@ class Store {
     if (_p.getString('identity') == identity) return;
     for (final kind in XKind.values) {
       await _p.remove('fav_${kind.name}');
+      await _p.remove('recent_${kind.name}');
     }
     await _p.remove('resume');
     _fav.clear();
+    _recent.clear();
     _resume = null;
     await _p.setString('identity', identity);
   }
@@ -112,6 +116,34 @@ class Store {
     return index < 0;
   }
 
+  // ---- recently watched ----
+  static final Map<XKind, List<XItem>> _recent = {};
+
+  /// Last opened channels / movies / series of one kind, newest first.
+  static List<XItem> recents(XKind kind) {
+    final cached = _recent[kind];
+    if (cached != null) return cached;
+    final list = <XItem>[];
+    for (final raw in _p.getStringList('recent_${kind.name}') ?? const <String>[]) {
+      try {
+        final item = XItem.fromJson(jsonDecode(raw));
+        if (item != null) list.add(item);
+      } catch (_) {}
+    }
+    _recent[kind] = list;
+    return list;
+  }
+
+  static void addRecent(XItem item) {
+    final list = recents(item.kind);
+    list.removeWhere((f) => f.id == item.id);
+    list.insert(0, item);
+    while (list.length > 30) {
+      list.removeLast();
+    }
+    _p.setStringList('recent_${item.kind.name}', list.map((f) => jsonEncode(f.toJson())).toList());
+  }
+
   // ---- resume positions (seconds) ----
   static Map<String, int> _loadResume() {
     final cached = _resume;
@@ -151,7 +183,13 @@ class Store {
   /// How the picture is drawn: "gpu" (standard, works with every video format) or "direct"
   /// (the device's hardware decoder draws straight to the screen: lightest for weak TV sticks,
   /// and the fallback when the standard way cannot start on a device).
-  static String get videoMode => _p.getString('video_mode') == 'direct' ? 'direct' : 'gpu';
+  static String get videoMode {
+    final v = _p.getString('video_mode');
+    if (v == 'direct' || v == 'gpu') return v;
+    // Direct by default: lightest for TV hardware and avoids slow/out-of-sync
+    // video on big screens. Emulator test builds keep the standard mode.
+    return kNoAutoDirect ? 'gpu' : 'direct';
+  }
   static void setVideoMode(String mode) => _p.setString('video_mode', mode);
 
   /// Subtitle language picked last time; empty = subtitles off.

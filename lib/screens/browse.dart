@@ -15,6 +15,7 @@ import 'series.dart';
 const _favId = '*fav';
 const _searchId = '*search';
 const _allId = '*all';
+const _recentId = '*recent';
 
 String kindTitle(XKind kind) {
   switch (kind) {
@@ -116,9 +117,13 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   Future<void> _select(String id, String name) async {
     _focusTimer?.cancel();
-    if (id == _selected && _items != null && id != _favId) return;
+    if (id == _selected && _items != null && id != _favId && id != _recentId) return;
     final request = ++_request;
-    final ready = id == _favId ? List<XItem>.of(Store.favourites(widget.kind)) : _cache[id];
+    final ready = id == _favId
+        ? List<XItem>.of(Store.favourites(widget.kind))
+        : id == _recentId
+            ? List<XItem>.of(Store.recents(widget.kind))
+            : _cache[id];
     setState(() {
       _selected = id;
       _selectedName = name;
@@ -127,6 +132,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     });
     if (ready != null) {
       if (id == _favId) log('browse ${widget.kind.name} favourites=${ready.length}');
+      if (id == _recentId) log('browse ${widget.kind.name} recent=${ready.length}');
       return;
     }
     try {
@@ -215,6 +221,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
   Future<void> _openItem(List<XItem> items, int index) async {
     final api = widget.api;
     final item = items[index];
+    Store.addRecent(item);
     if (widget.kind == XKind.series && item.url.isEmpty) {
       await Navigator.of(context)
           .push(MaterialPageRoute<void>(builder: (_) => SeriesScreen(api: api, series: item)));
@@ -238,7 +245,11 @@ class _BrowseScreenState extends State<BrowseScreen> {
       // Movies open on their details page first; "Watch now" there starts the player.
       await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MovieScreen(api: api, movie: item)));
     }
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {
+        if (_selected == _recentId) _items = List<XItem>.of(Store.recents(widget.kind));
+      });
+    }
   }
 
   @override
@@ -316,7 +327,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     if (cats == null) return const Loading();
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 16),
-      itemCount: cats.length + 3,
+      itemCount: cats.length + 4,
       itemExtent: 42,
       itemBuilder: (context, index) {
         if (index == 0) {
@@ -337,6 +348,15 @@ class _BrowseScreenState extends State<BrowseScreen> {
           );
         }
         if (index == 2) {
+          return _CategoryRow(
+            icon: Icons.history_rounded,
+            name: 'Recent',
+            selected: _selected == _recentId,
+            onTap: () => _select(_recentId, 'Recent'),
+            onFocus: () => _focusCategory(_recentId, 'Recent'),
+          );
+        }
+        if (index == 3) {
           final total = _all?.length;
           final title = allTitle(widget.kind);
           return _CategoryRow(
@@ -348,7 +368,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
             onFocus: () => _focusCategory(_allId, title),
           );
         }
-        final cat = cats[index - 3];
+        final cat = cats[index - 4];
         return _CategoryRow(
           name: cat.name,
           selected: _selected == cat.id,
@@ -368,7 +388,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
     if (items.isEmpty) {
       final text = _selected == _favId
           ? 'No favourites yet.\nHold OK on a ${_live ? 'channel' : 'title'} to add it here.'
-          : (_selected == _searchId ? 'Nothing found.' : 'This category is empty.');
+          : _selected == _recentId
+              ? 'Nothing watched yet.\nWhat you open appears here.'
+              : (_selected == _searchId ? 'Nothing found.' : 'This category is empty.');
       return Center(
         child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: C.dim, fontSize: 15, height: 1.5)),
       );

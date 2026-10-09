@@ -831,6 +831,12 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _reopenHere();
   }
 
+  /// The control-bar button flips between Direct and Standard directly.
+  void _cycleVideoMode() {
+    final next = (_videoModes.indexOf(Store.videoMode) + 1) % _videoModes.length;
+    _chooseVideoMode(next);
+  }
+
   void _chooseFit(int fit) {
     _fit = fit;
     log('fit=${_fitNames[fit]}');
@@ -1377,6 +1383,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _button(Icons.audiotrack_rounded, 'Audio language', _openOptions, node: widget.live && !many ? _mainButton : null),
       _button(Icons.closed_caption_rounded, 'Subtitles', _openOptions),
       _button(Icons.aspect_ratio_rounded, 'Picture: ${_fitNames[_fit]}', _cycleFit),
+      _button(Icons.memory_rounded,
+          'Video mode: ${_videoModeNames[_videoModes.indexOf(Store.videoMode)]}', _cycleVideoMode),
       _button(Icons.high_quality_rounded, 'Quality', _openQuality),
       if (!widget.live) _button(Icons.speed_rounded, 'Speed ${_speed}x', _openOptions),
       if (widget.live && item != null)
