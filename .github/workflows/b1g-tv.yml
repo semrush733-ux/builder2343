@@ -147,6 +147,14 @@ jobs:
             grep -hE "^e: |error:|Error:|FAILED|What went wrong|error -" out/logs/*.log 2>/dev/null | sort -u | head -60 || true
             echo "(end)"
             echo '```'
+            if grep -qs "What went wrong" out/logs/build*.log; then
+              echo "### Build failure details"
+              echo '```'
+              grep -hE "^e: |^w: .*(error|Error)|Execution failed|incompatible version|requires|Could not|Unresolved reference|uses-sdk|minSdk|compileSdk" out/logs/build*.log 2>/dev/null | cut -c1-320 | sort -u | head -40 || true
+              echo "---"
+              grep -h -A 45 "What went wrong" out/logs/build*.log 2>/dev/null | cut -c1-320 | head -110 || true
+              echo '```'
+            fi
           } > "$R"
           cat "$R"
 
