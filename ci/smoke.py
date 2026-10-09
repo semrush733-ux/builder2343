@@ -630,8 +630,10 @@ def run():
     time.sleep(2)
     check('signing in with only username and password works', ok)
     key(DOWN)
+    key(RIGHT)
+    key(RIGHT)  # to the right end of the bottom row ("Sign out") ...
     key(LEFT)
-    key(LEFT)  # "Update"
+    key(LEFT)  # ... and back to its left end: "Update" (one Left more would jump up to the tiles)
     shot('update-button-focused')
     m = mark()
     key(OK, pause=2)
