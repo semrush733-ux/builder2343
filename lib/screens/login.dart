@@ -126,19 +126,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   colors: [Color(0xFF1B1F2A), C.bg],
                 ),
               ),
-              padding: const EdgeInsets.all(48),
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Logo(size: 64),
-                  SizedBox(height: 26),
-                  Text('Live TV, movies and series\non your big screen.',
-                      style: TextStyle(fontSize: 24, height: 1.3, fontWeight: FontWeight.w700)),
-                  SizedBox(height: 14),
-                  Text('Sign in with the details from your provider.',
-                      style: TextStyle(fontSize: 15, color: C.dim)),
-                ],
+              padding: const EdgeInsets.symmetric(horizontal: 48),
+              alignment: Alignment.centerLeft,
+              // Scrollable so nothing breaks when the on-screen keyboard takes half the height.
+              child: const SingleChildScrollView(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Logo(size: 64),
+                    SizedBox(height: 26),
+                    Text('Live TV, movies and series\non your big screen.',
+                        style: TextStyle(fontSize: 24, height: 1.3, fontWeight: FontWeight.w700)),
+                    SizedBox(height: 14),
+                    Text('Sign in with the details from your provider.',
+                        style: TextStyle(fontSize: 15, color: C.dim)),
+                  ],
+                ),
               ),
             ),
           ),

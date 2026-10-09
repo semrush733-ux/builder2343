@@ -473,7 +473,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   void _toggleFavourite() {
     final item = _entry.item;
     if (item == null) return;
-    Store.toggleFavourite(item);
+    final added = Store.toggleFavourite(item);
+    log('favourite ${added ? 'added' : 'removed'}');
     setState(() {});
     _showOverlay();
   }
@@ -786,7 +787,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
           Text('Next  ${formatClock(next.start)}   ${next.title}',
               maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, color: Color(0xFFD5DAE3))),
         const SizedBox(height: 8),
-        const Text('▲ ▼  Change channel      OK  Info      Hold OK  Favourite      Back  Channel list',
+        const Text('Up / Down  Change channel      OK  Info      Hold OK  Favourite      Back  Channel list',
             style: TextStyle(fontSize: 12.5, color: C.dim)),
       ],
     );
@@ -823,7 +824,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
           ],
         ),
         const SizedBox(height: 10),
-        const Text('OK  Pause / Play      ◀ ▶  Jump 10 s (hold to jump further)      Back  Exit',
+        const Text('OK  Pause / Play      Left / Right  Jump 10 s (hold to jump further)      Back  Exit',
             style: TextStyle(fontSize: 12.5, color: C.dim)),
       ],
     );

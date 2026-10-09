@@ -97,7 +97,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
       _itemsError = null;
       _items = ready;
     });
-    if (ready != null) return;
+    if (ready != null) {
+      if (id == _favId) log('browse ${widget.kind.name} favourites=${ready.length}');
+      return;
+    }
     try {
       List<XItem> items;
       if (id == _allId) {
@@ -167,6 +170,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   void _toggleFavourite(XItem item) {
     final added = Store.toggleFavourite(item);
+    log('favourite ${added ? 'added' : 'removed'}');
     setState(() {
       if (_selected == _favId) _items = List<XItem>.of(Store.favourites(widget.kind));
     });

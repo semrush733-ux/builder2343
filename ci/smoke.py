@@ -186,6 +186,36 @@ def run():
 
     key(BACK, pause=2)
     shot('back-to-channel-list')
+
+    # 4b. favourites (hold OK) and search (text typed with a keyboard)
+    m = mark()
+    adb('shell', 'input', 'keyevent', '--longpress', OK)
+    got = wait_log(r'favourite added', m, 20)
+    time.sleep(0.5)
+    shot('favourite-added')
+    check('holding OK adds a favourite', got is not None)
+    key(LEFT)
+    for _ in range(4):
+        key(UP, pause=0.4)
+    shot('search-row-focused')
+    key(OK, pause=2)
+    m = mark()
+    adb('shell', 'input', 'text', 'Two')
+    time.sleep(1)
+    shot('search-typed')
+    key('66', pause=1)  # Enter
+    got = wait_log(r'browse live search=(\d+)', m, 40)
+    time.sleep(1)
+    shot('search-result')
+    check('search finds the channel', got is not None and int(got.group(1)) == 1, got.group(0) if got else '')
+    m = mark()
+    key(DOWN)
+    key(OK)
+    got = wait_log(r'browse live favourites=(\d+)', m, 20)
+    time.sleep(1)
+    shot('favourites-list')
+    check('Favourites lists the saved channel', got is not None and int(got.group(1)) == 1, got.group(0) if got else '')
+
     key(BACK, pause=2)
     shot('back-to-home')
 
@@ -249,6 +279,44 @@ def run():
     key(BACK, pause=2)
     key(BACK, pause=2)
     shot('end-home')
+
+    # 6b. sign out, wrong password, then type the right one with the remote + keyboard
+    key(DOWN)
+    shot('sign-out-focused')
+    key(OK, pause=2)
+    shot('sign-out-dialog')
+    m = mark()
+    key(RIGHT)
+    key(OK)
+    ok = wait_log(r'screen=login', m, 30) is not None
+    time.sleep(2)
+    shot('signed-out')
+    check('sign out returns to the sign-in screen', ok)
+
+    def retype_password(text):
+        key(UP)
+        for _ in range(8):
+            key('67', pause=0.2)  # Delete
+        adb('shell', 'input', 'text', text)
+        time.sleep(1)
+
+    retype_password('nope')
+    shot('password-typed')
+    m = mark()
+    key(DOWN)
+    key(OK)
+    got = wait_log(r'login failed: XtreamAuthException', m, 30)
+    time.sleep(1)
+    shot('wrong-password')
+    check('wrong password is refused with a message', got is not None)
+    retype_password('demo')
+    m = mark()
+    key(DOWN)
+    key(OK)
+    ok = wait_log(r'screen=home', m, 30) is not None
+    time.sleep(2)
+    shot('signed-in-again')
+    check('typing the password and signing in again works', ok)
 
     # 7. the app must still be alive and must not have crashed
     logcat = adb('logcat', '-d', timeout=60)
