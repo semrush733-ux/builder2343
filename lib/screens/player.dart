@@ -95,6 +95,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   static const _device = MethodChannel('b1g/device');
   static const _maxFails = 8;
 
+  /// The automatic change of picture mode is tried once per app start, never back and forth.
+  static bool _autoDirectTried = false;
+
   // A fresh engine is created for every stream that is opened and the old one is closed first:
   // an IPTV account usually allows a single connection, and a clean start is the most reliable.
   Player? _player;
@@ -530,6 +533,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
           !player.state.buffering;
       if (refused || idle || waited > const Duration(seconds: 25)) {
         log(refused ? 'open failed' : (idle ? 'open stopped' : 'open timed out'));
+        if (!refused && !idle && _direct) {
+          // The direct picture mode hung on this device: go back to the standard one.
+          log('direct mode did not start, back to standard mode');
+          Store.setVideoMode('gpu');
+        }
         _failed();
       }
       return;
@@ -540,7 +548,12 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
     // Sound but no picture: the standard picture mode could not start on this device.
     // Switch to the direct mode once (remembered for next time) and reopen.
-    if (_pictureFailed && !_direct && now.difference(_openedAt) > const Duration(seconds: 3)) {
+    if (_pictureFailed &&
+        !_direct &&
+        !kNoAutoDirect &&
+        !_autoDirectTried &&
+        now.difference(_openedAt) > const Duration(seconds: 3)) {
+      _autoDirectTried = true;
       log('picture failed in standard mode, switching to direct mode');
       Store.setVideoMode('direct');
       _reopenHere();

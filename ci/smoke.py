@@ -179,22 +179,14 @@ def run():
     check('channel 1 plays (.ts stream)', ready is not None and ready.group(1) == 'ts' and pos >= 5,
           '%s, position %ss' % (ready.group(0) if ready else 'not ready', pos))
     check('video picture is decoded', ready is not None and int(ready.group(2)) > 0, ready.group(0) if ready else '')
-    # If the standard picture mode cannot start on a device, the app notices (sound but no picture)
-    # and switches to the direct mode by itself within a few seconds. Either mode is fine here.
-    time.sleep(7)
-    lines = app_log()
-    readies = [i for i, line in enumerate(lines) if 'ready index=0 format=ts' in line]
-    m = readies[-1] if readies else m
-    mode = re.search(r'mode=(\w+)', lines[m]).group(1) if readies and 'mode=' in lines[m] else '?'
     # The mock sends live TV like a real panel: short burst, then real-time speed, one connection only.
+    # (The emulator has no graphics chip, so in the standard picture mode it plays without a visible
+    # picture; the picture itself is checked at the very end, in the direct mode.)
     pos = wait_position(0, 25, m, 60)
     opens = len([line for line in app_log()[m:] if 'open index=0' in line])
     shot('live-after-25s')
-    share = picture_share('live-after-25s')
-    check('live picture is really visible on the screen (picture mode: %s)' % mode, share > 0.5,
-          'non-black share %.2f' % share)
-    check('live keeps playing for 25 s on a real-time stream without reconnecting', pos >= 25 and opens == 0,
-          'position %ss, reopened %d time(s)' % (pos, opens))
+    check('live keeps playing for 25 s on a real-time stream without reconnecting', pos >= 25 and opens == 1,
+          'position %ss, opened %d time(s)' % (pos, opens))
 
     # 2b. panels inside the player: channel list (Left) and audio / subtitles (Right)
     m = mark()
@@ -299,8 +291,6 @@ def run():
     pos = wait_position(0, 5, m, 60)
     shot('movie-playing')
     check('movie plays', ready is not None and pos >= 5, 'position %ss' % pos)
-    share = picture_share('movie-playing')
-    check('movie picture is really visible on the screen', share > 0.5, 'non-black share %.2f' % share)
 
     # 5b. audio language and subtitles (the test movie has English + Urdu audio and English subtitles)
     tracks = wait_log(r'tracks audio=(\d+) subtitles=(\d+)', m, 10)
@@ -499,6 +489,26 @@ def run():
     pos = wait_position(0, 5, m2, 60)
     shot('m3u-movie-playing')
     check('playlist movie plays', got is not None and ready is not None and pos >= 5, 'position %ss' % pos)
+
+    # 7. the picture itself: switch this movie to the direct picture mode (which the emulator can draw)
+    key(OK)  # button bar
+    key(RIGHT)
+    key(RIGHT)  # Audio language
+    key(OK, pause=2)  # options panel
+    for _ in range(10):
+        key(DOWN, pause=0.4)  # down to the last row: Video mode
+    shot('video-mode-row')
+    m3 = mark()
+    key(RIGHT)
+    key(OK)
+    chosen = wait_log(r'video mode=direct', m3, 10)
+    ready = wait_log(r'ready index=0 format=mp4 video=\d+x\d+ mode=direct', m3, 60)
+    key(BACK, pause=2)  # close the panel
+    key(BACK, pause=4)  # put the button bar away
+    shot('direct-mode-picture')
+    share = picture_share('direct-mode-picture')
+    check('the picture mode can be changed in the player', chosen is not None and ready is not None)
+    check('the movie picture is really visible on the screen (direct mode)', share > 0.5, 'non-black share %.2f' % share)
     key(BACK, pause=2)
     key(BACK, pause=2)
     key(BACK, pause=2)
