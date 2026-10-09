@@ -120,8 +120,13 @@ class _TvFocusState extends State<TvFocus> {
   }
 }
 
-/// Text field that lets the remote leave it with Up / Down.
-class TvField extends StatelessWidget {
+/// Text field made for a TV remote (and fine with touch).
+///
+/// It is a normal focusable row until OK is pressed (or it is tapped): only then
+/// the keyboard opens. So moving over the form with the remote never pops the
+/// keyboard up, and OK on a field always brings the keyboard back.
+/// While typing: Next / Done on the keyboard confirms, Up / Down or Back leaves the field.
+class TvField extends StatefulWidget {
   const TvField({
     super.key,
     required this.controller,
@@ -133,68 +138,184 @@ class TvField extends StatelessWidget {
     this.action = TextInputAction.next,
     this.keyboardType,
     this.onSubmitted,
-    this.onUp,
-    this.onDown,
   });
 
   final TextEditingController controller;
   final String label;
   final IconData icon;
+
+  /// Focus of the row (not of the keyboard cursor).
   final FocusNode? focusNode;
   final bool obscure;
+
+  /// Start typing straight away (used where the field is the only thing on screen).
   final bool autofocus;
   final TextInputAction action;
   final TextInputType? keyboardType;
+
+  /// Called when the keyboard's Next / Done / Search key is pressed. The handler decides where
+  /// the focus goes next; without a handler the focus returns to this row.
   final ValueChanged<String>? onSubmitted;
-  final VoidCallback? onUp;
-  final VoidCallback? onDown;
+
+  @override
+  State<TvField> createState() => TvFieldState();
+}
+
+class TvFieldState extends State<TvField> {
+  final FocusNode _editNode = FocusNode(debugLabel: 'field-edit');
+  FocusNode? _ownRowNode;
+  bool _editing = false;
+  bool _hadFocus = false;
+
+  FocusNode get _rowNode => widget.focusNode ?? (_ownRowNode ??= FocusNode(debugLabel: 'field-row'));
+
+  @override
+  void initState() {
+    super.initState();
+    _editNode.addListener(_onEditFocus);
+    widget.controller.addListener(_onText);
+    if (widget.autofocus) {
+      _editing = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _editing) _editNode.requestFocus();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onText);
+    _editNode.removeListener(_onEditFocus);
+    _editNode.dispose();
+    _ownRowNode?.dispose();
+    super.dispose();
+  }
+
+  void _onText() {
+    if (mounted && !_editing) setState(() {});
+  }
+
+  void _onEditFocus() {
+    if (_editNode.hasFocus) {
+      _hadFocus = true;
+    } else if (_editing && _hadFocus) {
+      // Focus went somewhere else (another field was tapped, a dialog opened...).
+      _leave(backToRow: false);
+    }
+  }
+
+  /// Opens the keyboard on this field.
+  void edit() {
+    if (_editing) {
+      _showKeyboard();
+      return;
+    }
+    _hadFocus = false;
+    if (mounted) setState(() => _editing = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _editing) _editNode.requestFocus();
+    });
+  }
+
+  void _showKeyboard() {
+    SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+  }
+
+  void _leave({required bool backToRow}) {
+    if (!_editing || !mounted) return;
+    setState(() => _editing = false);
+    if (backToRow) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_editing) _rowNode.requestFocus();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    return _editing ? _editor() : _row();
+  }
+
+  Widget _row() {
+    final text = widget.controller.text;
+    final empty = text.isEmpty;
+    final shown = empty ? 'Press OK to type' : (widget.obscure ? '•' * text.length : text);
+    return TvFocus(
+      focusNode: _rowNode,
+      onTap: edit,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: Row(
+          children: [
+            Icon(widget.icon, color: C.dim, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(widget.label, style: const TextStyle(fontSize: 11.5, color: C.dim)),
+                  const SizedBox(height: 1),
+                  Text(
+                    shown,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 16, color: empty ? const Color(0xFF596070) : C.text),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.keyboard_rounded, color: Color(0xFF596070), size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _editor() {
     OutlineInputBorder border(Color color) => OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: color, width: 2.5),
         );
-    return CallbackShortcuts(
-      bindings: <ShortcutActivator, VoidCallback>{
-        const SingleActivator(LogicalKeyboardKey.arrowDown): () {
-          if (onDown != null) {
-            onDown!();
-          } else {
-            FocusScope.of(context).nextFocus();
-          }
-        },
-        const SingleActivator(LogicalKeyboardKey.arrowUp): () {
-          if (onUp != null) {
-            onUp!();
-          } else {
-            FocusScope.of(context).previousFocus();
-          }
-        },
+    return PopScope(
+      // Back first closes the keyboard (Android does that), then leaves the field, then the screen.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _leave(backToRow: true);
       },
-      child: TextField(
-        controller: controller,
-        focusNode: focusNode,
-        autofocus: autofocus,
-        obscureText: obscure,
-        autocorrect: false,
-        enableSuggestions: false,
-        keyboardType: keyboardType,
-        textInputAction: action,
-        onSubmitted: onSubmitted,
-        style: const TextStyle(fontSize: 16, color: C.text),
-        cursorColor: C.accent,
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: const TextStyle(color: C.dim),
-          floatingLabelStyle: const TextStyle(color: C.accent),
-          prefixIcon: Icon(icon, color: C.dim, size: 20),
-          filled: true,
-          fillColor: C.card,
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          enabledBorder: border(Colors.transparent),
-          focusedBorder: border(C.accent),
+      child: CallbackShortcuts(
+        bindings: <ShortcutActivator, VoidCallback>{
+          const SingleActivator(LogicalKeyboardKey.arrowDown): () => _leave(backToRow: true),
+          const SingleActivator(LogicalKeyboardKey.arrowUp): () => _leave(backToRow: true),
+          const SingleActivator(LogicalKeyboardKey.select): _showKeyboard,
+        },
+        child: TextField(
+          controller: widget.controller,
+          focusNode: _editNode,
+          obscureText: widget.obscure,
+          autocorrect: false,
+          enableSuggestions: false,
+          keyboardType: widget.keyboardType,
+          textInputAction: widget.action,
+          onSubmitted: (value) {
+            final handler = widget.onSubmitted;
+            _leave(backToRow: handler == null);
+            handler?.call(value);
+          },
+          style: const TextStyle(fontSize: 16, color: C.text),
+          cursorColor: C.accent,
+          decoration: InputDecoration(
+            labelText: widget.label,
+            labelStyle: const TextStyle(color: C.dim),
+            floatingLabelStyle: const TextStyle(color: C.accent),
+            prefixIcon: Icon(widget.icon, color: C.accent, size: 20),
+            filled: true,
+            fillColor: C.card,
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            enabledBorder: border(C.accent),
+            focusedBorder: border(C.accent),
+          ),
         ),
       ),
     );

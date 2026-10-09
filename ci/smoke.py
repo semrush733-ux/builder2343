@@ -388,7 +388,8 @@ def run():
     check('sign out returns to the sign-in screen', ok)
 
     def retype_password(text):
-        key(UP)
+        key(UP)  # the password row
+        key(OK, pause=1.5)  # OK opens the keyboard on it
         for _ in range(8):
             key('67', pause=0.2)  # Delete
         adb('shell', 'input', 'text', text)
@@ -397,16 +398,14 @@ def run():
     retype_password('nope')
     shot('password-typed')
     m = mark()
-    key(DOWN)
-    key(OK)
+    key('66')  # the keyboard's Done key signs in
     got = wait_log(r'login failed: XtreamAuthException', m, 30)
     time.sleep(1)
     shot('wrong-password')
     check('wrong password is refused with a message', got is not None)
     retype_password('demo')
     m = mark()
-    key(DOWN)
-    key(OK)
+    key('66')
     ok = wait_log(r'screen=home', m, 30) is not None
     time.sleep(2)
     shot('signed-in-again')
@@ -428,13 +427,14 @@ def run():
     got = wait_log(r'login mode=m3u', m, 15)
     shot('m3u-tab')
     check('the M3U link option can be chosen with the remote', ok and got is not None)
-    key(DOWN)
+    key(DOWN)  # the playlist link row
+    shot('m3u-row-focused')
+    key(OK, pause=1.5)
     adb('shell', 'input', 'text', 'http://10.0.2.2:8787/playlist.m3u')
     time.sleep(1)
     shot('m3u-link-typed')
     m = mark()
-    key(DOWN)
-    key(OK)
+    key('66')
     got = wait_log(r'login ok mode=m3u (.*)$', m, 40)
     ok = wait_log(r'screen=home', m, 20) is not None
     time.sleep(2)

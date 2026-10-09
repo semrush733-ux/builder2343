@@ -30,6 +30,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passNode = FocusNode();
   final _m3uNode = FocusNode();
   final _buttonNode = FocusNode();
+  final _userField = GlobalKey<TvFieldState>();
+  final _passField = GlobalKey<TvFieldState>();
   bool _m3uMode = false;
   bool _busy = false;
   String? _error;
@@ -83,8 +85,6 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     log('login mode=${m3u ? 'm3u' : 'xtream'}');
   }
-
-  void _focusTab() => (_m3uMode ? _m3uTabNode : _xtreamTabNode).requestFocus();
 
   void _fail(Object e) {
     log('login failed: ${e.runtimeType}');
@@ -289,8 +289,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           keyboardType: TextInputType.url,
                           action: TextInputAction.done,
                           onSubmitted: (_) => _login(),
-                          onUp: _focusTab,
-                          onDown: _buttonNode.requestFocus,
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -307,32 +305,28 @@ class _LoginScreenState extends State<LoginScreen> {
                             label: 'Server address',
                             icon: Icons.dns_rounded,
                             keyboardType: TextInputType.url,
-                            onSubmitted: (_) => _userNode.requestFocus(),
-                            onUp: _focusTab,
-                            onDown: _userNode.requestFocus,
+                            onSubmitted: (_) => _userField.currentState?.edit(),
                           ),
                           const SizedBox(height: 10),
                         ],
                         TvField(
                           controller: _user,
+                          key: _userField,
                           focusNode: _userNode,
                           label: 'Username',
                           icon: Icons.person_rounded,
-                          onSubmitted: (_) => _passNode.requestFocus(),
-                          onUp: _locked ? () {} : _serverNode.requestFocus,
-                          onDown: _passNode.requestFocus,
+                          onSubmitted: (_) => _passField.currentState?.edit(),
                         ),
                         const SizedBox(height: 10),
                         TvField(
                           controller: _pass,
+                          key: _passField,
                           focusNode: _passNode,
                           label: 'Password',
                           icon: Icons.lock_rounded,
                           obscure: true,
                           action: TextInputAction.done,
                           onSubmitted: (_) => _login(),
-                          onUp: _userNode.requestFocus,
-                          onDown: _buttonNode.requestFocus,
                         ),
                       ],
                       const SizedBox(height: 16),
