@@ -189,6 +189,7 @@ def run():
     shot('live-list')
     check('Live TV shows categories and channels', got is not None and int(got.group(1)) == 4, got.group(0) if got else '')
     key(RIGHT)
+    key(UP)  # the list has two rows now: make sure the remote is on the first channel
     shot('live-channel-focused')
     m = mark()
     key(OK)
