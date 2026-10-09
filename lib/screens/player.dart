@@ -59,6 +59,8 @@ String formatOfUrl(String url) {
 const _fits = [BoxFit.contain, BoxFit.cover, BoxFit.fill];
 const _fitNames = ['Fit', 'Fill', 'Stretch'];
 const _speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+const _videoModes = ['gpu', 'direct'];
+const _videoModeNames = ['Standard', 'Direct'];
 
 /// Full-screen player.
 ///
@@ -100,6 +102,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Future<void>? _closing;
   final List<StreamSubscription<dynamic>> _subs = [];
   Duration _wantStart = Duration.zero;
+  bool _direct = false; // picture mode of the engine that is open now
+  bool _pictureFailed = false;
   final FocusNode _focus = FocusNode(debugLabel: 'player');
 
   late int _index;
@@ -177,7 +181,15 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       ),
     );
     _player = player;
-    _video = VideoController(player);
+    _direct = Store.videoMode == 'direct';
+    _pictureFailed = false;
+    _video = VideoController(
+      player,
+      configuration: VideoControllerConfiguration(
+        vo: _direct ? 'mediacodec_embed' : null,
+        hwdec: _direct ? 'mediacodec' : null,
+      ),
+    );
     _subs.add(player.stream.position.listen(_onPosition));
     _subs.add(player.stream.duration.listen((d) {
       if (_accepting) _duration = d;
@@ -242,6 +254,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     await set('demuxer-readahead-secs', widget.live ? '10' : '30');
     await set('audio-channels', 'stereo');
     await set('sub-auto', 'no');
+    if (_direct) await set('hwdec', 'mediacodec');
   }
 
   @override
@@ -401,13 +414,14 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     final url = _entry.urls[_urlIndex % _entry.urls.length];
     final w = player.state.width ?? 0;
     final h = player.state.height ?? 0;
-    log('ready index=$_index format=${formatOfUrl(url)} video=${w}x$h');
+    log('ready index=$_index format=${formatOfUrl(url)} video=${w}x$h mode=${_direct ? 'direct' : 'gpu'}');
     _applyPreferredTracks();
     if (mounted) setState(() => _status = null);
     _showOverlay();
   }
 
   static final _address = RegExp(r'[a-z]+://\S+');
+  static final _pictureError = RegExp(r'video_out|VO window|suitable GPU context', caseSensitive: false);
   static final _fatal = RegExp(
       r'failed to open|loading failed|failed to recognize|unrecognized file format|http error|server returned|'
       r'connection refused|connection timed out|could not resolve|failed to resolve|no route to host|invalid data found',
@@ -431,6 +445,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _errorLoggedAt = now;
       log('engine: $short');
     }
+    if (_pictureError.hasMatch(text)) _pictureFailed = true;
     if (_accepting && !_ready && _fatal.hasMatch(text)) _errorAt ??= DateTime.now();
   }
 
@@ -511,6 +526,14 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
     if (_userPaused || _scrubbing) {
       _lastProgress = now;
+      return;
+    }
+    // Sound but no picture: the standard picture mode could not start on this device.
+    // Switch to the direct mode once (remembered for next time) and reopen.
+    if (_pictureFailed && !_direct && now.difference(_openedAt) > const Duration(seconds: 3)) {
+      log('picture failed in standard mode, switching to direct mode');
+      Store.setVideoMode('direct');
+      _reopenHere();
       return;
     }
     final frozen = now.difference(_lastProgress);
@@ -599,6 +622,20 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     log('speed=$speed');
   }
 
+  /// Opens the same stream again at the same place (after a picture-mode change).
+  void _reopenHere() {
+    _saveResume();
+    _fails = 0;
+    _open(startAt: widget.live ? null : _position);
+  }
+
+  void _chooseVideoMode(int index) {
+    if (Store.videoMode == _videoModes[index]) return;
+    Store.setVideoMode(_videoModes[index]);
+    log('video mode=${_videoModes[index]}');
+    _reopenHere();
+  }
+
   void _chooseFit(int fit) {
     _fit = fit;
     log('fit=${_fitNames[fit]}');
@@ -660,6 +697,13 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                 selected: _fit,
                 onTap: (i) => pick(() => _chooseFit(i)),
               ),
+              const _PanelHeading('Video mode'),
+              _PanelChips(
+                labels: _videoModeNames,
+                selected: _videoModes.indexOf(Store.videoMode),
+                onTap: (i) => pick(() => _chooseVideoMode(i)),
+              ),
+              const _PanelNote('Direct is lighter for TV sticks. Use Standard if a video shows no picture.'),
             ],
           );
         },
@@ -995,6 +1039,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                       controls: NoVideoControls,
                       fit: _fits[_fit],
                       fill: Colors.black,
+                      // Subtitles sit above the controls while those are on screen.
+                      subtitleViewConfiguration: SubtitleViewConfiguration(
+                        padding: EdgeInsets.fromLTRB(24, 0, 24, _overlay ? 118 : 26),
+                      ),
                     ),
                   ),
                 )

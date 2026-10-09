@@ -48,6 +48,21 @@ def shot(name):
         pass
 
 
+def picture_share(name):
+    """Share of clearly non-black pixels in the middle of the newest screenshot called `name` (0..1)."""
+    try:
+        from PIL import Image
+        path = sorted(p for p in os.listdir(OUT) if p.endswith('-%s.png' % name))[-1]
+        im = Image.open(os.path.join(OUT, path)).convert('RGB')
+        w, h = im.size
+        box = im.crop((w // 4, h // 4, w * 3 // 4, h * 3 // 4)).resize((96, 54))
+        px = list(box.getdata())
+        return sum(1 for r, g, b in px if max(r, g, b) > 60) / float(len(px))
+    except Exception as exc:  # noqa: BLE001
+        print('picture_share failed: %s' % exc, flush=True)
+        return -1.0
+
+
 def key(code, pause=1.2):
     adb('shell', 'input', 'keyevent', code)
     time.sleep(pause)
@@ -164,12 +179,21 @@ def run():
     check('channel 1 plays (.ts stream)', ready is not None and ready.group(1) == 'ts' and pos >= 5,
           '%s, position %ss' % (ready.group(0) if ready else 'not ready', pos))
     check('video picture is decoded', ready is not None and int(ready.group(2)) > 0, ready.group(0) if ready else '')
+    # The emulator has no real graphics chip: the standard picture mode cannot start there, and the
+    # app must notice that by itself and switch to the direct mode (this is also the safety net for
+    # real devices where the standard mode fails).
+    switched = wait_log(r'ready index=0 format=ts video=\d+x\d+ mode=direct', m, 60)
+    m = mark() - 1
     # The mock sends live TV like a real panel: short burst, then real-time speed, one connection only.
     pos = wait_position(0, 25, m, 60)
     opens = len([line for line in app_log()[m:] if 'open index=0' in line])
+    key(OK)  # hide or show the info bar; the picture is checked either way
     shot('live-after-25s')
-    check('live keeps playing for 25 s on a real-time stream without reconnecting', pos >= 25 and opens == 1,
-          'position %ss, opened %d time(s)' % (pos, opens))
+    share = picture_share('live-after-25s')
+    check('the app switches picture mode by itself when the standard one cannot start', switched is not None)
+    check('live picture is really visible on the screen', share > 0.5, 'non-black share %.2f' % share)
+    check('live keeps playing for 25 s on a real-time stream without reconnecting', pos >= 25 and opens == 0,
+          'position %ss, reopened %d time(s)' % (pos, opens))
 
     # 2b. panels inside the player: channel list (Left) and audio / subtitles (Right)
     m = mark()
@@ -265,6 +289,8 @@ def run():
     pos = wait_position(0, 5, m, 60)
     shot('movie-playing')
     check('movie plays', ready is not None and pos >= 5, 'position %ss' % pos)
+    share = picture_share('movie-playing')
+    check('movie picture is really visible on the screen', share > 0.5, 'non-black share %.2f' % share)
 
     # 5b. audio language and subtitles (the test movie has English + Urdu audio and English subtitles)
     tracks = wait_log(r'tracks audio=(\d+) subtitles=(\d+)', m, 10)

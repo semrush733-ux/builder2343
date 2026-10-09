@@ -133,6 +133,12 @@ class Store {
   static String get audioLanguage => _p.getString('audio_lang') ?? '';
   static void setAudioLanguage(String code) => _p.setString('audio_lang', code);
 
+  /// How the picture is drawn: "gpu" (standard, works with every video format) or "direct"
+  /// (the device's hardware decoder draws straight to the screen: lightest for weak TV sticks,
+  /// and the fallback when the standard way cannot start on a device).
+  static String get videoMode => _p.getString('video_mode') == 'direct' ? 'direct' : 'gpu';
+  static void setVideoMode(String mode) => _p.setString('video_mode', mode);
+
   /// Subtitle language picked last time; empty = subtitles off.
   static String get subtitleLanguage => _p.getString('sub_lang') ?? '';
   static void setSubtitleLanguage(String code) => _p.setString('sub_lang', code);
