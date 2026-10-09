@@ -244,6 +244,9 @@ jobs:
             flutter build web --release \
               --dart-define=B1G_SERVER="$SERVER" --dart-define=B1G_TMDB_KEY="$TMDB_API_KEY"
           } 2>&1 | tee outweb/web.log
+          # Relative base href, so the app also runs from a subfolder
+          # (e.g. /wp-content/uploads/b1g-web/ on the WordPress site).
+          sed -i 's|<base href="/">|<base href="./">|' build/web/index.html
           (cd build/web && zip -qr "$GITHUB_WORKSPACE/b1g-web.zip" .)
 
       - name: Add b1g-web.zip to the release
