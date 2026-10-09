@@ -231,23 +231,51 @@ jobs:
           cp -r "$RUNNER_TEMP/webscaffold/web" web
 
       - name: Build the web app
+        id: webbuild
+        continue-on-error: true
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: |
           set -o pipefail
+          mkdir -p outweb
           SERVER="$(tr -d ' \r\n' < config/server.txt)"
-          flutter pub get
-          flutter build web --release \
-            --build-name "1.0.$BUILD_NUMBER" --build-number "$BUILD_NUMBER" \
-            --dart-define=B1G_SERVER="$SERVER" --dart-define=B1G_TMDB_KEY="$TMDB_API_KEY"
+          {
+            flutter pub get
+            flutter build web --release \
+              --dart-define=B1G_SERVER="$SERVER" --dart-define=B1G_TMDB_KEY="$TMDB_API_KEY"
+          } 2>&1 | tee outweb/web.log
           (cd build/web && zip -qr "$GITHUB_WORKSPACE/b1g-web.zip" .)
 
       - name: Add b1g-web.zip to the release
+        if: steps.webbuild.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           upload() { gh release upload b1g-latest b1g-web.zip --clobber; }
           upload || { sleep 20; upload; } || { sleep 60; upload; }
+
+      # The web result (or its error) goes into the release notes, so it can be read anywhere.
+      - name: Report the web result in the release notes
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo ""
+            echo "### Web build (b1g-web.zip)"
+            echo '```'
+            if [ "${{ steps.webbuild.outcome }}" = "success" ]; then
+              echo "OK - b1g-web.zip attached ($(stat -c%s b1g-web.zip 2>/dev/null || echo '?') bytes)"
+            else
+              echo "FAILED - last errors:"
+              grep -hiE "error|exception|unsupported|not found|failed" outweb/web.log 2>/dev/null | tail -30 || tail -30 outweb/web.log 2>/dev/null || echo "(no log)"
+            fi
+            echo '```'
+          } > "$RUNNER_TEMP/webnote.md"
+          gh release view b1g-latest --json body -q .body > "$RUNNER_TEMP/body.md"
+          cat "$RUNNER_TEMP/webnote.md" >> "$RUNNER_TEMP/body.md"
+          gh release edit b1g-latest --notes-file "$RUNNER_TEMP/body.md"
 
   # Runs the test build on an emulator with a TV-sized screen and drives it with remote-control
   # keys against a mock IPTV server (ci/smoke.py). Screenshots go to the branch "ci-smoke-b1g".
