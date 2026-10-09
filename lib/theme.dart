@@ -51,7 +51,7 @@ class Logo extends StatelessWidget {
     // fails to load, the old wordmark appears instead of a blank space.
     return Image.asset(
       'assets/logo.png',
-      height: size * 1.3,
+      height: size * 1.7,
       filterQuality: FilterQuality.medium,
       errorBuilder: (_, __, ___) => Container(
         padding: EdgeInsets.symmetric(horizontal: size * 0.32, vertical: size * 0.06),
