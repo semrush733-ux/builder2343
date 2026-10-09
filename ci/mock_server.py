@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""
+Mock IPTV server for the automated test. It answers like an Xtream Codes panel
+(player_api.php) and serves the generated test videos from ci/media.
+
+    username / password: demo / demo
+    channel 1  .ts works            channel 2  only .m3u8 works (tests the fallback)
+    channel 3  never works          movie 10, series 20 (episodes 31, 32)
+"""
+import base64
+import json
+import os
+import re
+import sys
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlparse
+
+PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8787
+MEDIA = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'media')
+BASE = 'http://10.0.2.2:%d' % PORT  # the host machine as seen from the emulator
+
+LIVE_CATS = [{'category_id': '1', 'category_name': 'UK Entertainment', 'parent_id': 0},
+             {'category_id': '2', 'category_name': 'Sports', 'parent_id': 0}]
+LIVE = [
+    {'num': 1, 'name': 'Test One', 'stream_type': 'live', 'stream_id': 1, 'stream_icon': BASE + '/logo.png', 'epg_channel_id': 'one', 'category_id': '1'},
+    {'num': 2, 'name': 'Test Two (HLS only)', 'stream_type': 'live', 'stream_id': 2, 'stream_icon': '', 'epg_channel_id': 'two', 'category_id': '1'},
+    {'num': 3, 'name': 'Offline channel', 'stream_type': 'live', 'stream_id': 3, 'stream_icon': '', 'epg_channel_id': None, 'category_id': '1'},
+    {'num': 4, 'name': 'Sports One', 'stream_type': 'live', 'stream_id': '4', 'stream_icon': BASE + '/logo.png', 'epg_channel_id': '', 'category_id': '2'},
+]
+VOD_CATS = [{'category_id': '11', 'category_name': 'Action', 'parent_id': 0}]
+VOD = [{'num': 1, 'name': 'Test Movie', 'stream_type': 'movie', 'stream_id': 10, 'stream_icon': BASE + '/poster.jpg', 'rating': '7.5', 'category_id': '11', 'container_extension': 'mp4'},
+       {'num': 2, 'name': 'Second Movie With A Rather Long Title', 'stream_type': 'movie', 'stream_id': 12, 'stream_icon': '', 'rating': '', 'category_id': '11', 'container_extension': 'mp4'}]
+SERIES_CATS = [{'category_id': '21', 'category_name': 'Drama', 'parent_id': 0}]
+SERIES = [{'num': 1, 'name': 'Test Series', 'series_id': 20, 'cover': BASE + '/poster.jpg', 'plot': 'A short plot.', 'category_id': '21'}]
+SERIES_INFO = {
+    'seasons': [],
+    'info': {'name': 'Test Series', 'cover': BASE + '/poster.jpg', 'plot': 'Two friends test an app until every screen works.', 'genre': 'Drama'},
+    'episodes': {
+        '1': [{'id': '31', 'episode_num': 1, 'title': 'Pilot', 'container_extension': 'mp4', 'info': {'duration': '00:05:00'}, 'season': 1},
+              {'id': '32', 'episode_num': 2, 'title': 'The Second One', 'container_extension': 'mp4', 'info': {'duration': '00:05:00'}, 'season': 1}],
+        '2': [{'id': '33', 'episode_num': 1, 'title': 'New Season', 'container_extension': 'mp4', 'info': [], 'season': 2}],
+    },
+}
+
+
+def b64(text):
+    return base64.b64encode(text.encode()).decode()
+
+
+def epg():
+    now = int(time.time())
+    start = now - 600
+    rows = []
+    for i, title in enumerate(['Morning Show', 'News at Ten', 'Late Film']):
+        s = start + i * 1800
+        rows.append({'id': str(i), 'title': b64(title), 'description': b64('About ' + title),
+                     'start_timestamp': str(s), 'stop_timestamp': str(s + 1800)})
+    return {'epg_listings': rows}
+
+
+class Handler(BaseHTTPRequestHandler):
+    protocol_version = 'HTTP/1.1'
+
+    def log_message(self, fmt, *args):
+        sys.stdout.write('%s %s\n' % (time.strftime('%H:%M:%S'), fmt % args))
+        sys.stdout.flush()
+
+    def send_json(self, data, code=200):
+        body = json.dumps(data).encode()
+        self.send_response(code)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def send_text(self, text, ctype, code=200):
+        body = text.encode()
+        self.send_response(code)
+        self.send_header('Content-Type', ctype)
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def send_file(self, name, ctype):
+        path = os.path.join(MEDIA, name)
+        if not os.path.isfile(path):
+            return self.send_text('not found', 'text/plain', 404)
+        size = os.path.getsize(path)
+        start, end = 0, size - 1
+        m = re.match(r'bytes=(\d*)-(\d*)', self.headers.get('Range') or '')
+        partial = False
+        if m and (m.group(1) or m.group(2)):
+            partial = True
+            if m.group(1):
+                start = int(m.group(1))
+                if m.group(2):
+                    end = min(int(m.group(2)), size - 1)
+            else:
+                start = max(0, size - int(m.group(2)))
+            if start >= size:
+                self.send_response(416)
+                self.send_header('Content-Range', 'bytes */%d' % size)
+                self.send_header('Content-Length', '0')
+                self.end_headers()
+                return
+        length = end - start + 1
+        self.send_response(206 if partial else 200)
+        self.send_header('Content-Type', ctype)
+        self.send_header('Accept-Ranges', 'bytes')
+        self.send_header('Content-Length', str(length))
+        if partial:
+            self.send_header('Content-Range', 'bytes %d-%d/%d' % (start, end, size))
+        self.end_headers()
+        try:
+            with open(path, 'rb') as f:
+                f.seek(start)
+                left = length
+                while left > 0:
+                    chunk = f.read(min(65536, left))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    left -= len(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    def do_HEAD(self):
+        self.do_GET()
+
+    def do_GET(self):
+        url = urlparse(self.path)
+        q = {k: v[0] for k, v in parse_qs(url.query).items()}
+        path = url.path
+        if path == '/player_api.php':
+            return self.api(q)
+        if path in ('/logo.png', '/poster.jpg'):
+            return self.send_file(path[1:], 'image/png' if path.endswith('png') else 'image/jpeg')
+        m = re.match(r'^/hls/(seg\d+\.ts)$', path)
+        if m:
+            return self.send_file('hls/' + m.group(1), 'video/mp2t')
+        m = re.match(r'^/(live|movie|series)/demo/demo/(\d+)\.(\w+)$', path)
+        if not m:
+            return self.send_text('not found', 'text/plain', 404)
+        kind, sid, ext = m.group(1), m.group(2), m.group(3)
+        if kind == 'live':
+            if sid in ('1', '4') and ext == 'ts':
+                return self.send_file('live.ts', 'video/mp2t')
+            if sid in ('1', '2', '4') and ext == 'm3u8':
+                with open(os.path.join(MEDIA, 'hls', 'index.m3u8')) as f:
+                    text = re.sub(r'^(seg\d+\.ts)$', r'/hls/\1', f.read(), flags=re.M)
+                return self.send_text(text, 'application/vnd.apple.mpegurl')
+            return self.send_text('not found', 'text/plain', 404)
+        return self.send_file('movie.mp4', 'video/mp4')
+
+    def api(self, q):
+        ok = q.get('username') == 'demo' and q.get('password') == 'demo'
+        action = q.get('action')
+        if not ok:
+            return self.send_json({'user_info': {'auth': 0}})
+        if not action:
+            return self.send_json({
+                'user_info': {'username': 'demo', 'password': 'demo', 'auth': 1, 'status': 'Active',
+                              'exp_date': str(int(time.time()) + 90 * 86400), 'is_trial': '0', 'active_cons': '0',
+                              'max_connections': '1', 'allowed_output_formats': ['m3u8', 'ts']},
+                'server_info': {'url': '10.0.2.2', 'port': str(PORT), 'server_protocol': 'http'},
+            })
+        cat = q.get('category_id')
+
+        def by_cat(rows):
+            return [r for r in rows if cat is None or str(r['category_id']) == cat]
+
+        table = {
+            'get_live_categories': LIVE_CATS, 'get_vod_categories': VOD_CATS, 'get_series_categories': SERIES_CATS,
+            'get_live_streams': by_cat(LIVE), 'get_vod_streams': by_cat(VOD), 'get_series': by_cat(SERIES),
+        }
+        if action in table:
+            return self.send_json(table[action])
+        if action == 'get_series_info':
+            return self.send_json(SERIES_INFO)
+        if action == 'get_short_epg':
+            return self.send_json(epg() if q.get('stream_id') in ('1', '2') else {'epg_listings': []})
+        return self.send_json([])
+
+
+if __name__ == '__main__':
+    print('mock IPTV server on port %d, media in %s' % (PORT, MEDIA), flush=True)
+    ThreadingHTTPServer(('0.0.0.0', PORT), Handler).serve_forever()

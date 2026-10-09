@@ -1,0 +1,249 @@
+name: B1G TV app
+
+# Builds the B1G IPTV player (Flutter) for Fire TV / Android TV in the cloud.
+#
+# Result: release "b1g-latest" of this repository with B1G.apk
+#   https://github.com/<owner>/<repo>/releases/tag/b1g-latest
+#
+# Signing: with the secrets ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and
+# ANDROID_KEY_PASSWORD the APK is signed with your own key. Without them it is signed with a
+# throw-away key: it installs, but a later build cannot update it (uninstall first).
+
+on:
+  push:
+    branches: [b1g-tv]
+    paths-ignore: ['**.md']
+
+concurrency:
+  group: b1g-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.24.5'
+  BUILD_NUMBER: ${{ github.run_number }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      # The android/ folder is generated from Flutter's own template, then the files in
+      # android_overlay/ (manifest for TV, activity, icons, banner) are copied over it.
+      - name: Create the Android project
+        run: |
+          flutter --version
+          flutter create --no-pub --platforms=android --org com.b1g --project-name b1gtv "$RUNNER_TEMP/scaffold"
+          cp -r "$RUNNER_TEMP/scaffold/android" android
+          cp -r android_overlay/. android/
+          mkdir -p out/logs
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Check the code
+        run: |
+          set -o pipefail
+          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee out/logs/analyze.log
+
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          flutter test 2>&1 | tee out/logs/test.log
+
+      # Test build for the emulator (64-bit Intel, mock server pre-filled). Never published.
+      - name: Build the test app
+        run: |
+          set -o pipefail
+          flutter build apk --release --target-platform android-x64 \
+            --dart-define=B1G_SERVER=http://10.0.2.2:8787 --dart-define=B1G_PREFILL_USER=demo --dart-define=B1G_PREFILL_PASS=demo \
+            2>&1 | tee out/logs/build-test.log
+          mkdir -p out-smoke
+          cp build/app/outputs/flutter-apk/app-release.apk out-smoke/b1g-smoke.apk
+
+      - name: Build B1G.apk
+        run: |
+          set -o pipefail
+          SERVER="$(tr -d ' \r\n' < config/server.txt)"
+          echo "locked server address: ${SERVER:-(none - customers type it)}"
+          flutter build apk --release --target-platform android-arm,android-arm64 \
+            --build-name "1.0.$BUILD_NUMBER" --build-number "$BUILD_NUMBER" \
+            --dart-define=B1G_SERVER="$SERVER" \
+            2>&1 | tee out/logs/build.log
+          cp build/app/outputs/flutter-apk/app-release.apk out/B1G.apk
+
+      - name: Sign with your own key
+        if: env.HAS_SIGNING == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          "$BT/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEY_PASSWORD \
+            --out "$RUNNER_TEMP/B1G-signed.apk" out/B1G.apk
+          mv "$RUNNER_TEMP/B1G-signed.apk" out/B1G.apk
+          rm -f "$RUNNER_TEMP/release.jks"
+
+      - name: Verify the APK and write the build report
+        if: always()
+        run: |
+          mkdir -p out
+          R=out/REPORT.md
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          {
+            echo "## B1G build #$BUILD_NUMBER"
+            echo ""
+            echo "Commit: \`$GITHUB_SHA\`  -  Flutter $FLUTTER_VERSION"
+            echo ""
+            echo '```'
+            echo "signed with your own key: $HAS_SIGNING"
+            if [ -f out/B1G.apk ]; then
+              echo "B1G.apk  $(stat -c%s out/B1G.apk) bytes  sha256 $(sha256sum out/B1G.apk | cut -d' ' -f1)"
+              "$BT/aapt2" dump badging out/B1G.apk | grep -E "^package:|^sdkVersion|^targetSdkVersion|^application-label:|^uses-permission|launchable-activity|^uses-feature|^native-code|^leanback" || true
+              echo "--- signature"
+              "$BT/apksigner" verify --print-certs out/B1G.apk 2>&1 | head -3 || true
+              echo "--- manifest"
+              "$BT/aapt2" dump xmltree --file AndroidManifest.xml out/B1G.apk | grep -E "usesCleartextTraffic|banner|LEANBACK_LAUNCHER|screenOrientation" | sed 's/^ *//' || true
+            else
+              echo "B1G.apk was NOT built"
+            fi
+            echo '```'
+            echo "### Code check"
+            echo '```'
+            tail -15 out/logs/analyze.log 2>/dev/null || true
+            echo '```'
+            echo "### Unit tests"
+            echo '```'
+            tail -3 out/logs/test.log 2>/dev/null || true
+            echo '```'
+            echo "### Errors"
+            echo '```'
+            grep -hE "^e: |error:|Error:|FAILED|What went wrong|error -" out/logs/*.log 2>/dev/null | sort -u | head -60 || true
+            echo "(end)"
+            echo '```'
+          } > "$R"
+          cat "$R"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b1g-tv
+          path: out/
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: b1g-smoke
+          path: out-smoke/
+          retention-days: 3
+
+      # A failed build still publishes its report (so the errors can be read), but never replaces a good APK.
+      - name: Publish to the "b1g-latest" release
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FILES=""
+          if [ -f out/B1G.apk ]; then FILES="out/B1G.apk"; fi
+          TITLE="B1G - build #$BUILD_NUMBER"
+          if [ -z "$FILES" ]; then TITLE="B1G - build #$BUILD_NUMBER FAILED (APK below is from an earlier build)"; fi
+          publish() {
+            if gh release view b1g-latest >/dev/null 2>&1; then
+              if [ -n "$FILES" ]; then gh release upload b1g-latest $FILES --clobber || return 1; fi
+              gh release edit b1g-latest --title "$TITLE" --notes-file out/REPORT.md --prerelease
+            else
+              gh release create b1g-latest $FILES --target "$GITHUB_SHA" --title "$TITLE" --notes-file out/REPORT.md --prerelease
+            fi
+          }
+          publish || { sleep 20; publish; } || { sleep 60; publish; }
+
+  # Runs the test build on an emulator with a TV-sized screen and drives it with remote-control
+  # keys against a mock IPTV server (ci/smoke.py). Screenshots go to the branch "ci-smoke-b1g".
+  smoke:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: b1g-smoke
+          path: out/smoke-apk
+
+      - name: Make the test videos
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          ci/make_media.sh
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the app on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        continue-on-error: true
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          profile: tv_1080p
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -memory 4096
+          script: python3 ci/smoke.py
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b1g-smoke-result
+          path: out/smoke/
+          if-no-files-found: warn
+
+      - name: Add the test result to the release notes
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -f out/smoke/SMOKE.md ] || { mkdir -p out/smoke; printf '### Emulator test\n\nThe emulator test did not produce a result.\n' > out/smoke/SMOKE.md; }
+          gh release view b1g-latest --json body -q .body > "$RUNNER_TEMP/body.md"
+          { echo ""; cat out/smoke/SMOKE.md; } >> "$RUNNER_TEMP/body.md"
+          gh release edit b1g-latest --notes-file "$RUNNER_TEMP/body.md"
+
+      - name: Publish the test screenshots
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          D="$RUNNER_TEMP/smoke-branch"; rm -rf "$D"; mkdir -p "$D"
+          cp out/smoke/*.png out/smoke/*.md out/smoke/app-log.txt out/smoke/mock-server.log "$D"/ 2>/dev/null || true
+          { grep -E "flutter|FATAL|AndroidRuntime|ExoPlayer|MediaCodec|b1gtv" out/smoke/logcat.txt | cut -c1-400 | tail -600; } > "$D/logcat-filtered.txt" 2>/dev/null || true
+          cd "$D"
+          git init -q && git checkout -q -b ci-smoke-b1g && git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -q -m "B1G emulator test output (build $BUILD_NUMBER)"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-smoke-b1g

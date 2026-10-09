@@ -1,0 +1,16 @@
+# Generated in the cloud build (see .github/workflows/b1g-tv.yml)
+/android/
+/build/
+/.dart_tool/
+/out/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+*.log
+.DS_Store
+__pycache__/
+
+# Signing material - never commit
+*.jks
+*.keystore
+keystore.properties
