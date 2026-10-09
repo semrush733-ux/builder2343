@@ -93,9 +93,13 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   static const _device = MethodChannel('b1g/device');
   static const _maxFails = 8;
 
-  late final Player _player;
-  late final VideoController _video;
+  // A fresh engine is created for every stream that is opened and the old one is closed first:
+  // an IPTV account usually allows a single connection, and a clean start is the most reliable.
+  Player? _player;
+  VideoController? _video;
+  Future<void>? _closing;
   final List<StreamSubscription<dynamic>> _subs = [];
+  Duration _wantStart = Duration.zero;
   final FocusNode _focus = FocusNode(debugLabel: 'player');
 
   late int _index;
@@ -159,51 +163,68 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _index = widget.index < 0 || widget.index >= widget.entries.length ? 0 : widget.index;
     WidgetsBinding.instance.addObserver(this);
     _keepScreenOn(true);
-    _player = Player(
+    _watchdog = Timer.periodic(const Duration(seconds: 2), (_) => _checkHealth());
+    _open();
+    _scheduleEpg();
+  }
+
+  Player _createPlayer() {
+    final player = Player(
       configuration: PlayerConfiguration(
         title: 'B1G',
         bufferSize: 48 * 1024 * 1024,
-        logLevel: MPVLogLevel.error,
+        logLevel: kVerbose ? MPVLogLevel.info : MPVLogLevel.error,
       ),
     );
-    _video = VideoController(_player);
-    _subs.add(_player.stream.position.listen(_onPosition));
-    _subs.add(_player.stream.duration.listen((d) {
+    _player = player;
+    _video = VideoController(player);
+    _subs.add(player.stream.position.listen(_onPosition));
+    _subs.add(player.stream.duration.listen((d) {
       if (_accepting) _duration = d;
     }));
-    _subs.add(_player.stream.buffering.listen((b) {
+    _subs.add(player.stream.buffering.listen((b) {
       if (b == _buffering) return;
       _buffering = b;
       if (mounted) setState(() {});
     }));
-    _subs.add(_player.stream.completed.listen((done) {
+    _subs.add(player.stream.completed.listen((done) {
       if (done) _onCompleted();
     }));
-    _subs.add(_player.stream.error.listen((message) {
+    _subs.add(player.stream.error.listen((message) {
       final text = message.trim();
-      if (text.isNotEmpty) _noteError(text);
+      if (text.isNotEmpty) _noteError(text, true);
     }));
-    _subs.add(_player.stream.tracks.listen((tracks) {
+    _subs.add(player.stream.tracks.listen((tracks) {
       if (_accepting) _readTracks(tracks);
     }));
-    _subs.add(_player.stream.log.listen((line) {
+    _subs.add(player.stream.log.listen((line) {
       final text = line.text.trim();
-      if (text.isNotEmpty) _noteError('${line.prefix}: $text');
+      if (text.isNotEmpty) _noteError('${line.prefix}: $text', line.level == 'error' || line.level == 'fatal');
     }));
-    _watchdog = Timer.periodic(const Duration(seconds: 2), (_) => _checkHealth());
-    _start();
-    _scheduleEpg();
+    return player;
   }
 
-  Future<void> _start() async {
-    await _configure();
-    if (mounted) _open();
+  /// Closes the engine (and with it the connection to the server). Waits for a
+  /// close that is still running, so two streams are never open at once.
+  Future<void> _closePlayer() async {
+    final player = _player;
+    if (player != null) {
+      _player = null;
+      _video = null;
+      for (final s in _subs) {
+        s.cancel();
+      }
+      _subs.clear();
+      _closing = player.dispose().catchError((Object _) {});
+    }
+    final closing = _closing;
+    if (closing != null) await closing;
   }
 
   /// Engine settings chosen for IPTV: reconnect inside the network layer, a
   /// few seconds of buffer, and only a short pause when the buffer runs dry.
-  Future<void> _configure() async {
-    final platform = _player.platform;
+  Future<void> _configure(Player player) async {
+    final platform = player.platform;
     if (platform is! NativePlayer) return;
     final NativePlayer mpv = platform;
     Future<void> set(String name, String value) async {
@@ -223,16 +244,6 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     await set('sub-auto', 'no');
   }
 
-  /// Where the next stream starts (resume). Set before opening, so the movie
-  /// does not play from the beginning for a moment and then jump.
-  Future<void> _setStart(Duration start) async {
-    final platform = _player.platform;
-    if (platform is! NativePlayer) return;
-    try {
-      await platform.setProperty('start', start > Duration.zero ? '${start.inSeconds}' : 'none');
-    } catch (_) {}
-  }
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -242,10 +253,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       t?.cancel();
     }
     _saveResume();
-    for (final s in _subs) {
-      s.cancel();
-    }
-    _player.dispose();
+    _closePlayer();
     log('player closed');
     _keepScreenOn(false);
     _focus.dispose();
@@ -269,7 +277,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _generation++;
       _retryTimer?.cancel();
       _saveResume();
-      _player.stop();
+      _closePlayer();
       log('player suspended');
     } else if (state == AppLifecycleState.resumed && _suspended) {
       _suspended = false;
@@ -314,12 +322,20 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         _status = _fails == 0 ? 'Loading…' : 'Reconnecting…';
       });
     }
+    _wantStart = start;
     log('open index=$_index format=$format try=$_fails');
     try {
-      await _setStart(start);
+      await _closePlayer();
       if (generation != _generation || !mounted) return;
-      await _player.open(Media(url, httpHeaders: const {'User-Agent': kUserAgent}), play: true);
-      if (_speed != 1.0) await _player.setRate(_speed);
+      final player = _createPlayer();
+      setState(() {}); // show the new engine's picture surface
+      await _configure(player);
+      if (generation != _generation || !mounted) return;
+      await player.open(
+        Media(url, httpHeaders: const {'User-Agent': kUserAgent}, start: start > Duration.zero ? start : null),
+        play: true,
+      );
+      if (_speed != 1.0) await player.setRate(_speed);
     } catch (e) {
       log('open failed: ${e.runtimeType}');
       if (generation != _generation || !mounted) return;
@@ -373,11 +389,18 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   void _markReady() {
     _ready = true;
     _playedThisUrl = true;
-    if (_duration <= Duration.zero) _duration = _player.state.duration;
-    _readTracks(_player.state.tracks);
+    final player = _player;
+    if (player == null) return;
+    if (_duration <= Duration.zero) _duration = player.state.duration;
+    _readTracks(player.state.tracks);
+    // Resume: if the engine did not start at the saved place, jump there now.
+    if (!widget.live && _wantStart > Duration.zero && _position < _wantStart - const Duration(seconds: 5)) {
+      log('resume by seeking to ${_wantStart.inSeconds}');
+      player.seek(_wantStart);
+    }
     final url = _entry.urls[_urlIndex % _entry.urls.length];
-    final w = _player.state.width ?? 0;
-    final h = _player.state.height ?? 0;
+    final w = player.state.width ?? 0;
+    final h = player.state.height ?? 0;
     log('ready index=$_index format=${formatOfUrl(url)} video=${w}x$h');
     _applyPreferredTracks();
     if (mounted) setState(() => _status = null);
@@ -394,14 +417,19 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   /// of a live stream, for example), so a message alone never stops playback.
   /// Only a message that means "cannot open", followed by no picture, counts
   /// as a failure - see [_checkHealth].
-  void _noteError(String raw) {
+  void _noteError(String raw, bool isError) {
     // Stream addresses contain the username and password: never show or log them.
     final text = raw.replaceAll(_address, '[address]');
+    final short = text.length > 160 ? text.substring(0, 160) : text;
+    if (!isError) {
+      if (kVerbose) log('mpv: $short');
+      return;
+    }
     _lastError = text;
     final now = DateTime.now();
-    if (now.difference(_errorLoggedAt) > const Duration(seconds: 1)) {
+    if (kVerbose || now.difference(_errorLoggedAt) > const Duration(seconds: 1)) {
       _errorLoggedAt = now;
-      log('engine: ${text.length > 140 ? text.substring(0, 140) : text}');
+      log('engine: $short');
     }
     if (_accepting && !_ready && _fatal.hasMatch(text)) _errorAt ??= DateTime.now();
   }
@@ -432,7 +460,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   void _failed({bool countsAsFailure = true}) {
     _accepting = false;
     _generation++;
-    _player.stop(); // frees the connection before the next attempt
+    _closePlayer(); // frees the connection before the next attempt
     if (!mounted || _suspended) return;
     if (countsAsFailure) {
       _fails++;
@@ -470,7 +498,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       final errorAt = _errorAt;
       final refused = errorAt != null && now.difference(errorAt) > const Duration(milliseconds: 2500);
       // The engine stopped by itself (nothing loading, not paused by the user).
-      final idle = waited > const Duration(seconds: 6) && !_player.state.playing && !_player.state.buffering;
+      final player = _player;
+      final idle = player != null &&
+          waited > const Duration(seconds: 6) &&
+          !player.state.playing &&
+          !player.state.buffering;
       if (refused || idle || waited > const Duration(seconds: 25)) {
         log(refused ? 'open failed' : (idle ? 'open stopped' : 'open timed out'));
         _failed();
@@ -526,7 +558,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       if (wantAudio.isNotEmpty) {
         for (final t in _audioTracks) {
           if ((t.language ?? '') == wantAudio) {
-            if (t.id != _audioId) _player.setAudioTrack(t);
+            if (t.id != _audioId) _player?.setAudioTrack(t);
             _audioId = t.id;
             break;
           }
@@ -544,26 +576,26 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       }
     }
     _subtitleId = chosen?.id ?? 'no';
-    _player.setSubtitleTrack(chosen ?? SubtitleTrack.no());
+    _player?.setSubtitleTrack(chosen ?? SubtitleTrack.no());
   }
 
   void _chooseAudio(AudioTrack track) {
     _audioId = track.id;
-    _player.setAudioTrack(track);
+    _player?.setAudioTrack(track);
     Store.setAudioLanguage(track.language ?? '');
     log('audio track=${track.language ?? track.id}');
   }
 
   void _chooseSubtitle(SubtitleTrack? track) {
     _subtitleId = track?.id ?? 'no';
-    _player.setSubtitleTrack(track ?? SubtitleTrack.no());
+    _player?.setSubtitleTrack(track ?? SubtitleTrack.no());
     Store.setSubtitleLanguage(track?.language ?? '');
     log('subtitle track=${track == null ? 'off' : (track.language ?? track.id)}');
   }
 
   void _chooseSpeed(double speed) {
     _speed = speed;
-    _player.setRate(speed);
+    _player?.setRate(speed);
     log('speed=$speed');
   }
 
@@ -739,10 +771,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (_userPaused) {
       _userPaused = false;
       _lastProgress = DateTime.now();
-      _player.play();
+      _player?.play();
     } else {
       _userPaused = true;
-      _player.pause();
+      _player?.pause();
     }
     setState(() {});
     _showOverlay();
@@ -774,7 +806,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (!mounted || !_ready) return;
     _lastProgress = DateTime.now();
     try {
-      await _player.seek(to);
+      await _player?.seek(to);
     } catch (_) {}
     if (!mounted) return;
     _position = to;
@@ -938,6 +970,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Widget build(BuildContext context) {
     final busy = _status != null || (_buffering && !_userPaused);
     final shown = widget.entries[_zapTarget ?? _index];
+    final video = _video;
     return Scaffold(
       backgroundColor: Colors.black,
       body: Focus(
@@ -952,17 +985,21 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
             children: [
               // The picture is hidden until it really plays, so the last frame of the previous
               // channel never shows under the new channel's name.
-              Opacity(
-                opacity: _ready ? 1 : 0,
-                child: IgnorePointer(
-                  child: Video(
-                    controller: _video,
-                    controls: NoVideoControls,
-                    fit: _fits[_fit],
-                    fill: Colors.black,
+              if (video != null)
+                Opacity(
+                  opacity: _ready ? 1 : 0,
+                  child: IgnorePointer(
+                    child: Video(
+                      key: ObjectKey(video),
+                      controller: video,
+                      controls: NoVideoControls,
+                      fit: _fits[_fit],
+                      fill: Colors.black,
+                    ),
                   ),
-                ),
-              ),
+                )
+              else
+                const SizedBox.expand(),
               if (busy && !_dead) Center(child: Loading(label: _status)),
               if (_dead) Center(child: _DeadMessage(text: _status ?? '', detail: _lastError)),
               IgnorePointer(

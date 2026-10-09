@@ -79,7 +79,7 @@ jobs:
         run: |
           set -o pipefail
           flutter build apk --release --target-platform android-x64 \
-            --dart-define=B1G_PREFILL_SERVER=http://10.0.2.2:8787 --dart-define=B1G_PREFILL_USER=demo --dart-define=B1G_PREFILL_PASS=demo \
+            --dart-define=B1G_VERBOSE=true --dart-define=B1G_PREFILL_SERVER=http://10.0.2.2:8787 --dart-define=B1G_PREFILL_USER=demo --dart-define=B1G_PREFILL_PASS=demo \
             2>&1 | tee out/logs/build-test.log
           mkdir -p out-smoke
           cp build/app/outputs/flutter-apk/app-release.apk out-smoke/b1g-smoke.apk
@@ -266,7 +266,7 @@ jobs:
         run: |
           D="$RUNNER_TEMP/smoke-branch"; rm -rf "$D"; mkdir -p "$D"
           cp out/smoke/*.png out/smoke/*.md out/smoke/app-log.txt out/smoke/mock-server.log "$D"/ 2>/dev/null || true
-          { grep -E "flutter|FATAL|AndroidRuntime|ExoPlayer|MediaCodec|b1gtv" out/smoke/logcat.txt | cut -c1-400 | tail -600; } > "$D/logcat-filtered.txt" 2>/dev/null || true
+          { grep -E "flutter|FATAL|AndroidRuntime|MediaCodec|b1gtv" out/smoke/logcat.txt | cut -c1-400 | tail -3000; } > "$D/logcat-filtered.txt" 2>/dev/null || true
           cd "$D"
           git init -q && git checkout -q -b ci-smoke-b1g && git add -A
           git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -q -m "B1G emulator test output (build $BUILD_NUMBER)"
