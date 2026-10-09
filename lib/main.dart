@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:media_kit/media_kit.dart';
 
 import 'config.dart';
+import 'input_mode.dart';
 import 'm3u.dart';
 import 'screens/home.dart';
 import 'screens/login.dart';
@@ -11,6 +13,8 @@ import 'xtream.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
+  InputMode.init();
   await Store.init();
   // Keep memory low on TV sticks with 1 GB of RAM.
   PaintingBinding.instance.imageCache.maximumSize = 300;
@@ -35,6 +39,12 @@ class B1GApp extends StatelessWidget {
       title: kAppName,
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
+      // Any touch switches the player to touch controls; any key switches back to remote hints.
+      builder: (context, child) => Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => InputMode.remote = false,
+        child: child,
+      ),
       home: home,
     );
   }

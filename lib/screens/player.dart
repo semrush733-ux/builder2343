@@ -2,9 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:video_player/video_player.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 
 import '../config.dart';
+import '../input_mode.dart';
+import '../lang.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -43,13 +46,31 @@ String formatTime(Duration d) {
 
 String formatClock(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
+/// "ts", "m3u8", "mp4"... or "stream" when the address has no file ending.
+String formatOfUrl(String url) {
+  var path = url;
+  final q = path.indexOf('?');
+  if (q >= 0) path = path.substring(0, q);
+  final slash = path.lastIndexOf('/');
+  final dot = path.lastIndexOf('.');
+  return dot > slash ? path.substring(dot + 1).toLowerCase() : 'stream';
+}
+
+const _fits = [BoxFit.contain, BoxFit.cover, BoxFit.fill];
+const _fitNames = ['Fit', 'Fill', 'Stretch'];
+const _speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+
 /// Full-screen player.
 ///
-/// Live TV:  Up / Down = next / previous channel, OK = info, hold OK = favourite.
-/// Movies:   OK = pause, Left / Right = jump back / forward (hold to jump further).
+/// Remote:  Live TV - Up / Down = channel, OK = info, Left = channel list, Right / Menu = audio and
+///          subtitles, hold OK = favourite.  Movies - OK = pause, Left / Right = jump, Down / Menu =
+///          audio, subtitles and speed.
+/// Touch:   tap = show controls; back, play / pause, 10 s back / forward, drag the bar, buttons for
+///          channels, audio and subtitles, speed and picture size.
 ///
-/// Playback runs on the device's own media engine (ExoPlayer on Android) with
-/// hardware decoding. A stream that drops is reconnected automatically.
+/// Playback runs on libmpv (the engine behind mpv-style players), which copes with the MPEG-TS and
+/// HLS streams IPTV servers send and with every common audio format. A stream that drops is
+/// reconnected automatically.
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({
     super.key,
@@ -72,30 +93,53 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   static const _device = MethodChannel('b1g/device');
   static const _maxFails = 8;
 
+  late final Player _player;
+  late final VideoController _video;
+  final List<StreamSubscription<dynamic>> _subs = [];
   final FocusNode _focus = FocusNode(debugLabel: 'player');
-  VideoPlayerController? _c;
+
   late int _index;
   int _generation = 0;
   int _urlIndex = 0;
   int _fails = 0;
   String? _status = 'Loading…';
+  String _lastError = '';
   bool _dead = false;
   bool _suspended = false;
+  bool _accepting = false; // false while switching streams: late events of the old one are ignored
+  bool _ready = false;
+  bool _playedThisUrl = false;
   bool _userPaused = false;
+  bool _buffering = false;
   bool _overlay = true;
-  bool _wasBuffering = false;
+  bool _scrubbing = false;
+  bool _panelOpen = false;
 
-  Duration _lastPosition = Duration.zero;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+  Duration? _firstPosition;
+  Duration _lastPosition = Duration.zero; // last known good position, for resume / reconnect
   DateTime _lastProgress = DateTime.now();
   DateTime _openedAt = DateTime.now();
+  DateTime? _errorAt;
+  DateTime _errorLoggedAt = DateTime.fromMillisecondsSinceEpoch(0);
   int _lastSavedSecond = -1;
   int _lastLoggedSecond = -1;
+  int _shownSecond = -1;
 
   int? _zapTarget;
   Duration? _seekTarget;
   int _seekPresses = 0;
   bool _okDown = false;
   bool _okLong = false;
+
+  List<AudioTrack> _audioTracks = const [];
+  List<SubtitleTrack> _subtitleTracks = const [];
+  String _audioId = '';
+  String _subtitleId = 'no';
+  bool _tracksApplied = false;
+  int _fit = 0;
+  double _speed = 1.0;
 
   List<XEpg> _epg = const [];
 
@@ -107,6 +151,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Timer? _epgTimer;
 
   PlayEntry get _entry => widget.entries[_index];
+  bool get _touch => !InputMode.remote;
 
   @override
   void initState() {
@@ -114,23 +159,94 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _index = widget.index < 0 || widget.index >= widget.entries.length ? 0 : widget.index;
     WidgetsBinding.instance.addObserver(this);
     _keepScreenOn(true);
-    _watchdog = Timer.periodic(const Duration(seconds: 2), (_) => _checkStall());
-    _open();
+    _player = Player(
+      configuration: PlayerConfiguration(
+        title: 'B1G',
+        bufferSize: 48 * 1024 * 1024,
+        logLevel: MPVLogLevel.error,
+      ),
+    );
+    _video = VideoController(_player);
+    _subs.add(_player.stream.position.listen(_onPosition));
+    _subs.add(_player.stream.duration.listen((d) {
+      if (_accepting) _duration = d;
+    }));
+    _subs.add(_player.stream.buffering.listen((b) {
+      if (b == _buffering) return;
+      _buffering = b;
+      if (mounted) setState(() {});
+    }));
+    _subs.add(_player.stream.completed.listen((done) {
+      if (done) _onCompleted();
+    }));
+    _subs.add(_player.stream.error.listen((message) {
+      final text = message.trim();
+      if (text.isNotEmpty) _noteError(text);
+    }));
+    _subs.add(_player.stream.tracks.listen((tracks) {
+      if (_accepting) _readTracks(tracks);
+    }));
+    _subs.add(_player.stream.log.listen((line) {
+      final text = line.text.trim();
+      if (text.isNotEmpty) _noteError('${line.prefix}: $text');
+    }));
+    _watchdog = Timer.periodic(const Duration(seconds: 2), (_) => _checkHealth());
+    _start();
     _scheduleEpg();
+  }
+
+  Future<void> _start() async {
+    await _configure();
+    if (mounted) _open();
+  }
+
+  /// Engine settings chosen for IPTV: reconnect inside the network layer, a
+  /// few seconds of buffer, and only a short pause when the buffer runs dry.
+  Future<void> _configure() async {
+    final platform = _player.platform;
+    if (platform is! NativePlayer) return;
+    final NativePlayer mpv = platform;
+    Future<void> set(String name, String value) async {
+      try {
+        await mpv.setProperty(name, value);
+      } catch (_) {}
+    }
+
+    await set('user-agent', kUserAgent);
+    await set('network-timeout', '20');
+    await set('stream-lavf-o', 'reconnect=1,reconnect_streamed=1,reconnect_delay_max=4');
+    await set('cache', 'yes');
+    await set('cache-pause-initial', 'no');
+    await set('cache-pause-wait', widget.live ? '1.5' : '2');
+    await set('demuxer-readahead-secs', widget.live ? '10' : '30');
+    await set('audio-channels', 'stereo');
+    await set('sub-auto', 'no');
+  }
+
+  /// Where the next stream starts (resume). Set before opening, so the movie
+  /// does not play from the beginning for a moment and then jump.
+  Future<void> _setStart(Duration start) async {
+    final platform = _player.platform;
+    if (platform is! NativePlayer) return;
+    try {
+      await platform.setProperty('start', start > Duration.zero ? '${start.inSeconds}' : 'none');
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _generation++;
+    _accepting = false;
     for (final t in [_hideTimer, _watchdog, _zapTimer, _seekTimer, _retryTimer, _epgTimer]) {
       t?.cancel();
     }
     _saveResume();
-    final c = _c;
-    _c = null;
-    c?.removeListener(_onTick);
-    c?.dispose();
+    for (final s in _subs) {
+      s.cancel();
+    }
+    _player.dispose();
+    log('player closed');
     _keepScreenOn(false);
     _focus.dispose();
     super.dispose();
@@ -149,13 +265,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
       if (_suspended) return;
       _suspended = true;
+      _accepting = false;
       _generation++;
       _retryTimer?.cancel();
       _saveResume();
-      final c = _c;
-      _c = null;
-      c?.removeListener(_onTick);
-      c?.dispose();
+      _player.stop();
       log('player suspended');
     } else if (state == AppLifecycleState.resumed && _suspended) {
       _suspended = false;
@@ -169,177 +283,177 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Future<void> _open({Duration? startAt}) async {
     final generation = ++_generation;
     _retryTimer?.cancel();
-    final old = _c;
-    _c = null;
-    if (mounted) {
-      setState(() {
-        _dead = false;
-        _status = _fails == 0 ? 'Loading…' : 'Reconnecting…';
-      });
-    }
-    if (old != null) {
-      old.removeListener(_onTick);
-      try {
-        await old.dispose();
-      } catch (_) {}
-    }
-    if (generation != _generation || !mounted) return;
-
+    _accepting = false;
     final entry = _entry;
     final url = entry.urls[_urlIndex % entry.urls.length];
-    final format = url.substring(url.lastIndexOf('.') + 1);
-    log('open index=$_index format=$format try=$_fails');
-
-    final uri = Uri.tryParse(url);
-    if (uri == null) {
-      _failed();
-      return;
-    }
-    final c = VideoPlayerController.networkUrl(uri, httpHeaders: const {'User-Agent': kUserAgent});
-    try {
-      await c.initialize().timeout(const Duration(seconds: 25));
-    } catch (e) {
-      log('open failed: ${e.runtimeType}');
-      try {
-        await c.dispose();
-      } catch (_) {}
-      if (generation != _generation || !mounted) return;
-      _failed();
-      return;
-    }
-    if (generation != _generation || !mounted) {
-      await c.dispose();
-      return;
-    }
+    final format = formatOfUrl(url);
 
     var start = startAt ?? Duration.zero;
     if (startAt == null && !widget.live && entry.resumeKey != null) {
       final saved = Store.resume(entry.resumeKey!);
       if (saved > 30) start = Duration(seconds: saved);
     }
+    if (widget.live) start = Duration.zero;
+
+    _ready = false;
+    _buffering = false;
+    _errorAt = null;
+    _firstPosition = null;
+    _position = start;
+    _duration = Duration.zero;
+    _seekTarget = null;
+    _tracksApplied = false;
+    _audioTracks = const [];
+    _subtitleTracks = const [];
+    _audioId = '';
+    _subtitleId = 'no';
+    _lastLoggedSecond = -1;
+    if (mounted) {
+      setState(() {
+        _dead = false;
+        _status = _fails == 0 ? 'Loading…' : 'Reconnecting…';
+      });
+    }
+    log('open index=$_index format=$format try=$_fails');
     try {
-      if (!widget.live && start > Duration.zero && c.value.duration > start + const Duration(seconds: 10)) {
-        await c.seekTo(start);
-      }
-      c.addListener(_onTick);
-      await c.play();
-    } catch (e) {
-      log('start failed: ${e.runtimeType}');
-      c.removeListener(_onTick);
-      try {
-        await c.dispose();
-      } catch (_) {}
+      await _setStart(start);
       if (generation != _generation || !mounted) return;
+      await _player.open(Media(url, httpHeaders: const {'User-Agent': kUserAgent}), play: true);
+      if (_speed != 1.0) await _player.setRate(_speed);
+    } catch (e) {
+      log('open failed: ${e.runtimeType}');
+      if (generation != _generation || !mounted) return;
+      _openedAt = DateTime.now();
       _failed();
       return;
     }
-    if (generation != _generation || !mounted) {
-      c.removeListener(_onTick);
-      await c.dispose();
-      return;
-    }
-    _lastPosition = c.value.position;
-    _lastProgress = DateTime.now();
+    if (generation != _generation || !mounted) return;
     _openedAt = DateTime.now();
-    _lastLoggedSecond = -1;
+    _lastProgress = DateTime.now();
     _userPaused = false;
-    final size = c.value.size;
-    log('ready index=$_index format=$format video=${size.width.round()}x${size.height.round()}');
-    setState(() {
-      _c = c;
-      _status = null;
-    });
+    _accepting = true;
+  }
+
+  void _onPosition(Duration p) {
+    if (!_accepting) return;
+    final first = _firstPosition ??= p;
+    if (p != _position) _lastProgress = DateTime.now();
+    _position = p;
+    if (!_ready) {
+      // "Ready" = the picture is really moving, not just "the address opened".
+      if ((p - first).inMilliseconds.abs() < 300) return;
+      _markReady();
+    }
+    _lastPosition = p;
+    final now = DateTime.now();
+    // Live streams count from an arbitrary clock; log the time since tuning in.
+    final second = widget.live ? (p - first).inSeconds : p.inSeconds;
+    if (second != _lastLoggedSecond && second % 5 == 0) {
+      _lastLoggedSecond = second;
+      log('playing index=$_index pos=$second');
+    }
+    if (now.difference(_openedAt) > const Duration(seconds: 8)) {
+      // Playing for a while: this stream works, forget earlier failures.
+      _fails = 0;
+      if (widget.live) {
+        final url = _entry.urls[_urlIndex % _entry.urls.length];
+        Store.setLiveFormat(formatOfUrl(url) == 'm3u8' ? 'm3u8' : 'ts');
+      }
+    }
+    if (!widget.live && (second - _lastSavedSecond).abs() >= 10) {
+      _lastSavedSecond = second;
+      _saveResume();
+    }
+    if (_overlay && second != _shownSecond && mounted) {
+      _shownSecond = second;
+      setState(() {});
+    }
+  }
+
+  void _markReady() {
+    _ready = true;
+    _playedThisUrl = true;
+    if (_duration <= Duration.zero) _duration = _player.state.duration;
+    _readTracks(_player.state.tracks);
+    final url = _entry.urls[_urlIndex % _entry.urls.length];
+    final w = _player.state.width ?? 0;
+    final h = _player.state.height ?? 0;
+    log('ready index=$_index format=${formatOfUrl(url)} video=${w}x$h');
+    _applyPreferredTracks();
+    if (mounted) setState(() => _status = null);
     _showOverlay();
   }
 
-  void _onTick() {
-    final c = _c;
-    if (c == null) return;
-    final v = c.value;
-    if (v.hasError) {
-      log('player error: ${v.errorDescription}');
-      _failed();
-      return;
-    }
+  static final _address = RegExp(r'[a-z]+://\S+');
+  static final _fatal = RegExp(
+      r'failed to open|loading failed|failed to recognize|unrecognized file format|http error|server returned|'
+      r'connection refused|connection timed out|could not resolve|failed to resolve|no route to host|invalid data found',
+      caseSensitive: false);
+
+  /// The engine also reports harmless hiccups (a damaged frame at the start
+  /// of a live stream, for example), so a message alone never stops playback.
+  /// Only a message that means "cannot open", followed by no picture, counts
+  /// as a failure - see [_checkHealth].
+  void _noteError(String raw) {
+    // Stream addresses contain the username and password: never show or log them.
+    final text = raw.replaceAll(_address, '[address]');
+    _lastError = text;
     final now = DateTime.now();
-    if (v.position != _lastPosition) {
-      _lastPosition = v.position;
-      _lastProgress = now;
-      final second = v.position.inSeconds;
-      if (second != _lastLoggedSecond && second % 5 == 0) {
-        _lastLoggedSecond = second;
-        log('playing index=$_index pos=$second');
-      }
-      // Playing for a while: this stream works, forget earlier failures.
-      if (now.difference(_openedAt) > const Duration(seconds: 8)) {
-        _fails = 0;
-        if (widget.live) {
-          final url = _entry.urls[_urlIndex % _entry.urls.length];
-          Store.setLiveFormat(url.endsWith('.m3u8') ? 'm3u8' : 'ts');
-        }
-      }
-      if (!widget.live && (second - _lastSavedSecond).abs() >= 10) {
-        _lastSavedSecond = second;
-        _saveResume();
-      }
+    if (now.difference(_errorLoggedAt) > const Duration(seconds: 1)) {
+      _errorLoggedAt = now;
+      log('engine: ${text.length > 140 ? text.substring(0, 140) : text}');
     }
-    if (v.isCompleted && !_userPaused) {
-      _ended();
-      return;
-    }
-    if (_overlay || v.isBuffering != _wasBuffering) {
-      _wasBuffering = v.isBuffering;
-      if (mounted) setState(() {});
-    }
+    if (_accepting && !_ready && _fatal.hasMatch(text)) _errorAt ??= DateTime.now();
   }
 
   /// A live stream that "ends" has dropped; a movie that ends is finished.
-  void _ended() {
-    if (widget.live) {
-      log('live stream ended, reconnecting');
-      _failed(countsAsFailure: DateTime.now().difference(_openedAt) < const Duration(seconds: 8));
+  void _onCompleted() {
+    if (!_accepting) return;
+    if (widget.live || !_ready) {
+      log('stream ended, reconnecting');
+      _failed(countsAsFailure: !_ready || DateTime.now().difference(_openedAt) < const Duration(seconds: 8));
       return;
     }
     final key = _entry.resumeKey;
     if (key != null) Store.setResume(key, 0);
+    _lastPosition = Duration.zero;
     if (_index < widget.entries.length - 1) {
       _index++;
       _urlIndex = 0;
       _fails = 0;
-      _lastPosition = Duration.zero;
+      _playedThisUrl = false;
       _open();
     } else {
-      final c = _c;
-      _c = null;
-      c?.removeListener(_onTick);
-      c?.dispose();
+      _accepting = false;
       if (mounted) Navigator.of(context).maybePop();
     }
   }
 
   void _failed({bool countsAsFailure = true}) {
-    final c = _c;
-    _c = null;
-    c?.removeListener(_onTick);
-    c?.dispose();
+    _accepting = false;
     _generation++;
+    _player.stop(); // frees the connection before the next attempt
     if (!mounted || _suspended) return;
     if (countsAsFailure) {
       _fails++;
-      if (_entry.urls.length > 1) _urlIndex++; // try the other stream format
+      // A format that never played is swapped for the other one at once; a
+      // stream that did play and then dropped gets a second chance first.
+      if (_entry.urls.length > 1 && (!_playedThisUrl || _fails % 2 == 0)) {
+        _urlIndex++;
+        _playedThisUrl = false;
+      }
     }
     if (_fails > _maxFails) {
       log('gave up index=$_index');
       setState(() {
         _dead = true;
-        _status = widget.live
-            ? 'This channel is not available right now.'
-            : 'This video cannot be played right now.';
+        _status = widget.live ? 'This channel is not available right now.' : 'This video cannot be played right now.';
       });
       _showOverlay();
       return;
     }
-    final wait = !countsAsFailure || _fails <= 2 ? 1 : (_fails <= 5 ? 3 : 6);
+    // Give the server a moment to notice the old connection is gone.
+    final wait = !countsAsFailure || _fails <= 2 ? 2 : (_fails <= 5 ? 3 : 6);
     setState(() => _status = 'Reconnecting…');
     _retryTimer?.cancel();
     _retryTimer = Timer(Duration(seconds: wait), () {
@@ -347,18 +461,30 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     });
   }
 
-  /// Picture frozen although it should be playing: reconnect.
-  void _checkStall() {
-    final c = _c;
-    if (c == null || _suspended || _dead || !c.value.isInitialized) return;
-    if (_userPaused) {
-      _lastProgress = DateTime.now();
+  /// Runs every two seconds: nothing on screen for too long means reconnect.
+  void _checkHealth() {
+    if (!_accepting || _suspended || _dead) return;
+    final now = DateTime.now();
+    if (!_ready) {
+      final waited = now.difference(_openedAt);
+      final errorAt = _errorAt;
+      final refused = errorAt != null && now.difference(errorAt) > const Duration(milliseconds: 2500);
+      // The engine stopped by itself (nothing loading, not paused by the user).
+      final idle = waited > const Duration(seconds: 6) && !_player.state.playing && !_player.state.buffering;
+      if (refused || idle || waited > const Duration(seconds: 25)) {
+        log(refused ? 'open failed' : (idle ? 'open stopped' : 'open timed out'));
+        _failed();
+      }
       return;
     }
-    final frozen = DateTime.now().difference(_lastProgress);
-    if (frozen > Duration(seconds: widget.live ? 15 : 40)) {
+    if (_userPaused || _scrubbing) {
+      _lastProgress = now;
+      return;
+    }
+    final frozen = now.difference(_lastProgress);
+    if (frozen > Duration(seconds: widget.live ? 14 : 40)) {
       log('stalled for ${frozen.inSeconds}s, reconnecting');
-      _lastProgress = DateTime.now();
+      _lastProgress = now;
       _failed();
     }
   }
@@ -366,14 +492,185 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   void _saveResume() {
     if (widget.live) return;
     final key = _entry.resumeKey;
-    if (key == null) return;
-    final c = _c;
-    final position = c != null ? c.value.position : _lastPosition;
-    final duration = c != null ? c.value.duration : Duration.zero;
-    if (duration.inSeconds > 60 && position.inSeconds > duration.inSeconds * 0.95) {
+    if (key == null || !_ready) return;
+    final position = _lastPosition;
+    if (_duration.inSeconds > 60 && position.inSeconds > _duration.inSeconds * 0.95) {
       Store.setResume(key, 0);
     } else if (position.inSeconds > 0) {
       Store.setResume(key, position.inSeconds);
+    }
+  }
+
+  // ------------------------------------------------------- audio / subtitles
+
+  void _readTracks(Tracks tracks) {
+    bool real(String id) => id != 'auto' && id != 'no';
+    final audio = tracks.audio.where((t) => real(t.id)).toList();
+    final subtitle = tracks.subtitle.where((t) => real(t.id)).toList();
+    if (audio.length == _audioTracks.length && subtitle.length == _subtitleTracks.length) return;
+    _audioTracks = audio;
+    _subtitleTracks = subtitle;
+    log('tracks audio=${audio.length} subtitles=${subtitle.length}');
+    if (_ready) _applyPreferredTracks();
+    if (mounted && _panelOpen) setState(() {});
+  }
+
+  /// The language chosen last time is chosen again when the stream has it.
+  void _applyPreferredTracks() {
+    if (_tracksApplied) return;
+    if (_audioTracks.isEmpty && _subtitleTracks.isEmpty) return;
+    _tracksApplied = true;
+    final wantAudio = Store.audioLanguage;
+    if (_audioTracks.isNotEmpty) {
+      _audioId = _audioTracks.first.id;
+      if (wantAudio.isNotEmpty) {
+        for (final t in _audioTracks) {
+          if ((t.language ?? '') == wantAudio) {
+            if (t.id != _audioId) _player.setAudioTrack(t);
+            _audioId = t.id;
+            break;
+          }
+        }
+      }
+    }
+    final wantSubtitle = Store.subtitleLanguage;
+    SubtitleTrack? chosen;
+    if (wantSubtitle.isNotEmpty) {
+      for (final t in _subtitleTracks) {
+        if ((t.language ?? '') == wantSubtitle) {
+          chosen = t;
+          break;
+        }
+      }
+    }
+    _subtitleId = chosen?.id ?? 'no';
+    _player.setSubtitleTrack(chosen ?? SubtitleTrack.no());
+  }
+
+  void _chooseAudio(AudioTrack track) {
+    _audioId = track.id;
+    _player.setAudioTrack(track);
+    Store.setAudioLanguage(track.language ?? '');
+    log('audio track=${track.language ?? track.id}');
+  }
+
+  void _chooseSubtitle(SubtitleTrack? track) {
+    _subtitleId = track?.id ?? 'no';
+    _player.setSubtitleTrack(track ?? SubtitleTrack.no());
+    Store.setSubtitleLanguage(track?.language ?? '');
+    log('subtitle track=${track == null ? 'off' : (track.language ?? track.id)}');
+  }
+
+  void _chooseSpeed(double speed) {
+    _speed = speed;
+    _player.setRate(speed);
+    log('speed=$speed');
+  }
+
+  void _chooseFit(int fit) {
+    _fit = fit;
+    log('fit=${_fitNames[fit]}');
+  }
+
+  Future<void> _openOptions() async {
+    if (_panelOpen) return;
+    _panelOpen = true;
+    _hideTimer?.cancel();
+    log('panel=options');
+    await showDialog<void>(
+      context: context,
+      barrierColor: const Color(0x66000000),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, refresh) {
+          void pick(VoidCallback action) {
+            action();
+            refresh(() {});
+            if (mounted) setState(() {});
+          }
+
+          return _SidePanel(
+            alignment: Alignment.centerRight,
+            title: 'Audio and subtitles',
+            children: [
+              const _PanelHeading('Audio'),
+              if (_audioTracks.isEmpty) const _PanelNote('This stream has one audio track.'),
+              for (var i = 0; i < _audioTracks.length; i++)
+                _PanelRow(
+                  label: trackLabel(_audioTracks[i].language, _audioTracks[i].title, i + 1),
+                  selected: _audioTracks[i].id == _audioId,
+                  autofocus: _audioTracks[i].id == _audioId,
+                  onTap: () => pick(() => _chooseAudio(_audioTracks[i])),
+                ),
+              const _PanelHeading('Subtitles'),
+              _PanelRow(
+                label: 'Off',
+                selected: _subtitleId == 'no',
+                autofocus: _audioTracks.isEmpty,
+                onTap: () => pick(() => _chooseSubtitle(null)),
+              ),
+              for (var i = 0; i < _subtitleTracks.length; i++)
+                _PanelRow(
+                  label: trackLabel(_subtitleTracks[i].language, _subtitleTracks[i].title, i + 1),
+                  selected: _subtitleTracks[i].id == _subtitleId,
+                  onTap: () => pick(() => _chooseSubtitle(_subtitleTracks[i])),
+                ),
+              if (!widget.live) ...[
+                const _PanelHeading('Speed'),
+                _PanelChips(
+                  labels: [for (final s in _speeds) '${s}x'],
+                  selected: _speeds.indexOf(_speed),
+                  onTap: (i) => pick(() => _chooseSpeed(_speeds[i])),
+                ),
+              ],
+              const _PanelHeading('Picture'),
+              _PanelChips(
+                labels: _fitNames,
+                selected: _fit,
+                onTap: (i) => pick(() => _chooseFit(i)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    _panelOpen = false;
+    if (mounted) _showOverlay();
+  }
+
+  Future<void> _openChannels() async {
+    if (_panelOpen || !widget.live || widget.entries.length < 2) return;
+    _panelOpen = true;
+    _hideTimer?.cancel();
+    log('panel=channels');
+    const rowHeight = 42.0;
+    final scroll = ScrollController(initialScrollOffset: (_index < 4 ? 0 : _index - 4) * rowHeight);
+    final picked = await showDialog<int>(
+      context: context,
+      barrierColor: const Color(0x66000000),
+      builder: (ctx) => _SidePanel(
+        alignment: Alignment.centerLeft,
+        title: 'Channels',
+        list: ListView.builder(
+          controller: scroll,
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+          itemExtent: rowHeight,
+          itemCount: widget.entries.length,
+          itemBuilder: (context, i) => _PanelRow(
+            label: '${i + 1}   ${widget.entries[i].title}',
+            selected: i == _index,
+            autofocus: i == _index,
+            onTap: () => Navigator.of(ctx).pop(i),
+          ),
+        ),
+      ),
+    );
+    scroll.dispose();
+    _panelOpen = false;
+    if (!mounted) return;
+    if (picked != null && picked != _index) {
+      _tuneTo(picked);
+    } else {
+      _showOverlay();
     }
   }
 
@@ -383,18 +680,37 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _hideTimer?.cancel();
     if (!_overlay && mounted) setState(() => _overlay = true);
     _hideTimer = Timer(const Duration(seconds: 5), () {
-      if (!mounted || _dead || _userPaused || _zapTarget != null || _seekTarget != null) return;
+      if (!mounted || _dead || _userPaused || _scrubbing || _panelOpen || _zapTarget != null || _seekTarget != null) {
+        return;
+      }
       setState(() => _overlay = false);
     });
   }
 
   void _toggleOverlay() {
-    if (_overlay && !_dead) {
+    if (_overlay && !_dead && !_userPaused) {
       _hideTimer?.cancel();
       setState(() => _overlay = false);
     } else {
       _showOverlay();
     }
+  }
+
+  void _tuneTo(int index) {
+    _zapTimer?.cancel();
+    _saveResume();
+    setState(() {
+      _index = index;
+      _zapTarget = null;
+      _urlIndex = 0;
+      _fails = 0;
+      _playedThisUrl = false;
+      _epg = const [];
+      _lastPosition = Duration.zero;
+    });
+    _open();
+    _scheduleEpg();
+    _showOverlay();
   }
 
   void _zap(int step) {
@@ -411,63 +727,60 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _zapTimer?.cancel();
     _zapTimer = Timer(const Duration(milliseconds: 450), () {
       final next = _zapTarget;
-      if (!mounted || next == null) return;
-      _saveResume();
-      setState(() {
-        _index = next;
-        _zapTarget = null;
-        _urlIndex = 0;
-        _fails = 0;
-        _epg = const [];
-        _lastPosition = Duration.zero;
-      });
-      _open();
-      _scheduleEpg();
-      _showOverlay();
+      if (mounted && next != null) _tuneTo(next);
     });
   }
 
   void _togglePause() {
-    final c = _c;
-    if (c == null || !c.value.isInitialized) return;
-    if (c.value.isPlaying) {
-      _userPaused = true;
-      c.pause();
-    } else {
+    if (!_ready || widget.live) {
+      _showOverlay();
+      return;
+    }
+    if (_userPaused) {
       _userPaused = false;
       _lastProgress = DateTime.now();
-      c.play();
+      _player.play();
+    } else {
+      _userPaused = true;
+      _player.pause();
     }
     setState(() {});
     _showOverlay();
   }
 
   void _seek(int direction) {
-    final c = _c;
-    if (c == null || !c.value.isInitialized) return;
-    final duration = c.value.duration;
-    if (duration <= Duration.zero) return;
+    if (!_ready || widget.live || _duration <= Duration.zero) return;
     _seekPresses++;
     final step = _seekPresses > 16 ? 60 : (_seekPresses > 6 ? 30 : 10);
-    var target = (_seekTarget ?? c.value.position) + Duration(seconds: step * direction);
-    if (target < Duration.zero) target = Duration.zero;
-    final end = duration - const Duration(seconds: 3);
-    if (target > end) target = end;
-    setState(() => _seekTarget = target);
-    _showOverlay();
+    _previewSeek((_seekTarget ?? _position) + Duration(seconds: step * direction));
     _seekTimer?.cancel();
-    _seekTimer = Timer(const Duration(milliseconds: 400), () async {
+    _seekTimer = Timer(const Duration(milliseconds: 400), () {
+      _seekPresses = 0;
       final to = _seekTarget;
-      final now = _c;
-      if (to == null || now == null || !mounted) return;
-      _lastProgress = DateTime.now();
-      try {
-        await now.seekTo(to);
-      } catch (_) {}
-      if (!mounted) return;
-      setState(() => _seekTarget = null);
-      _showOverlay();
+      if (to != null) _commitSeek(to);
     });
+  }
+
+  void _previewSeek(Duration target) {
+    var to = target;
+    if (to < Duration.zero) to = Duration.zero;
+    final end = _duration - const Duration(seconds: 3);
+    if (end > Duration.zero && to > end) to = end;
+    setState(() => _seekTarget = to);
+    _showOverlay();
+  }
+
+  Future<void> _commitSeek(Duration to) async {
+    if (!mounted || !_ready) return;
+    _lastProgress = DateTime.now();
+    try {
+      await _player.seek(to);
+    } catch (_) {}
+    if (!mounted) return;
+    _position = to;
+    _lastPosition = to;
+    setState(() => _seekTarget = null);
+    _showOverlay();
   }
 
   void _toggleFavourite() {
@@ -479,10 +792,25 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _showOverlay();
   }
 
+  void _nextEpisode() {
+    if (_index < widget.entries.length - 1) _tuneTo(_index + 1);
+  }
+
   void _retryNow() {
     _fails = 0;
     _urlIndex = 0;
+    _playedThisUrl = false;
     _open(startAt: widget.live ? null : _lastPosition);
+  }
+
+  void _tap() {
+    if (_dead) {
+      _retryNow();
+    } else {
+      _toggleOverlay();
+    }
+    // Rebuild in any case: the first touch switches the controls from remote hints to buttons.
+    if (mounted) setState(() {});
   }
 
   bool _isOk(LogicalKeyboardKey k) =>
@@ -521,18 +849,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       return KeyEventResult.handled;
     }
 
-    if (event is KeyUpEvent) {
-      if (k == LogicalKeyboardKey.arrowLeft ||
-          k == LogicalKeyboardKey.arrowRight ||
-          k == LogicalKeyboardKey.mediaRewind ||
-          k == LogicalKeyboardKey.mediaFastForward) {
-        _seekPresses = 0;
-      }
-      return KeyEventResult.ignored;
-    }
+    if (event is KeyUpEvent) return KeyEventResult.ignored;
+    final down = event is KeyDownEvent;
 
     if (k == LogicalKeyboardKey.contextMenu) {
-      if (event is KeyDownEvent) _toggleFavourite();
+      if (down) _openOptions();
       return KeyEventResult.handled;
     }
 
@@ -545,12 +866,16 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         _zap(-1);
         return KeyEventResult.handled;
       }
-      if (k == LogicalKeyboardKey.arrowLeft || k == LogicalKeyboardKey.arrowRight) {
-        _showOverlay();
+      if (k == LogicalKeyboardKey.arrowLeft) {
+        if (down) _openChannels();
+        return KeyEventResult.handled;
+      }
+      if (k == LogicalKeyboardKey.arrowRight) {
+        if (down) _openOptions();
         return KeyEventResult.handled;
       }
       if (k == LogicalKeyboardKey.mediaPlayPause) {
-        if (event is KeyDownEvent) _toggleOverlay();
+        if (down) _toggleOverlay();
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
@@ -564,28 +889,28 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _seek(1);
       return KeyEventResult.handled;
     }
-    if (k == LogicalKeyboardKey.arrowUp || k == LogicalKeyboardKey.arrowDown) {
+    if (k == LogicalKeyboardKey.arrowDown) {
+      if (down) _openOptions();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.arrowUp) {
       _showOverlay();
       return KeyEventResult.handled;
     }
     if (k == LogicalKeyboardKey.mediaPlayPause || k == LogicalKeyboardKey.space) {
-      if (event is KeyDownEvent) _togglePause();
+      if (down) _togglePause();
       return KeyEventResult.handled;
     }
     if (k == LogicalKeyboardKey.mediaPlay) {
-      if (event is KeyDownEvent && _userPaused) _togglePause();
+      if (down && _userPaused) _togglePause();
       return KeyEventResult.handled;
     }
     if (k == LogicalKeyboardKey.mediaPause) {
-      if (event is KeyDownEvent && !_userPaused) _togglePause();
+      if (down && !_userPaused) _togglePause();
       return KeyEventResult.handled;
     }
-    if (k == LogicalKeyboardKey.mediaTrackNext && widget.entries.length > 1) {
-      if (event is KeyDownEvent) _zap(1);
-      return KeyEventResult.handled;
-    }
-    if (k == LogicalKeyboardKey.mediaTrackPrevious && widget.entries.length > 1) {
-      if (event is KeyDownEvent) _zap(-1);
+    if (k == LogicalKeyboardKey.mediaTrackNext) {
+      if (down) _nextEpisode();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -611,9 +936,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
   @override
   Widget build(BuildContext context) {
-    final c = _c;
-    final ready = c != null && c.value.isInitialized;
-    final buffering = c != null && c.value.isInitialized && c.value.isBuffering && !_userPaused;
+    final busy = _status != null || (_buffering && !_userPaused);
     final shown = widget.entries[_zapTarget ?? _index];
     return Scaffold(
       backgroundColor: Colors.black,
@@ -623,31 +946,31 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         onKeyEvent: _onKey,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () {
-            if (_dead) {
-              _retryNow();
-            } else if (widget.live) {
-              _toggleOverlay();
-            } else {
-              _togglePause();
-            }
-          },
-          onLongPress: widget.live ? _toggleFavourite : null,
+          onTap: _tap,
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (c != null && ready) _video(c) else const SizedBox.expand(),
-              if (_status != null || buffering)
-                Center(
-                  child: _dead
-                      ? _DeadMessage(text: _status ?? '')
-                      : Loading(label: _status),
+              // The picture is hidden until it really plays, so the last frame of the previous
+              // channel never shows under the new channel's name.
+              Opacity(
+                opacity: _ready ? 1 : 0,
+                child: IgnorePointer(
+                  child: Video(
+                    controller: _video,
+                    controls: NoVideoControls,
+                    fit: _fits[_fit],
+                    fill: Colors.black,
+                  ),
                 ),
+              ),
+              if (busy && !_dead) Center(child: Loading(label: _status)),
+              if (_dead) Center(child: _DeadMessage(text: _status ?? '', detail: _lastError)),
               IgnorePointer(
+                ignoring: !_overlay,
                 child: AnimatedOpacity(
                   opacity: _overlay ? 1 : 0,
                   duration: const Duration(milliseconds: 160),
-                  child: _overlayLayer(shown, c, ready),
+                  child: ExcludeFocus(child: _overlayLayer(shown, busy)),
                 ),
               ),
             ],
@@ -657,23 +980,14 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     );
   }
 
-  Widget _video(VideoPlayerController c) {
-    final ratio = c.value.aspectRatio;
-    return Center(
-      child: AspectRatio(
-        aspectRatio: ratio.isFinite && ratio > 0.2 ? ratio : 16 / 9,
-        child: VideoPlayer(c),
-      ),
-    );
-  }
-
-  Widget _overlayLayer(PlayEntry shown, VideoPlayerController? c, bool ready) {
+  Widget _overlayLayer(PlayEntry shown, bool busy) {
     final item = shown.item;
     final favourite = item != null && Store.isFavourite(item);
+    final touch = _touch;
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.fromLTRB(34, 22, 34, 46),
+          padding: const EdgeInsets.fromLTRB(26, 18, 34, 46),
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
@@ -682,8 +996,17 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
             ),
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              if (touch) ...[
+                _RoundButton(
+                  icon: Icons.arrow_back_rounded,
+                  size: 44,
+                  onTap: () => Navigator.of(context).maybePop(),
+                ),
+                const SizedBox(width: 10),
+              ] else
+                const SizedBox(width: 8),
               if (widget.live) ...[
                 Container(
                   width: 52,
@@ -697,6 +1020,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Row(
                       children: [
@@ -730,9 +1054,34 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
             ],
           ),
         ),
-        const Spacer(),
+        Expanded(
+          child: touch && !_dead && !busy
+              ? Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: widget.live
+                        ? [
+                            _RoundButton(icon: Icons.skip_previous_rounded, size: 56, onTap: () => _zap(-1)),
+                            const SizedBox(width: 56),
+                            _RoundButton(icon: Icons.skip_next_rounded, size: 56, onTap: () => _zap(1)),
+                          ]
+                        : [
+                            _RoundButton(icon: Icons.replay_10_rounded, size: 52, onTap: () => _seek(-1)),
+                            const SizedBox(width: 36),
+                            _RoundButton(
+                              icon: _userPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                              size: 72,
+                              onTap: _togglePause,
+                            ),
+                            const SizedBox(width: 36),
+                            _RoundButton(icon: Icons.forward_10_rounded, size: 52, onTap: () => _seek(1)),
+                          ],
+                  ),
+                )
+              : const SizedBox(),
+        ),
         Container(
-          padding: const EdgeInsets.fromLTRB(34, 50, 34, 24),
+          padding: const EdgeInsets.fromLTRB(34, 44, 34, 20),
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
@@ -740,13 +1089,13 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
               colors: [Colors.transparent, Color(0xE6000000)],
             ),
           ),
-          child: widget.live ? _liveBar() : _movieBar(c, ready),
+          child: widget.live ? _liveBar(touch, favourite) : _movieBar(touch),
         ),
       ],
     );
   }
 
-  Widget _liveBar() {
+  Widget _liveBar(bool touch, bool favourite) {
     final now = DateTime.now();
     XEpg? current;
     XEpg? next;
@@ -786,58 +1135,317 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         if (next != null)
           Text('Next  ${formatClock(next.start)}   ${next.title}',
               maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, color: Color(0xFFD5DAE3))),
-        const SizedBox(height: 8),
-        const Text('Up / Down  Change channel      OK  Info      Hold OK  Favourite      Back  Channel list',
-            style: TextStyle(fontSize: 12.5, color: C.dim)),
+        const SizedBox(height: 10),
+        if (touch)
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              if (widget.entries.length > 1)
+                _Pill(icon: Icons.list_rounded, label: 'Channels', onTap: _openChannels),
+              _Pill(icon: Icons.subtitles_rounded, label: 'Audio and subtitles', onTap: _openOptions),
+              if (_entry.item != null)
+                _Pill(
+                  icon: favourite ? Icons.star_rounded : Icons.star_border_rounded,
+                  label: favourite ? 'In Favourites' : 'Add to Favourites',
+                  onTap: _toggleFavourite,
+                ),
+            ],
+          )
+        else
+          const Text(
+              'Up / Down  Channel      OK  Info      Left  Channel list      Right  Audio and subtitles      Hold OK  Favourite',
+              style: TextStyle(fontSize: 12.5, color: C.dim)),
       ],
     );
   }
 
-  Widget _movieBar(VideoPlayerController? c, bool ready) {
-    final duration = ready ? c!.value.duration : Duration.zero;
-    final position = _seekTarget ?? (ready ? c!.value.position : _lastPosition);
-    final double value =
-        duration.inMilliseconds > 0 ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0).toDouble() : 0.0;
+  Widget _movieBar(bool touch) {
+    final duration = _duration;
+    final position = _seekTarget ?? _position;
+    final known = duration > Duration.zero;
+    final double value = known ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0).toDouble() : 0.0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           children: [
-            Icon(_userPaused ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 26, color: C.accent),
-            const SizedBox(width: 10),
+            if (!touch) ...[
+              Icon(_userPaused ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 26, color: C.accent),
+              const SizedBox(width: 10),
+            ],
             Text(formatTime(position), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-            const SizedBox(width: 12),
             Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(3),
-                child: LinearProgressIndicator(
-                  minHeight: 6,
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 5,
+                  activeTrackColor: C.accent,
+                  inactiveTrackColor: const Color(0x44FFFFFF),
+                  thumbColor: C.accent,
+                  overlayColor: const Color(0x33FFC400),
+                  thumbShape: RoundSliderThumbShape(enabledThumbRadius: touch ? 8 : 5),
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
+                ),
+                child: Slider(
                   value: value,
-                  color: C.accent,
-                  backgroundColor: const Color(0x44FFFFFF),
+                  onChangeStart: known
+                      ? (_) {
+                          _scrubbing = true;
+                          _hideTimer?.cancel();
+                        }
+                      : null,
+                  onChanged: known ? (v) => _previewSeek(duration * v) : null,
+                  onChangeEnd: known
+                      ? (v) {
+                          _scrubbing = false;
+                          _commitSeek(duration * v);
+                        }
+                      : null,
                 ),
               ),
             ),
-            const SizedBox(width: 12),
             Text(formatTime(duration), style: const TextStyle(fontSize: 15, color: Color(0xFFD5DAE3))),
           ],
         ),
-        const SizedBox(height: 10),
-        const Text('OK  Pause / Play      Left / Right  Jump 10 s (hold to jump further)      Back  Exit',
-            style: TextStyle(fontSize: 12.5, color: C.dim)),
+        const SizedBox(height: 6),
+        if (touch)
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              _Pill(icon: Icons.subtitles_rounded, label: 'Audio and subtitles', onTap: _openOptions),
+              _Pill(icon: Icons.speed_rounded, label: 'Speed ${_speed}x', onTap: _openOptions),
+              if (_index < widget.entries.length - 1)
+                _Pill(icon: Icons.skip_next_rounded, label: 'Next episode', onTap: _nextEpisode),
+            ],
+          )
+        else
+          const Text(
+              'OK  Pause / Play      Left / Right  Jump 10 s (hold to jump further)      Down  Audio, subtitles, speed      Back  Exit',
+              style: TextStyle(fontSize: 12.5, color: C.dim)),
       ],
     );
   }
 }
 
-class _DeadMessage extends StatelessWidget {
-  const _DeadMessage({required this.text});
+/// Round, tappable control drawn over the picture.
+class _RoundButton extends StatelessWidget {
+  const _RoundButton({required this.icon, required this.onTap, this.size = 48});
+  final IconData icon;
+  final VoidCallback onTap;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0x73000000),
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        canRequestFocus: false,
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Icon(icon, size: size * 0.58, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0x99202430),
+      borderRadius: BorderRadius.circular(22),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        canRequestFocus: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: C.accent),
+              const SizedBox(width: 8),
+              Text(label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Panel over one side of the picture (channel list, audio and subtitles).
+class _SidePanel extends StatelessWidget {
+  const _SidePanel({required this.alignment, required this.title, this.children, this.list});
+  final Alignment alignment;
+  final String title;
+  final List<Widget>? children;
+  final Widget? list;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: alignment,
+      child: Material(
+        color: const Color(0xF211141B),
+        child: SizedBox(
+          width: 330,
+          height: double.infinity,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 20, 12, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(title, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+                    ),
+                    if (!InputMode.remote)
+                      ExcludeFocus(
+                        child: IconButton(
+                          icon: const Icon(Icons.close_rounded, color: C.dim),
+                          onPressed: () => Navigator.of(context).maybePop(),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: list ??
+                    ListView(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+                      children: children ?? const [],
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PanelHeading extends StatelessWidget {
+  const _PanelHeading(this.text);
   final String text;
 
   @override
   Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 12, 10, 8),
+      child: Text(text.toUpperCase(),
+          style: const TextStyle(fontSize: 12, letterSpacing: 1.1, fontWeight: FontWeight.w700, color: C.dim)),
+    );
+  }
+}
+
+class _PanelNote extends StatelessWidget {
+  const _PanelNote(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 2, 10, 6),
+      child: Text(text, style: const TextStyle(fontSize: 13.5, color: C.dim)),
+    );
+  }
+}
+
+class _PanelRow extends StatelessWidget {
+  const _PanelRow({required this.label, required this.selected, required this.onTap, this.autofocus = false});
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final bool autofocus;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: TvFocus(
+        autofocus: autofocus,
+        selected: selected,
+        radius: 8,
+        color: const Color(0xFF171B24),
+        onTap: onTap,
+        child: SizedBox(
+          height: 38,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 14.5, fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
+                ),
+                if (selected) const Icon(Icons.check_rounded, color: C.accent, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PanelChips extends StatelessWidget {
+  const _PanelChips({required this.labels, required this.selected, required this.onTap});
+  final List<String> labels;
+  final int selected;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 0, 2, 4),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          for (var i = 0; i < labels.length; i++)
+            TvFocus(
+              selected: i == selected,
+              radius: 18,
+              color: const Color(0xFF171B24),
+              onTap: () => onTap(i),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+                child: Text(labels[i],
+                    style: TextStyle(fontSize: 13.5, fontWeight: i == selected ? FontWeight.w800 : FontWeight.w500)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DeadMessage extends StatelessWidget {
+  const _DeadMessage({required this.text, this.detail = ''});
+  final String text;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final shortDetail = detail.length > 110 ? '${detail.substring(0, 110)}…' : detail;
     return Container(
+      constraints: const BoxConstraints(maxWidth: 520),
       padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 20),
       decoration: BoxDecoration(color: const Color(0xCC11141B), borderRadius: BorderRadius.circular(14)),
       child: Column(
@@ -845,9 +1453,15 @@ class _DeadMessage extends StatelessWidget {
         children: [
           const Icon(Icons.error_outline_rounded, color: C.dim, size: 32),
           const SizedBox(height: 10),
-          Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          Text(text, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
-          const Text('Press OK to try again', style: TextStyle(fontSize: 13.5, color: C.dim)),
+          Text(InputMode.remote ? 'Press OK to try again' : 'Tap to try again',
+              style: const TextStyle(fontSize: 13.5, color: C.dim)),
+          if (shortDetail.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(shortDetail,
+                textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Color(0xFF6B7384))),
+          ],
         ],
       ),
     );

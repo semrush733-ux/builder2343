@@ -1,0 +1,13 @@
+
+// ---- B1G: pack only the processor types this build is for (keeps the APK small) ----
+def b1gAbis = System.getenv('B1G_ABIS')
+if (b1gAbis) {
+    android {
+        defaultConfig {
+            ndk {
+                abiFilters.clear()
+                abiFilters.addAll(b1gAbis.split(',').collect { it.trim() })
+            }
+        }
+    }
+}

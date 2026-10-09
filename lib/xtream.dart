@@ -383,6 +383,9 @@ class XtreamApi implements Source {
   @override
   String get label => username;
 
+  /// Stream formats this account may use ("ts", "m3u8"), known after [login].
+  List<String> formats = const [];
+
   static const _actions = {
     XKind.live: ['get_live_categories', 'get_live_streams'],
     XKind.vod: ['get_vod_categories', 'get_vod_streams'],
@@ -417,7 +420,9 @@ class XtreamApi implements Source {
 
   @override
   Future<XAccount> login() async {
-    return parseAccount(await _json(const {}, timeout: const Duration(seconds: 20)));
+    final account = parseAccount(await _json(const {}, timeout: const Duration(seconds: 20)));
+    formats = account.formats;
+    return account;
   }
 
   @override
@@ -458,7 +463,11 @@ class XtreamApi implements Source {
   @override
   List<String> liveUrlsFor(XItem item, String preferredFormat) {
     final other = preferredFormat == 'ts' ? 'm3u8' : 'ts';
-    return [liveUrl(item.id, preferredFormat), liveUrl(item.id, other)];
+    var order = [preferredFormat, other];
+    // Do not try a format the provider has switched off for this account.
+    final allowed = order.where(formats.contains).toList();
+    if (allowed.isNotEmpty) order = allowed;
+    return [for (final format in order) liveUrl(item.id, format)];
   }
 
   @override

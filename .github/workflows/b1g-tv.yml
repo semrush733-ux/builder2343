@@ -53,6 +53,7 @@ jobs:
           flutter create --no-pub --platforms=android --org com.b1g --project-name b1gtv "$RUNNER_TEMP/scaffold"
           cp -r "$RUNNER_TEMP/scaffold/android" android
           cp -r android_overlay/. android/
+          cat android_extra/app-build-extra.gradle >> android/app/build.gradle
           mkdir -p out/logs
 
       - name: Get packages
@@ -70,6 +71,8 @@ jobs:
 
       # Test build for the emulator (64-bit Intel, mock server pre-filled). Never published.
       - name: Build the test app
+        env:
+          B1G_ABIS: x86_64
         run: |
           set -o pipefail
           flutter build apk --release --target-platform android-x64 \
@@ -79,6 +82,8 @@ jobs:
           cp build/app/outputs/flutter-apk/app-release.apk out-smoke/b1g-smoke.apk
 
       - name: Build B1G.apk
+        env:
+          B1G_ABIS: armeabi-v7a,arm64-v8a
         run: |
           set -o pipefail
           SERVER="$(tr -d ' \r\n' < config/server.txt)"
@@ -131,7 +136,7 @@ jobs:
             echo '```'
             echo "### Code check"
             echo '```'
-            tail -15 out/logs/analyze.log 2>/dev/null || true
+            tail -45 out/logs/analyze.log 2>/dev/null || true
             echo '```'
             echo "### Unit tests"
             echo '```'

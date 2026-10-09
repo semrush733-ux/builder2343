@@ -165,6 +165,19 @@ def run():
           '%s, position %ss' % (ready.group(0) if ready else 'not ready', pos))
     check('video picture is decoded', ready is not None and int(ready.group(2)) > 0, ready.group(0) if ready else '')
 
+    # 2b. panels inside the player: channel list (Left) and audio / subtitles (Right)
+    m = mark()
+    key(LEFT, pause=2)
+    got = wait_log(r'panel=channels', m, 10)
+    shot('live-channel-list')
+    key(BACK, pause=1.5)
+    m2 = mark()
+    key(RIGHT, pause=2)
+    got2 = wait_log(r'panel=options', m2, 10)
+    shot('live-options')
+    key(BACK, pause=1.5)
+    check('channel list and options open inside the live player', got is not None and got2 is not None)
+
     # 3. channel up: channel 2 has no .ts on the mock server, the app must fall back to .m3u8
     m = mark()
     key(UP, pause=0.3)
@@ -177,10 +190,22 @@ def run():
     key(OK)
     shot('live-info-toggled')
 
+    # 3b. pick a channel from the list inside the player
+    key(LEFT, pause=2)
+    key(UP)
+    m = mark()
+    key(OK)
+    ready = wait_log(r'ready index=0 format=(\w+)', m, 90)
+    pos = wait_position(0, 5, m, 60)
+    shot('live-picked-from-list')
+    check('a channel can be picked from the list in the player', ready is not None and pos >= 5,
+          '%s, position %ss' % (ready.group(0) if ready else 'not ready', pos))
+
     # 4. channel 3 never works: the app must stop retrying with a clear message, not crash
     m = mark()
     key(UP, pause=0.3)
-    gave_up = wait_log(r'gave up index=2', m, 150)
+    key(UP, pause=0.3)
+    gave_up = wait_log(r'gave up index=2', m, 320)
     shot('live-offline-channel')
     check('dead channel ends with a message instead of hanging', gave_up is not None)
 
@@ -234,6 +259,31 @@ def run():
     pos = wait_position(0, 5, m, 60)
     shot('movie-playing')
     check('movie plays', ready is not None and pos >= 5, 'position %ss' % pos)
+
+    # 5b. audio language and subtitles (the test movie has English + Urdu audio and English subtitles)
+    tracks = wait_log(r'tracks audio=(\d+) subtitles=(\d+)', m, 10)
+    check('the movie reports its audio and subtitle tracks', tracks is not None and tracks.group(1) == '2' and tracks.group(2) == '1',
+          tracks.group(0) if tracks else '')
+    m2 = mark()
+    key(DOWN, pause=2)
+    shot('movie-options')
+    key(DOWN)
+    key(OK)
+    audio = wait_log(r'audio track=urd', m2, 10)
+    key(DOWN)
+    key(DOWN)
+    key(OK)
+    subs = wait_log(r'subtitle track=eng', m2, 10)
+    time.sleep(1)
+    shot('movie-options-chosen')
+    key(BACK, pause=4)
+    shot('movie-with-subtitles')
+    before = wait_position(0, 0, m2, 1)
+    time.sleep(6)
+    after = wait_position(0, 0, m2, 1)
+    check('audio language and subtitles can be changed with the remote', audio is not None and subs is not None)
+    check('the movie keeps playing after the change', after > before, '%ss -> %ss' % (before, after))
+
     m = mark()
     for _ in range(6):
         key(RIGHT, pause=0.25)
@@ -244,7 +294,19 @@ def run():
     key(OK)
     time.sleep(1)
     shot('movie-paused')
-    key(BACK, pause=2)
+
+    # 5c. touch: a tap shows the touch controls, the back button closes the player
+    adb('shell', 'input', 'tap', '960', '330')
+    time.sleep(1.5)
+    shot('movie-touch-controls')
+    m = mark()
+    adb('shell', 'input', 'tap', '96', '80')
+    closed = wait_log(r'player closed', m, 10)
+    time.sleep(1.5)
+    shot('movie-touch-back')
+    check('touch: the back button closes the player', closed is not None)
+    if closed is None:
+        key(BACK, pause=2)
     m = mark()
     key(OK)
     ready = wait_log(r'ready index=0 format=mp4', m, 90)

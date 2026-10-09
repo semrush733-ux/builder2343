@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../input_mode.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -78,6 +79,14 @@ class _SeriesScreenState extends State<SeriesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (!InputMode.remote)
+                  ExcludeFocus(
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.arrow_back_rounded, color: C.text),
+                      onPressed: () => Navigator.of(context).maybePop(),
+                    ),
+                  ),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: Container(

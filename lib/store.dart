@@ -129,6 +129,14 @@ class Store {
   }
 
   // ---- playback ----
+  /// Audio language picked last time (ISO code such as "eng"); empty = the stream's default.
+  static String get audioLanguage => _p.getString('audio_lang') ?? '';
+  static void setAudioLanguage(String code) => _p.setString('audio_lang', code);
+
+  /// Subtitle language picked last time; empty = subtitles off.
+  static String get subtitleLanguage => _p.getString('sub_lang') ?? '';
+  static void setSubtitleLanguage(String code) => _p.setString('sub_lang', code);
+
   /// Stream format that worked last time for live channels: "ts" or "m3u8".
   static String get liveFormat => _p.getString('live_format') == 'm3u8' ? 'm3u8' : 'ts';
 

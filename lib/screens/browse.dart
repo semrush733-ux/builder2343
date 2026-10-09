@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../input_mode.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -237,6 +238,14 @@ class _BrowseScreenState extends State<BrowseScreen> {
                   padding: const EdgeInsets.only(left: 6, bottom: 12),
                   child: Row(
                     children: [
+                      if (!InputMode.remote)
+                        ExcludeFocus(
+                          child: IconButton(
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(Icons.arrow_back_rounded, color: C.text),
+                            onPressed: () => Navigator.of(context).maybePop(),
+                          ),
+                        ),
                       const Logo(size: 18),
                       const SizedBox(width: 10),
                       Text(kindTitle(widget.kind), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
