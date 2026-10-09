@@ -7,7 +7,7 @@ import '../backend.dart';
 import '../start.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'update.dart';
+import 'update_web.dart' if (dart.library.io) 'update.dart';
 
 /// Sits above every screen: checks the licence and the website settings at start, whenever the
 /// app comes back to the front and a few times a day. Opens the activation screen when the

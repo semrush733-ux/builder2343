@@ -8,7 +8,7 @@ import '../xtream.dart';
 import 'browse.dart';
 import 'device.dart';
 import 'login.dart';
-import 'update.dart';
+import 'update_web.dart' if (dart.library.io) 'update.dart';
 
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 

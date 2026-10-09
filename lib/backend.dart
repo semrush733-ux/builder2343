@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:flutter/services.dart' show MethodChannel;
@@ -344,7 +344,9 @@ class Backend {
       }
       log('backend register hwid=${ids.containsKey('hwid') ? 'yes' : 'no'} mac=${ids.containsKey('mac') ? 'yes' : 'no'}');
       final data = await _post('/device/register', {
-        'platform': Platform.isAndroid ? 'android-tv' : Platform.operatingSystem,
+        'platform': kIsWeb
+            ? 'web'
+            : (defaultTargetPlatform == TargetPlatform.android ? 'android-tv' : defaultTargetPlatform.name),
         ...ids,
       });
       final d = data['device'];

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show compute;
@@ -36,7 +35,9 @@ class XtreamAuthException extends XtreamException {
 String friendlyError(Object e) {
   if (e is XtreamException) return e.message;
   if (e is TimeoutException) return 'The server did not answer in time. Please try again.';
-  if (e is SocketException || e is http.ClientException || e is HandshakeException) {
+  // Checked by name so this file also compiles for the web build (no dart:io there).
+  final kind = e.runtimeType.toString();
+  if (kind == 'SocketException' || kind == 'HandshakeException' || kind == '_ClientSocketException' || e is http.ClientException) {
     return 'Cannot reach the server. Check the address and your internet connection.';
   }
   if (e is FormatException) return 'This address did not answer like an IPTV server.';

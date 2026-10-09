@@ -209,6 +209,46 @@ jobs:
           }
           publish || { sleep 20; publish; } || { sleep 60; publish; }
 
+  # Builds the same app for the browser and adds b1g-web.zip to the "b1g-latest" release.
+  # Runs in its own job, so a web problem never blocks the APK. Note: in browsers only
+  # https HLS streams play reliably (mixed-content and CORS limits of the web platform).
+  web:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create the web project
+        run: |
+          flutter create --no-pub --platforms=web --org com.b1g --project-name b1gtv "$RUNNER_TEMP/webscaffold"
+          cp -r "$RUNNER_TEMP/webscaffold/web" web
+
+      - name: Build the web app
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: |
+          set -o pipefail
+          SERVER="$(tr -d ' \r\n' < config/server.txt)"
+          flutter pub get
+          flutter build web --release \
+            --build-name "1.0.$BUILD_NUMBER" --build-number "$BUILD_NUMBER" \
+            --dart-define=B1G_SERVER="$SERVER" --dart-define=B1G_TMDB_KEY="$TMDB_API_KEY"
+          (cd build/web && zip -qr "$GITHUB_WORKSPACE/b1g-web.zip" .)
+
+      - name: Add b1g-web.zip to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          upload() { gh release upload b1g-latest b1g-web.zip --clobber; }
+          upload || { sleep 20; upload; } || { sleep 60; upload; }
+
   # Runs the test build on an emulator with a TV-sized screen and drives it with remote-control
   # keys against a mock IPTV server (ci/smoke.py). Screenshots go to the branch "ci-smoke-b1g".
   smoke:
