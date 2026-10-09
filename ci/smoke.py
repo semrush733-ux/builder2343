@@ -136,6 +136,9 @@ def run():
     shot('login')
     if not check('app starts on the sign-in screen', ok):
         return
+    # The emulator uses a phone system image, which starts in "touch mode": Android swallows the
+    # first remote key to leave that mode. A real TV is never in touch mode. Down does nothing here.
+    key(DOWN)
     m = mark()
     key(OK)
     ok = wait_log(r'screen=home', m, 60) is not None
