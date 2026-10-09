@@ -5,13 +5,10 @@ import 'package:media_kit/media_kit.dart';
 import 'backend.dart';
 import 'config.dart';
 import 'input_mode.dart';
-import 'm3u.dart';
 import 'screens/device.dart';
-import 'screens/home.dart';
-import 'screens/login.dart';
+import 'start.dart';
 import 'store.dart';
 import 'theme.dart';
-import 'xtream.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,20 +32,19 @@ class B1GApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Source source =
-        Store.isM3u ? M3uSource(Store.m3uUrl) : XtreamApi(Store.server, Store.username, Store.password);
-    final Widget home = Store.loggedIn ? HomeScreen(api: source) : const LoginScreen();
     return MaterialApp(
       title: kAppName,
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
+      navigatorKey: navigatorKey,
       // Any touch switches the player to touch controls; any key switches back to remote hints.
+      // AppGate checks the licence and looks for app updates, whatever screen is open.
       builder: (context, child) => Listener(
         behavior: HitTestBehavior.translucent,
         onPointerDown: (_) => InputMode.remote = false,
-        child: child,
+        child: AppGate(child: child ?? const SizedBox()),
       ),
-      home: LicenseGate(child: home),
+      home: Backend.allowed ? startScreen() : const ActivationScreen(),
     );
   }
 }

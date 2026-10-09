@@ -45,13 +45,24 @@ class Store {
     await _p.setString('identity', identity);
   }
 
-  static Future<void> saveSession(String server, String username, String password) async {
+  /// True when the saved login used the server address from the B1G website (the customer typed
+  /// only username and password). Such a login follows the website when the address changes there.
+  static bool get viaSite => _p.getBool('via_site') ?? false;
+
+  static Future<void> saveSession(String server, String username, String password, {bool viaSite = false}) async {
     await _switchAccount('xtream|$server|$username');
     await _p.setString('mode', 'xtream');
     await _p.setString('server', server);
     await _p.setString('username', username);
     await _p.setString('password', password);
+    await _p.setBool('via_site', viaSite);
     await _p.setBool('logged_in', true);
+  }
+
+  /// The provider moved to a new address: same account, so favourites and resume positions stay.
+  static Future<void> moveServer(String server) async {
+    await _p.setString('server', server);
+    await _p.setString('identity', 'xtream|$server|$username');
   }
 
   static Future<void> saveM3uSession(String url) async {

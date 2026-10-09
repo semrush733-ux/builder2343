@@ -7,6 +7,8 @@ import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import androidx.core.content.FileProvider
+import java.io.File
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -29,6 +31,13 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    @Suppress("DEPRECATION")
+    private fun appVersion(): Map<String, Any> {
+        val info = packageManager.getPackageInfo(packageName, 0)
+        val code = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode.toInt() else info.versionCode
+        return mapOf("code" to code, "name" to (info.versionName ?: ""))
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         // The player asks to keep the screen awake while a stream is open.
@@ -46,6 +55,32 @@ class MainActivity : FlutterActivity() {
                     try {
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(call.arguments as String))
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                } else if (call.method == "appVersion") {
+                    try {
+                        result.success(appVersion())
+                    } catch (e: Exception) {
+                        result.success(null)
+                    }
+                } else if (call.method == "cacheDir") {
+                    result.success(cacheDir.absolutePath)
+                } else if (call.method == "canInstall") {
+                    // From Android 8 the customer allows "install unknown apps" per app, once.
+                    result.success(
+                        Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls()
+                    )
+                } else if (call.method == "installApk") {
+                    // "Update now": hands the downloaded APK to Android's installer.
+                    try {
+                        val file = File(call.arguments as String)
+                        val uri = FileProvider.getUriForFile(this, "$packageName.files", file)
+                        val intent = Intent(Intent.ACTION_VIEW)
+                        intent.setDataAndType(uri, "application/vnd.android.package-archive")
+                        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                         startActivity(intent)
                         result.success(true)
                     } catch (e: Exception) {

@@ -34,6 +34,18 @@ customers, add a keystore as repository secrets (`ANDROID_KEYSTORE_BASE64`,
 `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) and keep that keystore
 safe - updates must always be signed with the same key.
 
+## The B1G website (licence, default server, updates)
+
+The app talks to the WordPress plugin "B1G App Platform" (`lib/backend.dart`, address in
+`kApiBase`, override with `--dart-define=B1G_API_BASE=...`):
+
+- device registration, trial / licence check and activation code, QR code to add a playlist;
+- `GET app/config`: a default IPTV server (the sign-in screen then asks for username and
+  password only; Xtream Codes and M3U link stay as tabs) and the newest app version
+  ("Update available" with **Update now**, which downloads the APK and opens the installer).
+
+What the website has to provide is written down in `docs/WEBSITE-CHANGES.md`.
+
 ## Project layout
 
 ```
@@ -41,7 +53,8 @@ lib/                    the app (Dart)
   xtream.dart           Xtream Codes API and the common Source interface
   m3u.dart              M3U playlist reader
   store.dart            saved login, favourites, resume positions
-  screens/              login, home, browse, series, player
+  backend.dart          the B1G website: licence, default server, app updates
+  screens/              login, home, browse, series, player, device (QR / activation), update
 android_overlay/        TV manifest, activity, icons and banner (copied over Flutter's Android template)
 config/server.txt       optional fixed server address
 ci/                     mock IPTV server and emulator test

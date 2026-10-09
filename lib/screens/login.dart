@@ -27,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
   late final TextEditingController _user;
   late final TextEditingController _pass;
   late final TextEditingController _m3u;
+  final _accountTabNode = FocusNode();
   final _xtreamTabNode = FocusNode();
   final _m3uTabNode = FocusNode();
   final _serverNode = FocusNode();
@@ -36,7 +37,14 @@ class _LoginScreenState extends State<LoginScreen> {
   final _buttonNode = FocusNode();
   final _userField = GlobalKey<TvFieldState>();
   final _passField = GlobalKey<TvFieldState>();
-  bool _m3uMode = false;
+  // What the form asks for:
+  //   account - username and password only; the server address comes from the B1G website
+  //   xtream  - server address, username and password
+  //   m3u     - a playlist link
+  static const _account = 0, _xtream = 1, _m3uLink = 2;
+  static const _modeNames = ['account', 'xtream', 'm3u'];
+  int _mode = _xtream;
+  bool _modeChosen = false;
   bool _busy = false;
   String? _error;
   List<BPlaylist> _serverLists = const [];
@@ -45,6 +53,50 @@ class _LoginScreenState extends State<LoginScreen> {
   /// A build that is locked to one server only asks for username and password.
   bool get _locked => kLockedServer.isNotEmpty;
 
+  bool get _m3uMode => _mode == _m3uLink;
+
+  /// The website gave a server address: "username and password only" is offered, and is the default.
+  bool get _hasSiteServer => !_locked && Backend.serverUrl.isNotEmpty;
+
+  int _startMode() {
+    if (_locked) return _xtream;
+    if (Store.isM3u && Store.m3uUrl.isNotEmpty) return _m3uLink;
+    if (_hasSiteServer &&
+        (Store.viaSite ||
+            _server.text.trim().isEmpty ||
+            bareServer(_server.text) == bareServer(Backend.serverUrl))) {
+      return _account;
+    }
+    return _xtream;
+  }
+
+  /// The website settings arrive a moment after the first start (and can change later).
+  void _onBackendChange() {
+    if (!mounted) return;
+    if (_busy || _modeChosen) {
+      setState(() {});
+      return;
+    }
+    var mode = _mode;
+    if (_mode == _xtream && _hasSiteServer && _server.text.trim().isEmpty) mode = _account;
+    if (_mode == _account && !_hasSiteServer) mode = _xtream;
+    final changed = mode != _mode;
+    final serverHadFocus = _serverNode.hasFocus;
+    setState(() => _mode = mode);
+    if (!changed) return;
+    log('login mode=${_modeNames[mode]} (website)');
+    // The server row appears or disappears: make sure the remote still stands on something.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final focus = FocusManager.instance.primaryFocus;
+      if (!serverHadFocus && focus != null && focus is! FocusScopeNode) return;
+      (_mode == _xtream
+              ? _serverNode
+              : (_user.text.isEmpty ? _userNode : (_pass.text.isEmpty ? _passNode : _buttonNode)))
+          .requestFocus();
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -52,9 +104,11 @@ class _LoginScreenState extends State<LoginScreen> {
     _user = TextEditingController(text: kPrefillUser.isNotEmpty ? kPrefillUser : Store.username);
     _pass = TextEditingController(text: kPrefillPass);
     _m3u = TextEditingController(text: Store.m3uUrl);
-    _m3uMode = !_locked && Store.isM3u && Store.m3uUrl.isNotEmpty;
+    _mode = _startMode();
     _error = widget.message;
     log('screen=login');
+    if (_mode == _account) log('login mode=account (website)');
+    Backend.changes.addListener(_onBackendChange);
     // Register with the B1G website and watch for playlists added online
     // (by us for the client, or by the client through the QR link).
     Backend.ensureRegistered().then((_) {
@@ -66,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       if (_m3uMode) {
         (_m3u.text.isEmpty ? _m3uNode : _buttonNode).requestFocus();
-      } else if (!_locked && _server.text.isEmpty) {
+      } else if (_mode == _xtream && !_locked && _server.text.isEmpty) {
         _serverNode.requestFocus();
       } else if (_user.text.isEmpty) {
         _userNode.requestFocus();
@@ -100,11 +154,17 @@ class _LoginScreenState extends State<LoginScreen> {
       _server.text = pl.url;
       _user.text = pl.username;
       _pass.text = pl.password;
-      _m3uMode = false;
+      setState(() {
+        _mode = _xtream;
+        _modeChosen = true;
+      });
       await _loginXtream();
     } else {
       _m3u.text = pl.url;
-      _m3uMode = true;
+      setState(() {
+        _mode = _m3uLink;
+        _modeChosen = true;
+      });
       await _loginM3u();
     }
   }
@@ -112,23 +172,25 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     _poll?.cancel();
+    Backend.changes.removeListener(_onBackendChange);
     _server.dispose();
     _user.dispose();
     _pass.dispose();
     _m3u.dispose();
-    for (final node in [_xtreamTabNode, _m3uTabNode, _serverNode, _userNode, _passNode, _m3uNode, _buttonNode]) {
+    for (final node in [_accountTabNode, _xtreamTabNode, _m3uTabNode, _serverNode, _userNode, _passNode, _m3uNode, _buttonNode]) {
       node.dispose();
     }
     super.dispose();
   }
 
-  void _setMode(bool m3u) {
-    if (_busy || _m3uMode == m3u) return;
+  void _setMode(int mode) {
+    if (_busy || _mode == mode) return;
     setState(() {
-      _m3uMode = m3u;
+      _mode = mode;
+      _modeChosen = true;
       _error = null;
     });
-    log('login mode=${m3u ? 'm3u' : 'xtream'}');
+    log('login mode=${_modeNames[mode]}');
   }
 
   void _fail(Object e) {
@@ -151,7 +213,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _loginXtream() async {
     if (_busy) return;
-    final parsed = parseServerInput(_locked ? kLockedServer : _server.text);
+    final fixedServer = _locked || _mode == _account;
+    final parsed = parseServerInput(_locked ? kLockedServer : (_mode == _account ? Backend.serverUrl : _server.text));
     var user = _user.text.trim();
     var pass = _pass.text.trim();
     // A pasted playlist link carries the username and password itself.
@@ -160,7 +223,8 @@ class _LoginScreenState extends State<LoginScreen> {
       pass = parsed.password ?? '';
     }
     if (parsed.server.isEmpty || user.isEmpty || pass.isEmpty) {
-      setState(() => _error = _locked ? 'Please enter your username and password.' : 'Please fill in all three fields.');
+      setState(
+          () => _error = fixedServer ? 'Please enter your username and password.' : 'Please fill in all three fields.');
       return;
     }
     setState(() {
@@ -181,7 +245,7 @@ class _LoginScreenState extends State<LoginScreen> {
         api = XtreamApi(parsed.server.replaceFirst('http://', 'https://'), user, pass);
         account = await api.login();
       }
-      await Store.saveSession(api.server, user, pass);
+      await Store.saveSession(api.server, user, pass, viaSite: !_locked && _mode == _account);
       log('login ok mode=xtream');
       _enter(api, account);
     } catch (e) {
@@ -230,21 +294,23 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Widget _tab(String label, bool m3u, FocusNode node) {
-    final selected = _m3uMode == m3u;
+  Widget _tab(String label, int mode, FocusNode node) {
+    final selected = _mode == mode;
     return Expanded(
       child: TvFocus(
         focusNode: node,
         selected: selected,
         radius: 9,
-        onTap: () => _setMode(m3u),
+        onTap: () => _setMode(mode),
         child: SizedBox(
           height: 38,
           child: Center(
             child: Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: _hasSiteServer ? 13 : 14,
                 fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
                 color: selected ? C.text : C.dim,
               ),
@@ -347,9 +413,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       if (!_locked) ...[
                         Row(
                           children: [
-                            _tab('Xtream Codes', false, _xtreamTabNode),
+                            if (_hasSiteServer) ...[
+                              _tab(Backend.serverName.isEmpty ? 'Account' : Backend.serverName, _account,
+                                  _accountTabNode),
+                              const SizedBox(width: 8),
+                            ],
+                            _tab('Xtream Codes', _xtream, _xtreamTabNode),
                             const SizedBox(width: 8),
-                            _tab('M3U link', true, _m3uTabNode),
+                            _tab('M3U link', _m3uLink, _m3uTabNode),
                           ],
                         ),
                         const SizedBox(height: 12),
@@ -383,7 +454,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: const TextStyle(color: C.dim, fontSize: 12.5, height: 1.35),
                         ),
                       ] else ...[
-                        if (!_locked) ...[
+                        if (!_locked && _mode == _xtream) ...[
                           TvField(
                             controller: _server,
                             focusNode: _serverNode,

@@ -11,3 +11,8 @@ if (b1gAbis) {
         }
     }
 }
+
+// ---- B1G: FileProvider (hands the downloaded update to Android's installer) ----
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
+}

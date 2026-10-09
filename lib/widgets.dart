@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter/services.dart';
 
 import 'theme.dart';
@@ -392,9 +394,44 @@ class NetImage extends StatelessWidget {
   }
 }
 
-class Loading extends StatelessWidget {
-  const Loading({super.key, this.label});
+class Loading extends StatefulWidget {
+  const Loading({super.key, this.label, this.expected = const Duration(milliseconds: 2500)});
   final String? label;
+
+  /// Roughly how long this kind of loading takes; sets how fast the number climbs.
+  final Duration expected;
+
+  @override
+  State<Loading> createState() => _LoadingState();
+}
+
+/// A ring that fills while a number counts from 1 towards 100.
+///
+/// Neither a list request nor a stream that is still connecting reports how far along it is, so
+/// the number is an estimate: quick at first, slower the longer it takes, and it never claims
+/// 100 before the content is really there (the content then replaces the ring).
+class _LoadingState extends State<Loading> with SingleTickerProviderStateMixin {
+  late final Ticker _ticker;
+  final ValueNotifier<int> _percent = ValueNotifier<int>(1);
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = createTicker((elapsed) {
+      final t = elapsed.inMilliseconds / widget.expected.inMilliseconds.clamp(300, 60000);
+      // 63 % after the expected time, 86 % after twice that, 95 % after three times.
+      final value = (1 + 98 * (1 - math.exp(-t))).floor().clamp(1, 99).toInt();
+      if (value != _percent.value) _percent.value = value;
+    })
+      ..start();
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    _percent.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -402,14 +439,41 @@ class Loading extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(
-            width: 30,
-            height: 30,
-            child: CircularProgressIndicator(strokeWidth: 3, color: C.accent),
+          ValueListenableBuilder<int>(
+            valueListenable: _percent,
+            builder: (context, percent, _) => SizedBox(
+              width: 64,
+              height: 64,
+              child: Stack(
+                fit: StackFit.expand,
+                alignment: Alignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    value: percent / 100,
+                    strokeWidth: 4,
+                    strokeCap: StrokeCap.round,
+                    color: C.accent,
+                    backgroundColor: const Color(0x33FFFFFF),
+                  ),
+                  Center(
+                    child: Text(
+                      '$percent%',
+                      style: const TextStyle(
+                        color: C.text,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        shadows: [Shadow(color: Colors.black, blurRadius: 6)],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          if (label != null) ...[
+          if (widget.label != null) ...[
             const SizedBox(height: 14),
-            Text(label!, style: const TextStyle(color: C.dim, fontSize: 14)),
+            Text(widget.label!,
+                style: const TextStyle(color: C.dim, fontSize: 14, shadows: [Shadow(color: Colors.black, blurRadius: 6)])),
           ],
         ],
       ),

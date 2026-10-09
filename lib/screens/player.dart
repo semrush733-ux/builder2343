@@ -951,6 +951,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _overlay && !_panelOpen && _focus.hasPrimaryFocus) _mainButton.requestFocus();
       });
+      // The bar may already be on screen (nothing to redraw): ask for a frame, so the remote
+      // lands on the button at once and not with the next picture update.
+      WidgetsBinding.instance.ensureVisualUpdate();
     }
     _hideTimer = Timer(const Duration(seconds: 6), () {
       if (!mounted || _dead || _userPaused || _scrubbing || _panelOpen || _zapTarget != null || _seekTarget != null) {
@@ -1293,7 +1296,14 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                   )
                 else
                   const SizedBox.expand(),
-                if (busy && !_dead) Center(child: Loading(label: _status)),
+                if (busy && !_dead)
+                  Loading(
+                    // One count per stream: it carries on through a reconnect and starts again
+                    // for the next channel or a pause to buffer.
+                    key: ValueKey('loading-$_index-$_ready'),
+                    label: _status,
+                    expected: Duration(milliseconds: widget.live ? 3000 : 4000),
+                  ),
                 if (_dead) Center(child: _DeadMessage(text: _status ?? '', detail: _lastError)),
                 IgnorePointer(
                   ignoring: !_overlay,

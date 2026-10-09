@@ -8,6 +8,7 @@ import '../xtream.dart';
 import 'browse.dart';
 import 'device.dart';
 import 'login.dart';
+import 'update.dart';
 
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -32,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _account = widget.account;
     log('screen=home');
+    Backend.changes.addListener(_onBackendChange);
     if (_account == null) _refreshAccount();
   }
 
@@ -61,18 +63,21 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => BrowseScreen(api: widget.api, kind: kind)));
   }
 
-  void _showDevice() {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: C.panel,
-        title: const Text('My device'),
-        content: const DeviceCard(),
-        actions: [
-          TextButton(autofocus: true, onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close')),
-        ],
-      ),
-    );
+  void _showDevice() => showDeviceDialog(context);
+
+  void _showUpdate() {
+    final update = Backend.update;
+    if (update != null) showUpdateDialog(context, update);
+  }
+
+  void _onBackendChange() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    Backend.changes.removeListener(_onBackendChange);
+    super.dispose();
   }
 
   Future<void> _logout() async {
@@ -183,9 +188,33 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 16),
             Row(
               children: [
-                const Text('Hold OK on a channel or title to add it to Favourites.',
-                    style: TextStyle(color: C.dim, fontSize: 13)),
-                const Spacer(),
+                const Expanded(
+                  child: Text('Hold OK on a channel or title to add it to Favourites.',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: C.dim, fontSize: 13)),
+                ),
+                const SizedBox(width: 12),
+                if (Backend.updateAvailable) ...[
+                  TvFocus(
+                    color: C.accent,
+                    focusBorder: Colors.white,
+                    onTap: _showUpdate,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.system_update_rounded, size: 17, color: Colors.black),
+                          SizedBox(width: 8),
+                          Text('Update',
+                              style: TextStyle(fontSize: 14, color: Colors.black, fontWeight: FontWeight.w800)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 TvFocus(
                   onTap: _showDevice,
                   child: Padding(

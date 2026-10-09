@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show ValueNotifier;
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -73,11 +75,69 @@ class BPlaylist {
   }
 }
 
+/// A server address without "http://" and trailing slash, for comparing two spellings of one address.
+String bareServer(String url) =>
+    url.trim().toLowerCase().replaceFirst(RegExp(r'^https?://'), '').replaceFirst(RegExp(r'/+$'), '');
+
+/// A newer version of the app, announced by the website.
+class BUpdate {
+  BUpdate({
+    required this.versionCode,
+    required this.versionName,
+    required this.apkUrl,
+    this.notes = '',
+    this.force = false,
+  });
+
+  final int versionCode;
+  final String versionName;
+  final String apkUrl;
+  final String notes;
+
+  /// The app cannot be used until it is updated.
+  final bool force;
+
+  static BUpdate? fromJson(dynamic j) {
+    if (j is! Map) return null;
+    final code = int.tryParse((j['version_code'] ?? '').toString()) ?? 0;
+    final url = (j['apk_url'] ?? '').toString().trim();
+    if (code <= 0 || !url.startsWith('http')) return null;
+    final force = j['force'];
+    return BUpdate(
+      versionCode: code,
+      versionName: (j['version_name'] ?? '').toString().trim(),
+      apkUrl: url,
+      notes: (j['notes'] ?? '').toString().trim(),
+      force: force == true || force == 1 || force == '1' || force == 'true',
+    );
+  }
+}
+
 /// Talks to the B1G website: device registration, licence status,
-/// activation codes and remote playlists.
+/// activation codes, remote playlists, the default server and app updates.
 class Backend {
   static SharedPreferences? _p;
   static Future<bool>? _registering;
+  static const _device = MethodChannel('b1g/device');
+
+  /// Counts up whenever something from the website changed (licence, default server, update),
+  /// so screens can listen and redraw.
+  static final ValueNotifier<int> changes = ValueNotifier<int>(0);
+
+  /// The IPTV server set on the website. With it the sign-in screen only asks for
+  /// username and password. Kept on the device so it also works without the website.
+  static String serverUrl = '';
+  static String serverName = '';
+
+  /// The newest app version the website knows about (null: none announced).
+  static BUpdate? update;
+
+  /// This installation (from Android): versionCode and versionName.
+  static int appVersionCode = 0;
+  static String appVersionName = '';
+
+  static bool get updateAvailable =>
+      update != null && appVersionCode > 0 && update!.versionCode > appVersionCode;
 
   static String deviceId = '';
   static String pairingCode = '';
@@ -97,6 +157,38 @@ class Backend {
     licDaysLeft = _p!.getInt('b1g_lic_days') ?? 0;
     final ms = _p!.getInt('b1g_lic_checked') ?? 0;
     licChecked = ms > 0 ? DateTime.fromMillisecondsSinceEpoch(ms) : null;
+    serverUrl = _p!.getString('b1g_server_url') ?? '';
+    serverName = _p!.getString('b1g_server_name') ?? '';
+    try {
+      final v = await _device.invokeMethod<dynamic>('appVersion');
+      if (v is Map) {
+        appVersionCode = int.tryParse((v['code'] ?? 0).toString()) ?? 0;
+        appVersionName = (v['name'] ?? '').toString();
+      }
+    } catch (_) {
+      // Not on Android (tests): no update check.
+    }
+  }
+
+  /// Folder for the downloaded update (inside the app's own cache).
+  static Future<String> cacheDir() async => (await _device.invokeMethod<String>('cacheDir')) ?? '';
+
+  /// May this app start an installation? (Android asks the customer once to allow it.)
+  static Future<bool> canInstall() async {
+    try {
+      return (await _device.invokeMethod<bool>('canInstall')) ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Hands the downloaded APK to Android's installer.
+  static Future<bool> installApk(String path) async {
+    try {
+      return (await _device.invokeMethod<bool>('installApk', path)) ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   static bool get registered => deviceId.isNotEmpty && pairingCode.isNotEmpty;
@@ -164,6 +256,7 @@ class Backend {
 
   static Future<void> _storeStatus(dynamic d) async {
     if (d is! Map) return;
+    final before = '$licStatus/$licType/$licDaysLeft';
     licStatus = (d['status'] ?? '').toString();
     licType = (d['licence_type'] ?? '').toString();
     licDaysLeft = int.tryParse((d['days_left'] ?? 0).toString()) ?? 0;
@@ -172,6 +265,35 @@ class Backend {
     await _p?.setString('b1g_lic_type', licType);
     await _p?.setInt('b1g_lic_days', licDaysLeft);
     await _p?.setInt('b1g_lic_checked', licChecked!.millisecondsSinceEpoch);
+    if (before != '$licStatus/$licType/$licDaysLeft') changes.value++;
+  }
+
+  /// Reads the app settings from the website: the default IPTV server and the newest app version.
+  /// A website without this route (older plugin) or without a connection changes nothing.
+  static Future<void> loadConfig() async {
+    try {
+      final data = await _get('/app/config?platform=android-tv&version_code=$appVersionCode'
+          '&device_id=${Uri.encodeQueryComponent(deviceId)}');
+      final c = data['config'];
+      if (c is Map) {
+        final url = (c['server_url'] ?? '').toString().trim();
+        final name = (c['server_name'] ?? '').toString().trim();
+        if (url != serverUrl || name != serverName) {
+          serverUrl = url;
+          serverName = name;
+          await _p?.setString('b1g_server_url', url);
+          await _p?.setString('b1g_server_name', name);
+        }
+      }
+      update = BUpdate.fromJson(data['update']);
+      log('backend config server=${serverUrl.isEmpty ? 'none' : 'set'} '
+          'update=${update?.versionCode ?? 0} app=$appVersionCode');
+      changes.value++;
+    } on BackendException catch (e) {
+      log('backend config: ${e.statusCode}');
+    } catch (e) {
+      log('backend config failed: ${e.runtimeType}');
+    }
   }
 
   // ---- API ----

@@ -96,7 +96,7 @@ class OutOfTime(Exception):
 
 
 START = time.time()
-LIMIT = 24 * 60  # seconds; stop in good time so the results are always published
+LIMIT = 28 * 60  # seconds; stop in good time so the results are always published
 
 
 def write_summary(note=''):
@@ -594,6 +594,55 @@ def run():
     time.sleep(2)
     shot('website-playlist-home')
     check('a playlist added on the website signs in from the sign-in screen', ok and got is not None and home)
+
+    # 6e. website settings: a default server (sign in with username and password only) and an update
+    urllib.request.urlopen('http://127.0.0.1:8787/test/config-on', timeout=10).read()
+    adb('shell', 'am', 'force-stop', PKG)
+    time.sleep(1)
+    m = mark()
+    adb('shell', 'am', 'start', '-n', PKG + '/.MainActivity')
+    home = wait_log(r'screen=home', m, 60) is not None
+    prompt = wait_log(r'update prompt version=999', m, 30)
+    time.sleep(2)
+    shot('update-prompt')
+    check('the app opens signed in and offers the newer version from the website', home and prompt is not None)
+    key(DOWN)  # nothing below "Update now": only wakes the remote after the restart
+    key(RIGHT)  # "Later"
+    key(OK, pause=2)
+    key(DOWN)
+    key(RIGHT)
+    key(RIGHT)  # bottom row: Update, My device, Sign out
+    shot('home-with-update-button')
+    key(OK, pause=2)
+    m = mark()
+    key(RIGHT)
+    key(OK)
+    ok = wait_log(r'screen=login', m, 30) is not None
+    got = wait_log(r'login mode=account \(website\)', m, 10)
+    time.sleep(3)
+    shot('login-username-password-only')
+    check('with a server set on the website the sign-in screen asks only for username and password',
+          ok and got is not None)
+    m = mark()
+    key(OK)  # "Sign in" (the test build has the username and password filled in)
+    ok = wait_log(r'login ok mode=xtream', m, 30) is not None and wait_log(r'screen=home', m, 30) is not None
+    time.sleep(2)
+    check('signing in with only username and password works', ok)
+    key(DOWN)
+    key(LEFT)
+    key(LEFT)  # "Update"
+    shot('update-button-focused')
+    m = mark()
+    key(OK, pause=2)
+    shot('update-window')
+    key(OK)  # "Update now"
+    got = wait_log(r'update downloaded bytes=(\d+)', m, 150)
+    shot('update-downloaded')
+    inst = wait_log(r'update installer started=true', m, 20)
+    time.sleep(4)
+    shot('update-installer')
+    check('"Update now" downloads the new version and hands it to the installer',
+          got is not None and inst is not None, got.group(0) if got else 'not downloaded')
 
     # 7. the app must still be alive and must not have crashed
     logcat = adb('logcat', '-d', timeout=60)

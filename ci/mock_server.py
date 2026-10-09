@@ -87,6 +87,8 @@ def epg():
 
 SITE = '/wp-json/b1g/v1'
 SITE_LISTS = [False]
+SITE_CONFIG = [False]
+UPDATE_APK = 'out/smoke-apk/b1g-smoke.apk'
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -213,6 +215,15 @@ class Handler(BaseHTTPRequestHandler):
             lists = [{'id': 1, 'name': 'My IPTV', 'type': 'xtream', 'url': BASE,
                       'username': 'demo', 'password': 'demo'}] if SITE_LISTS[0] else []
             return self.send_json({'success': True, 'device': device, 'playlists': lists})
+        if path == '/app/config':
+            # Off: a website that has no default server and announces no update.
+            on = SITE_CONFIG[0]
+            return self.send_json({
+                'success': True,
+                'config': {'server_url': BASE if on else '', 'server_name': 'B1G TV' if on else ''},
+                'update': {'version_code': 999, 'version_name': '9.9.9', 'apk_url': BASE + '/app/B1G.apk',
+                           'notes': 'Faster start.\nSmall fixes.', 'force': False} if on else None,
+            })
         return self.send_json({'success': False, 'message': 'Unknown route.'}, 404)
 
     def do_POST(self):
@@ -230,6 +241,11 @@ class Handler(BaseHTTPRequestHandler):
         path = url.path
         if path.startswith(SITE):
             return self.site(path[len(SITE):])
+        if path == '/test/config-on':  # the test sets a default server and announces an update
+            SITE_CONFIG[0] = True
+            return self.send_text('ok', 'text/plain')
+        if path == '/app/B1G.apk':  # the "new version": the test app itself
+            return self.send_file(os.path.abspath(UPDATE_APK), 'application/vnd.android.package-archive')
         if path == '/test/site-lists-on':  # the test switches on "a playlist was added on the website"
             SITE_LISTS[0] = True
             return self.send_text('ok', 'text/plain')
