@@ -1,5 +1,7 @@
 package com.b1g.b1gtv
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -39,6 +41,16 @@ class MainActivity : FlutterActivity() {
                         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     }
                     result.success(null)
+                } else if (call.method == "openUrl") {
+                    // Opens a link (a YouTube trailer) in whatever app the device has for it.
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(call.arguments as String))
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
                 } else {
                     result.notImplemented()
                 }

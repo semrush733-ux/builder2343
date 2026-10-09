@@ -237,7 +237,7 @@ jobs:
           arch: x86_64
           profile: tv_1080p
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -memory 4096
+          emulator-options: -no-window -gpu swangle_indirect -noaudio -no-boot-anim -no-snapshot -memory 4096
           script: python3 ci/smoke.py
 
       - uses: actions/upload-artifact@v4

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -318,6 +320,49 @@ class TvFieldState extends State<TvField> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Time and date, as on a TV home screen.
+class Clock extends StatefulWidget {
+  const Clock({super.key});
+
+  @override
+  State<Clock> createState() => _ClockState();
+}
+
+class _ClockState extends State<Clock> {
+  static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = DateTime.now();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('${two(t.hour)}:${two(t.minute)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+        Text('${_days[t.weekday - 1]} ${t.day} ${_months[t.month - 1]} ${t.year}',
+            style: const TextStyle(fontSize: 12.5, color: C.dim)),
+      ],
     );
   }
 }

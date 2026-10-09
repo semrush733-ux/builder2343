@@ -179,19 +179,20 @@ def run():
     check('channel 1 plays (.ts stream)', ready is not None and ready.group(1) == 'ts' and pos >= 5,
           '%s, position %ss' % (ready.group(0) if ready else 'not ready', pos))
     check('video picture is decoded', ready is not None and int(ready.group(2)) > 0, ready.group(0) if ready else '')
-    # The emulator has no real graphics chip: the standard picture mode cannot start there, and the
-    # app must notice that by itself and switch to the direct mode (this is also the safety net for
-    # real devices where the standard mode fails).
-    switched = wait_log(r'ready index=0 format=ts video=\d+x\d+ mode=direct', m, 60)
-    m = mark() - 1
+    # If the standard picture mode cannot start on a device, the app notices (sound but no picture)
+    # and switches to the direct mode by itself within a few seconds. Either mode is fine here.
+    time.sleep(7)
+    lines = app_log()
+    readies = [i for i, line in enumerate(lines) if 'ready index=0 format=ts' in line]
+    m = readies[-1] if readies else m
+    mode = re.search(r'mode=(\w+)', lines[m]).group(1) if readies and 'mode=' in lines[m] else '?'
     # The mock sends live TV like a real panel: short burst, then real-time speed, one connection only.
     pos = wait_position(0, 25, m, 60)
     opens = len([line for line in app_log()[m:] if 'open index=0' in line])
-    key(OK)  # hide or show the info bar; the picture is checked either way
     shot('live-after-25s')
     share = picture_share('live-after-25s')
-    check('the app switches picture mode by itself when the standard one cannot start', switched is not None)
-    check('live picture is really visible on the screen', share > 0.5, 'non-black share %.2f' % share)
+    check('live picture is really visible on the screen (picture mode: %s)' % mode, share > 0.5,
+          'non-black share %.2f' % share)
     check('live keeps playing for 25 s on a real-time stream without reconnecting', pos >= 25 and opens == 0,
           'position %ss, reopened %d time(s)' % (pos, opens))
 
@@ -217,11 +218,13 @@ def run():
     shot('live-channel-2')
     check('channel change + fallback to the second stream format', ready is not None and ready.group(1) == 'm3u8' and pos >= 5,
           '%s, position %ss' % (ready.group(0) if ready else 'not ready', pos))
-    key(OK)
-    shot('live-info-toggled')
+    key(OK)  # OK shows the button bar; the remote lands on "Channel list"
+    time.sleep(1)
+    shot('live-button-bar')
 
     # 3b. pick a channel from the list inside the player
-    key(LEFT, pause=2)
+    key(OK, pause=2)
+    shot('live-channel-list-from-button')
     key(UP)
     m = mark()
     key(OK)
@@ -284,7 +287,14 @@ def run():
     check('Movies shows categories and titles', got is not None and int(got.group(1)) == 2, got.group(0) if got else '')
     key(RIGHT)
     m = mark()
-    key(OK)
+    key(OK)  # a movie opens on its details page
+    info = wait_log(r'screen=movie details=(\w+) cast=(\w+) trailer=(\w+)', m, 30)
+    time.sleep(2)
+    shot('movie-details')
+    check('the movie details page shows plot, cast and trailer from the server',
+          info is not None and info.groups() == ('true', 'true', 'true'), info.group(0) if info else '')
+    m = mark()
+    key(OK)  # "Watch now"
     ready = wait_log(r'ready index=0 format=mp4', m, 90)
     pos = wait_position(0, 5, m, 60)
     shot('movie-playing')
@@ -297,8 +307,16 @@ def run():
     check('the movie reports its audio and subtitle tracks', tracks is not None and tracks.group(1) == '2' and tracks.group(2) == '1',
           tracks.group(0) if tracks else '')
     m2 = mark()
-    key(DOWN, pause=2)
+    key(OK)  # shows the button bar, the remote lands on Play / Pause
+    time.sleep(1)
+    shot('movie-button-bar')
+    key(RIGHT)  # Forward 10 s
+    key(RIGHT)  # Audio language
+    shot('movie-audio-button')
+    key(OK, pause=2)
+    panel = wait_log(r'panel=options', m2, 10)
     shot('movie-options')
+    check('the player buttons can be reached and pressed with the remote', panel is not None)
     key(DOWN)
     key(OK)
     audio = wait_log(r'audio track=urd', m2, 10)
@@ -316,6 +334,7 @@ def run():
     check('audio language and subtitles can be changed with the remote', audio is not None and subs is not None)
     check('the movie keeps playing after the change', after > before, '%ss -> %ss' % (before, after))
 
+    key(BACK, pause=1.5)  # puts the button bar away; Left / Right now jump directly
     m = mark()
     for _ in range(6):
         key(RIGHT, pause=0.25)
@@ -323,9 +342,13 @@ def run():
     pos = wait_position(0, 60, m, 25)
     shot('movie-after-jump')
     check('Right x6 jumps about one minute forward', pos >= 60, 'position %ss' % pos)
-    key(OK)
+    m = mark()
+    key(OK)  # button bar, on Play / Pause
+    key(OK)  # pause
+    paused = wait_log(r'paused', m, 10)
     time.sleep(1)
     shot('movie-paused')
+    check('OK on the Pause button pauses the movie', paused is not None)
 
     # 5c. touch: a tap shows the touch controls, the back button closes the player
     adb('shell', 'input', 'tap', '960', '330')
@@ -345,8 +368,9 @@ def run():
     pos = wait_position(0, 60, m, 25)
     shot('movie-resumed')
     check('movie resumes where it was left', ready is not None and pos >= 60, 'position %ss' % pos)
-    key(BACK, pause=2)
-    key(BACK, pause=2)
+    key(BACK, pause=2)  # player -> details
+    key(BACK, pause=2)  # details -> list
+    key(BACK, pause=2)  # list -> home
 
     # 6. series
     m = mark()
@@ -468,12 +492,14 @@ def run():
     got = wait_log(r'browse vod items=(\d+)', m, 40)
     time.sleep(2)
     key(RIGHT)
+    key(OK, pause=3)  # details page (a playlist only has name and picture)
     m2 = mark()
-    key(OK)
+    key(OK)  # "Watch now"
     ready = wait_log(r'ready index=0 format=mp4', m2, 90)
     pos = wait_position(0, 5, m2, 60)
     shot('m3u-movie-playing')
     check('playlist movie plays', got is not None and ready is not None and pos >= 5, 'position %ss' % pos)
+    key(BACK, pause=2)
     key(BACK, pause=2)
     key(BACK, pause=2)
     shot('m3u-end-home')

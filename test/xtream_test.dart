@@ -220,6 +220,36 @@ http://example.com:8080/bob/pw/103
     expect(api.liveUrlsFor(item, 'm3u8'), ['http://s/live/u/p/5.ts']);
   });
 
+  group('movie details', () {
+    test('fields are read whatever shape the server uses', () {
+      final info = parseMovieInfo({
+        'info': {
+          'movie_image': 'http://x/p.jpg',
+          'backdrop_path': ['http://x/b.jpg'],
+          'plot': 'A story.',
+          'cast': 'A, B',
+          'genre': 'Drama',
+          'releasedate': '2026-03-14',
+          'rating': '6.4',
+          'duration': '02:18:00',
+          'youtube_trailer': 'https://www.youtube.com/watch?v=abcdefghijk',
+        }
+      });
+      expect(info.plot, 'A story.');
+      expect(info.backdrop, 'http://x/b.jpg');
+      expect(info.year, '2026');
+      expect(info.rating, 6.4);
+      expect(info.duration, '2 h 18 min');
+      expect(info.trailer, 'abcdefghijk');
+    });
+
+    test('a server without details gives an empty result', () {
+      expect(parseMovieInfo({'info': []}).plot, '');
+      expect(parseMovieInfo(null).duration, '');
+      expect(parseMovieInfo({'info': {'duration_secs': 300, 'backdrop_path': ''}}).duration, '5 min');
+    });
+  });
+
   test('time format', () {
     expect(formatTime(const Duration(seconds: 65)), '1:05');
     expect(formatTime(const Duration(hours: 1, minutes: 2, seconds: 3)), '1:02:03');

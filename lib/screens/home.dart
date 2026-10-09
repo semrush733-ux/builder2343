@@ -108,6 +108,13 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 const Logo(size: 30),
                 const Spacer(),
+                const Clock(),
+                Container(
+                  width: 1,
+                  height: 34,
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  color: const Color(0xFF2A303C),
+                ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [

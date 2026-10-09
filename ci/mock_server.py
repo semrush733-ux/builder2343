@@ -248,6 +248,16 @@ class Handler(BaseHTTPRequestHandler):
         }
         if action in table:
             return self.send_json(table[action])
+        if action == 'get_vod_info':
+            return self.send_json({
+                'info': {'movie_image': BASE + '/poster.jpg', 'backdrop_path': [BASE + '/poster.jpg'],
+                         'plot': 'Two engineers test a TV app all night until every screen, every button and every '
+                                 'stream works the way it should. A story about patience and test cards.',
+                         'cast': 'Ali Khan, Sara Ahmed, John Smith, Maria Lopez', 'director': 'Test Director',
+                         'genre': 'Action, Drama', 'releasedate': '2026-03-14', 'rating': '6.4',
+                         'duration': '00:05:00', 'duration_secs': 300, 'youtube_trailer': 'TESTtrailer'},
+                'movie_data': {'stream_id': 10, 'name': 'Test Movie', 'container_extension': 'mp4'},
+            })
         if action == 'get_series_info':
             return self.send_json(SERIES_INFO)
         if action == 'get_short_epg':

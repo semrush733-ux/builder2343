@@ -201,6 +201,10 @@ class M3uSource implements Source {
   Future<XSeriesInfo> seriesInfo(String seriesId) async =>
       const XSeriesInfo(plot: '', cover: '', genre: '', seasons: {});
 
+  /// A playlist only knows the name and the picture of a movie.
+  @override
+  Future<XMovieInfo> movieInfo(XItem item) async => XMovieInfo(cover: item.icon);
+
   /// A playlist carries no TV guide.
   @override
   Future<List<XEpg>> shortEpg(String streamId) async => const [];

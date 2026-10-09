@@ -182,6 +182,94 @@ class XSeriesInfo {
   final Map<int, List<XEpisode>> seasons;
 }
 
+/// Details of one movie, as far as the server has them.
+class XMovieInfo {
+  const XMovieInfo({
+    this.plot = '',
+    this.cast = '',
+    this.director = '',
+    this.genre = '',
+    this.year = '',
+    this.rating = 0,
+    this.duration = '',
+    this.backdrop = '',
+    this.cover = '',
+    this.trailer = '',
+    this.country = '',
+  });
+
+  final String plot;
+  final String cast;
+  final String director;
+  final String genre;
+  final String year;
+
+  /// 0 to 10; 0 = unknown.
+  final double rating;
+
+  /// Readable length such as "2 h 18 min".
+  final String duration;
+  final String backdrop;
+  final String cover;
+
+  /// YouTube video id of the trailer, when the server has one.
+  final String trailer;
+  final String country;
+}
+
+String _firstText(List<dynamic> values) {
+  for (final v in values) {
+    if (v is List) {
+      final inner = _firstText(v);
+      if (inner.isNotEmpty) return inner;
+    } else {
+      final s = str(v);
+      if (s.isNotEmpty && s.toLowerCase() != 'null') return s;
+    }
+  }
+  return '';
+}
+
+String _readableLength(Map info) {
+  var seconds = toInt(info['duration_secs']);
+  if (seconds <= 0) {
+    final parts = str(info['duration']).split(':');
+    if (parts.length == 3) {
+      seconds = toInt(parts[0]) * 3600 + toInt(parts[1]) * 60 + toInt(parts[2]);
+    } else if (parts.length == 1 && toInt(parts[0]) > 0) {
+      seconds = toInt(parts[0]) * 60; // some servers send minutes
+    }
+  }
+  if (seconds <= 0) return '';
+  final h = seconds ~/ 3600;
+  final m = (seconds % 3600) ~/ 60;
+  return h > 0 ? '$h h $m min' : '$m min';
+}
+
+XMovieInfo parseMovieInfo(dynamic data) {
+  if (data is! Map || data['info'] is! Map) return const XMovieInfo();
+  final info = data['info'] as Map;
+  final date = _firstText([info['releasedate'], info['release_date'], info['releaseDate'], info['year']]);
+  final year = RegExp(r'(19|20)\d\d').firstMatch(date)?.group(0) ?? '';
+  var trailer = _firstText([info['youtube_trailer'], info['trailer']]);
+  final watch = RegExp(r'(?:v=|youtu\.be/|embed/)([A-Za-z0-9_-]{6,})').firstMatch(trailer);
+  if (watch != null) trailer = watch.group(1)!;
+  if (trailer.contains('/') || trailer.contains(' ')) trailer = '';
+  return XMovieInfo(
+    plot: _firstText([info['plot'], info['description']]),
+    cast: _firstText([info['cast'], info['actors']]),
+    director: _firstText([info['director']]),
+    genre: _firstText([info['genre']]),
+    year: year,
+    rating: double.tryParse(_firstText([info['rating'], info['rating_5based']])) ?? 0,
+    duration: _readableLength(info),
+    backdrop: _firstText([info['backdrop_path'], info['backdrop']]),
+    cover: _firstText([info['movie_image'], info['cover_big'], info['cover']]),
+    trailer: trailer,
+    country: _firstText([info['country']]),
+  );
+}
+
 class XEpg {
   const XEpg(this.title, this.start, this.end);
   final String title;
@@ -363,6 +451,9 @@ abstract class Source {
 
   Future<XSeriesInfo> seriesInfo(String seriesId);
 
+  /// Plot, cast, rating... of a movie. Empty when the source has none.
+  Future<XMovieInfo> movieInfo(XItem item);
+
   Future<List<XEpg>> shortEpg(String streamId);
 
   /// Stream addresses of a live channel, the one to try first at the front.
@@ -443,6 +534,11 @@ class XtreamApi implements Source {
   @override
   Future<XSeriesInfo> seriesInfo(String seriesId) async {
     return parseSeriesInfo(await _json({'action': 'get_series_info', 'series_id': seriesId}));
+  }
+
+  @override
+  Future<XMovieInfo> movieInfo(XItem item) async {
+    return parseMovieInfo(await _json({'action': 'get_vod_info', 'vod_id': item.id}));
   }
 
   @override

@@ -105,6 +105,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   bool _direct = false; // picture mode of the engine that is open now
   bool _pictureFailed = false;
   final FocusNode _focus = FocusNode(debugLabel: 'player');
+  final FocusNode _mainButton = FocusNode(debugLabel: 'player-main-button');
+  String _buttonLabel = '';
+  String _videoSize = '';
 
   late int _index;
   int _generation = 0;
@@ -159,7 +162,6 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Timer? _epgTimer;
 
   PlayEntry get _entry => widget.entries[_index];
-  bool get _touch => !InputMode.remote;
 
   @override
   void initState() {
@@ -230,7 +232,12 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _closing = player.dispose().catchError((Object _) {});
     }
     final closing = _closing;
-    if (closing != null) await closing;
+    if (closing != null) {
+      // Never wait for ever: a stuck engine must not block the next stream.
+      await closing.timeout(const Duration(seconds: 4), onTimeout: () {
+        log('engine close timed out');
+      });
+    }
   }
 
   /// Engine settings chosen for IPTV: reconnect inside the network layer, a
@@ -269,6 +276,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _closePlayer();
     log('player closed');
     _keepScreenOn(false);
+    _mainButton.dispose();
     _focus.dispose();
     super.dispose();
   }
@@ -414,6 +422,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     final url = _entry.urls[_urlIndex % _entry.urls.length];
     final w = player.state.width ?? 0;
     final h = player.state.height ?? 0;
+    _videoSize = w > 0 && h > 0 ? '$w x $h' : '';
     log('ready index=$_index format=${formatOfUrl(url)} video=${w}x$h mode=${_direct ? 'direct' : 'gpu'}');
     _applyPreferredTracks();
     if (mounted) setState(() => _status = null);
@@ -468,7 +477,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _open();
     } else {
       _accepting = false;
-      if (mounted) Navigator.of(context).maybePop();
+      _close();
     }
   }
 
@@ -488,6 +497,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
     if (_fails > _maxFails) {
       log('gave up index=$_index');
+      if (!_focus.hasPrimaryFocus) _focus.requestFocus();
       setState(() {
         _dead = true;
         _status = widget.live ? 'This channel is not available right now.' : 'This video cannot be played right now.';
@@ -752,21 +762,35 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
   // ---------------------------------------------------------------- controls
 
-  void _showOverlay() {
+  /// True while the remote is on one of the buttons of the control bar.
+  bool get _onControls => _overlay && _focus.hasFocus && !_focus.hasPrimaryFocus;
+
+  /// Shows the control bar. With [focus] the remote lands on its main button.
+  void _showOverlay({bool focus = false}) {
     _hideTimer?.cancel();
     if (!_overlay && mounted) setState(() => _overlay = true);
-    _hideTimer = Timer(const Duration(seconds: 5), () {
+    if (focus && !_dead) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _overlay && !_panelOpen && _focus.hasPrimaryFocus) _mainButton.requestFocus();
+      });
+    }
+    _hideTimer = Timer(const Duration(seconds: 6), () {
       if (!mounted || _dead || _userPaused || _scrubbing || _panelOpen || _zapTarget != null || _seekTarget != null) {
         return;
       }
-      setState(() => _overlay = false);
+      _hideOverlay();
     });
+  }
+
+  void _hideOverlay() {
+    _hideTimer?.cancel();
+    if (!_focus.hasPrimaryFocus) _focus.requestFocus();
+    if (_overlay && mounted) setState(() => _overlay = false);
   }
 
   void _toggleOverlay() {
     if (_overlay && !_dead && !_userPaused) {
-      _hideTimer?.cancel();
-      setState(() => _overlay = false);
+      _hideOverlay();
     } else {
       _showOverlay();
     }
@@ -820,6 +844,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _userPaused = true;
       _player?.pause();
     }
+    log(_userPaused ? 'paused' : 'resumed');
     setState(() {});
     _showOverlay();
   }
@@ -864,12 +889,20 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (item == null) return;
     final added = Store.toggleFavourite(item);
     log('favourite ${added ? 'added' : 'removed'}');
-    setState(() {});
+    setState(() => _buttonLabel = added ? 'Added to Favourites' : 'Removed from Favourites');
     _showOverlay();
   }
 
-  void _nextEpisode() {
-    if (_index < widget.entries.length - 1) _tuneTo(_index + 1);
+  void _step(int direction) {
+    final next = _index + direction;
+    if (next >= 0 && next < widget.entries.length) _tuneTo(next);
+  }
+
+  void _cycleFit() {
+    _fit = (_fit + 1) % _fits.length;
+    log('fit=${_fitNames[_fit]}');
+    setState(() => _buttonLabel = 'Picture: ${_fitNames[_fit]}');
+    _showOverlay();
   }
 
   void _retryNow() {
@@ -885,8 +918,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     } else {
       _toggleOverlay();
     }
-    // Rebuild in any case: the first touch switches the controls from remote hints to buttons.
     if (mounted) setState(() {});
+  }
+
+  void _close() {
+    if (mounted) Navigator.of(context).pop();
   }
 
   bool _isOk(LogicalKeyboardKey k) =>
@@ -895,12 +931,72 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       k == LogicalKeyboardKey.numpadEnter ||
       k == LogicalKeyboardKey.gameButtonA;
 
+  /// Remote keys.
+  ///
+  /// Bar hidden:  OK shows the buttons. Movies: Left / Right jump. Live: Up / Down change
+  ///              channel, Left = channel list, Right = audio and subtitles, hold OK = favourite.
+  /// On the bar:  Left / Right move between the buttons, OK presses one (hold OK on the jump
+  ///              buttons to keep jumping), Back hides the bar.
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     final k = event.logicalKey;
+    final down = event is KeyDownEvent;
+    final up = event is KeyUpEvent;
 
-    // OK: short press = info / pause, long press = favourite (live).
+    // Keys that mean the same wherever the focus is.
+    if (!up) {
+      if (k == LogicalKeyboardKey.contextMenu) {
+        if (down) _openOptions();
+        return KeyEventResult.handled;
+      }
+      if (widget.live) {
+        if (k == LogicalKeyboardKey.arrowUp || k == LogicalKeyboardKey.channelUp) {
+          _zap(1);
+          return KeyEventResult.handled;
+        }
+        if (k == LogicalKeyboardKey.arrowDown || k == LogicalKeyboardKey.channelDown) {
+          _zap(-1);
+          return KeyEventResult.handled;
+        }
+      } else {
+        if (k == LogicalKeyboardKey.mediaRewind) {
+          _seek(-1);
+          return KeyEventResult.handled;
+        }
+        if (k == LogicalKeyboardKey.mediaFastForward) {
+          _seek(1);
+          return KeyEventResult.handled;
+        }
+        if (k == LogicalKeyboardKey.mediaPlayPause || k == LogicalKeyboardKey.space) {
+          if (down) _togglePause();
+          return KeyEventResult.handled;
+        }
+        if (k == LogicalKeyboardKey.mediaPlay) {
+          if (down && _userPaused) _togglePause();
+          return KeyEventResult.handled;
+        }
+        if (k == LogicalKeyboardKey.mediaPause) {
+          if (down && !_userPaused) _togglePause();
+          return KeyEventResult.handled;
+        }
+        if (k == LogicalKeyboardKey.mediaTrackNext) {
+          if (down) _step(1);
+          return KeyEventResult.handled;
+        }
+        if (k == LogicalKeyboardKey.mediaTrackPrevious) {
+          if (down) _step(-1);
+          return KeyEventResult.handled;
+        }
+      }
+    }
+
+    if (_onControls) {
+      // The focused button gets OK and Left / Right. Any key keeps the bar on screen.
+      if (down) _showOverlay();
+      return KeyEventResult.ignored;
+    }
+
     if (_isOk(k)) {
-      if (event is KeyDownEvent) {
+      if (down) {
         _okDown = true;
         _okLong = false;
       } else if (event is KeyRepeatEvent) {
@@ -908,40 +1004,23 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
           _okLong = true;
           _toggleFavourite();
         }
-      } else if (event is KeyUpEvent) {
+      } else if (up) {
         final tap = _okDown && !_okLong;
         _okDown = false;
         _okLong = false;
         if (tap) {
           if (_dead) {
             _retryNow();
-          } else if (widget.live) {
-            _toggleOverlay();
           } else {
-            _togglePause();
+            _showOverlay(focus: true);
           }
         }
       }
       return KeyEventResult.handled;
     }
-
-    if (event is KeyUpEvent) return KeyEventResult.ignored;
-    final down = event is KeyDownEvent;
-
-    if (k == LogicalKeyboardKey.contextMenu) {
-      if (down) _openOptions();
-      return KeyEventResult.handled;
-    }
+    if (up) return KeyEventResult.ignored;
 
     if (widget.live) {
-      if (k == LogicalKeyboardKey.arrowUp || k == LogicalKeyboardKey.channelUp) {
-        _zap(1);
-        return KeyEventResult.handled;
-      }
-      if (k == LogicalKeyboardKey.arrowDown || k == LogicalKeyboardKey.channelDown) {
-        _zap(-1);
-        return KeyEventResult.handled;
-      }
       if (k == LogicalKeyboardKey.arrowLeft) {
         if (down) _openChannels();
         return KeyEventResult.handled;
@@ -950,43 +1029,18 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         if (down) _openOptions();
         return KeyEventResult.handled;
       }
-      if (k == LogicalKeyboardKey.mediaPlayPause) {
-        if (down) _toggleOverlay();
-        return KeyEventResult.handled;
-      }
       return KeyEventResult.ignored;
     }
-
-    if (k == LogicalKeyboardKey.arrowLeft || k == LogicalKeyboardKey.mediaRewind) {
+    if (k == LogicalKeyboardKey.arrowLeft) {
       _seek(-1);
       return KeyEventResult.handled;
     }
-    if (k == LogicalKeyboardKey.arrowRight || k == LogicalKeyboardKey.mediaFastForward) {
+    if (k == LogicalKeyboardKey.arrowRight) {
       _seek(1);
       return KeyEventResult.handled;
     }
-    if (k == LogicalKeyboardKey.arrowDown) {
-      if (down) _openOptions();
-      return KeyEventResult.handled;
-    }
-    if (k == LogicalKeyboardKey.arrowUp) {
-      _showOverlay();
-      return KeyEventResult.handled;
-    }
-    if (k == LogicalKeyboardKey.mediaPlayPause || k == LogicalKeyboardKey.space) {
-      if (down) _togglePause();
-      return KeyEventResult.handled;
-    }
-    if (k == LogicalKeyboardKey.mediaPlay) {
-      if (down && _userPaused) _togglePause();
-      return KeyEventResult.handled;
-    }
-    if (k == LogicalKeyboardKey.mediaPause) {
-      if (down && !_userPaused) _togglePause();
-      return KeyEventResult.handled;
-    }
-    if (k == LogicalKeyboardKey.mediaTrackNext) {
-      if (down) _nextEpisode();
+    if (k == LogicalKeyboardKey.arrowUp || k == LogicalKeyboardKey.arrowDown) {
+      if (down) _showOverlay(focus: true);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -1015,60 +1069,127 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     final busy = _status != null || (_buffering && !_userPaused);
     final shown = widget.entries[_zapTarget ?? _index];
     final video = _video;
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Focus(
-        focusNode: _focus,
-        autofocus: true,
-        onKeyEvent: _onKey,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: _tap,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // The picture is hidden until it really plays, so the last frame of the previous
-              // channel never shows under the new channel's name.
-              if (video != null)
-                Opacity(
-                  opacity: _ready ? 1 : 0,
-                  child: IgnorePointer(
-                    child: Video(
-                      key: ObjectKey(video),
-                      controller: video,
-                      controls: NoVideoControls,
-                      fit: _fits[_fit],
-                      fill: Colors.black,
-                      // Subtitles sit above the controls while those are on screen.
-                      subtitleViewConfiguration: SubtitleViewConfiguration(
-                        padding: EdgeInsets.fromLTRB(24, 0, 24, _overlay ? 118 : 26),
+    return PopScope(
+      // Back first puts the control bar away, the next Back leaves the player.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_onControls) {
+          _hideOverlay();
+        } else {
+          _close();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Focus(
+          focusNode: _focus,
+          autofocus: true,
+          onKeyEvent: _onKey,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _tap,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // The picture is hidden until it really plays, so the last frame of the previous
+                // channel never shows under the new channel's name.
+                if (video != null)
+                  Opacity(
+                    opacity: _ready ? 1 : 0,
+                    child: IgnorePointer(
+                      child: ExcludeFocus(
+                        child: Video(
+                          key: ObjectKey(video),
+                          controller: video,
+                          controls: NoVideoControls,
+                          fit: _fits[_fit],
+                          fill: Colors.black,
+                          // Subtitles sit above the controls while those are on screen.
+                          subtitleViewConfiguration: SubtitleViewConfiguration(
+                            padding: EdgeInsets.fromLTRB(24, 0, 24, _overlay ? 150 : 26),
+                          ),
+                        ),
                       ),
                     ),
+                  )
+                else
+                  const SizedBox.expand(),
+                if (busy && !_dead) Center(child: Loading(label: _status)),
+                if (_dead) Center(child: _DeadMessage(text: _status ?? '', detail: _lastError)),
+                IgnorePointer(
+                  ignoring: !_overlay,
+                  child: AnimatedOpacity(
+                    opacity: _overlay ? 1 : 0,
+                    duration: const Duration(milliseconds: 160),
+                    child: ExcludeFocus(excluding: !_overlay || _dead, child: _overlayLayer(shown)),
                   ),
-                )
-              else
-                const SizedBox.expand(),
-              if (busy && !_dead) Center(child: Loading(label: _status)),
-              if (_dead) Center(child: _DeadMessage(text: _status ?? '', detail: _lastError)),
-              IgnorePointer(
-                ignoring: !_overlay,
-                child: AnimatedOpacity(
-                  opacity: _overlay ? 1 : 0,
-                  duration: const Duration(milliseconds: 160),
-                  child: ExcludeFocus(child: _overlayLayer(shown, busy)),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _overlayLayer(PlayEntry shown, bool busy) {
+  Widget _button(IconData icon, String label, VoidCallback onTap, {double size = 44, FocusNode? node, bool active = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      child: TvFocus(
+        focusNode: node,
+        radius: size / 2,
+        color: const Color(0x8C10131A),
+        onTap: onTap,
+        onFocus: () {
+          if (_buttonLabel != label) setState(() => _buttonLabel = label);
+        },
+        child: SizedBox(
+          width: size - 5,
+          height: size - 5,
+          child: Icon(icon, size: size * 0.5, color: active ? C.accent : Colors.white),
+        ),
+      ),
+    );
+  }
+
+  Widget _overlayLayer(PlayEntry shown) {
     final item = shown.item;
     final favourite = item != null && Store.isFavourite(item);
-    final touch = _touch;
+    final many = widget.entries.length > 1;
+    final number = (_zapTarget ?? _index) + 1;
+
+    final List<Widget> centre = widget.live
+        ? [
+            if (many) _button(Icons.list_rounded, 'Channel list', _openChannels, node: _mainButton, size: 52),
+            if (many) _button(Icons.skip_previous_rounded, 'Previous channel', () => _zap(-1)),
+            if (many) _button(Icons.skip_next_rounded, 'Next channel', () => _zap(1)),
+          ]
+        : [
+            if (many) _button(Icons.skip_previous_rounded, 'Previous episode', () => _step(-1)),
+            _button(Icons.fast_rewind_rounded, 'Back 10 seconds (hold for more)', () => _seek(-1)),
+            _button(
+              _userPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+              _userPaused ? 'Play' : 'Pause',
+              _togglePause,
+              node: _mainButton,
+              size: 60,
+            ),
+            _button(Icons.fast_forward_rounded, 'Forward 10 seconds (hold for more)', () => _seek(1)),
+            if (many) _button(Icons.skip_next_rounded, 'Next episode', () => _step(1)),
+          ];
+    final List<Widget> side = [
+      _button(Icons.audiotrack_rounded, 'Audio language', _openOptions, node: widget.live && !many ? _mainButton : null),
+      _button(Icons.closed_caption_rounded, 'Subtitles', _openOptions),
+      _button(Icons.aspect_ratio_rounded, 'Picture: ${_fitNames[_fit]}', _cycleFit),
+      if (!widget.live) _button(Icons.speed_rounded, 'Speed ${_speed}x', _openOptions),
+      if (widget.live && item != null)
+        _button(favourite ? Icons.star_rounded : Icons.star_border_rounded,
+            favourite ? 'Remove from Favourites' : 'Add to Favourites', _toggleFavourite,
+            active: favourite),
+      _button(Icons.undo_rounded, 'Back', _close),
+    ];
+
     return Column(
       children: [
         Container(
@@ -1083,25 +1204,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              if (touch) ...[
-                _RoundButton(
-                  icon: Icons.arrow_back_rounded,
-                  size: 44,
-                  onTap: () => Navigator.of(context).maybePop(),
-                ),
-                const SizedBox(width: 10),
-              ] else
-                const SizedBox(width: 8),
-              if (widget.live) ...[
-                Container(
-                  width: 52,
-                  height: 52,
-                  padding: const EdgeInsets.all(5),
-                  decoration: BoxDecoration(color: const Color(0x66000000), borderRadius: BorderRadius.circular(8)),
-                  child: NetImage(shown.logo, cacheWidth: 120),
-                ),
-                const SizedBox(width: 14),
-              ],
+              // For touch screens; the remote uses the Back key or the Back button of the bar.
+              ExcludeFocus(child: _RoundButton(icon: Icons.arrow_back_rounded, size: 44, onTap: _close)),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1111,7 +1216,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                       children: [
                         Flexible(
                           child: Text(
-                            widget.live ? '${(_zapTarget ?? _index) + 1}   ${shown.title}' : shown.title,
+                            widget.live ? '$number.  ${shown.title}' : shown.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
@@ -1139,48 +1244,83 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
             ],
           ),
         ),
-        Expanded(
-          child: touch && !_dead && !busy
-              ? Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: widget.live
-                        ? [
-                            _RoundButton(icon: Icons.skip_previous_rounded, size: 56, onTap: () => _zap(-1)),
-                            const SizedBox(width: 56),
-                            _RoundButton(icon: Icons.skip_next_rounded, size: 56, onTap: () => _zap(1)),
-                          ]
-                        : [
-                            _RoundButton(icon: Icons.replay_10_rounded, size: 52, onTap: () => _seek(-1)),
-                            const SizedBox(width: 36),
-                            _RoundButton(
-                              icon: _userPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                              size: 72,
-                              onTap: _togglePause,
-                            ),
-                            const SizedBox(width: 36),
-                            _RoundButton(icon: Icons.forward_10_rounded, size: 52, onTap: () => _seek(1)),
-                          ],
-                  ),
-                )
-              : const SizedBox(),
-        ),
+        const Spacer(),
         Container(
-          padding: const EdgeInsets.fromLTRB(34, 44, 34, 20),
+          padding: const EdgeInsets.fromLTRB(28, 44, 28, 16),
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Colors.transparent, Color(0xE6000000)],
+              colors: [Colors.transparent, Color(0xF0000000)],
             ),
           ),
-          child: widget.live ? _liveBar(touch, favourite) : _movieBar(touch),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Logo / poster with the picture size under it.
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      width: widget.live ? 76 : 70,
+                      height: widget.live ? 76 : 100,
+                      color: const Color(0x8C10131A),
+                      padding: EdgeInsets.all(widget.live ? 6 : 0),
+                      child: NetImage(
+                        shown.logo,
+                        fit: widget.live ? BoxFit.contain : BoxFit.cover,
+                        cacheWidth: 200,
+                        fallback: widget.live ? Icons.tv : Icons.movie_rounded,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(_zapTarget == null ? _videoSize : '',
+                      style: const TextStyle(fontSize: 11.5, color: Color(0xFFD5DAE3), fontWeight: FontWeight.w600)),
+                ],
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.live) _guide() else _timeline(),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      height: 66,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(_buttonLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13, color: C.dim)),
+                          ),
+                          Row(mainAxisSize: MainAxisSize.min, children: centre),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Row(mainAxisSize: MainAxisSize.min, children: side),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 
-  Widget _liveBar(bool touch, bool favourite) {
+  /// Live TV: what is on now and next.
+  Widget _guide() {
     final now = DateTime.now();
     XEpg? current;
     XEpg? next;
@@ -1193,128 +1333,96 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         }
       }
     }
+    final double progress = current == null
+        ? 0.0
+        : (now.difference(current.start).inSeconds / (current.end.difference(current.start).inSeconds.clamp(1, 1 << 30)))
+            .clamp(0.0, 1.0)
+            .toDouble();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (current != null) ...[
-          Text('${formatClock(current.start)} – ${formatClock(current.end)}   ${current.title}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 7),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: LinearProgressIndicator(
-              minHeight: 4,
-              value: (now.difference(current.start).inSeconds /
-                      (current.end.difference(current.start).inSeconds.clamp(1, 1 << 30)))
-                  .clamp(0.0, 1.0)
-                  .toDouble(),
-              color: C.accent,
-              backgroundColor: const Color(0x44FFFFFF),
-            ),
+        Text(
+          current == null
+              ? 'No TV guide for this channel'
+              : '${formatClock(current.start)} – ${formatClock(current.end)}   ${current.title}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: current == null ? 13.5 : 17,
+            fontWeight: current == null ? FontWeight.w500 : FontWeight.w700,
+            color: current == null ? C.dim : C.text,
           ),
-          const SizedBox(height: 7),
-        ],
+        ),
+        const SizedBox(height: 7),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: LinearProgressIndicator(
+            minHeight: 4,
+            value: progress,
+            color: C.accent,
+            backgroundColor: const Color(0x44FFFFFF),
+          ),
+        ),
         if (next != null)
-          Text('Next  ${formatClock(next.start)}   ${next.title}',
-              maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, color: Color(0xFFD5DAE3))),
-        const SizedBox(height: 10),
-        if (touch)
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              if (widget.entries.length > 1)
-                _Pill(icon: Icons.list_rounded, label: 'Channels', onTap: _openChannels),
-              _Pill(icon: Icons.subtitles_rounded, label: 'Audio and subtitles', onTap: _openOptions),
-              if (_entry.item != null)
-                _Pill(
-                  icon: favourite ? Icons.star_rounded : Icons.star_border_rounded,
-                  label: favourite ? 'In Favourites' : 'Add to Favourites',
-                  onTap: _toggleFavourite,
-                ),
-            ],
-          )
-        else
-          const Text(
-              'Up / Down  Channel      OK  Info      Left  Channel list      Right  Audio and subtitles      Hold OK  Favourite',
-              style: TextStyle(fontSize: 12.5, color: C.dim)),
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text('Next  ${formatClock(next.start)}   ${next.title}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 14, color: Color(0xFFD5DAE3))),
+          ),
       ],
     );
   }
 
-  Widget _movieBar(bool touch) {
+  /// Movies and episodes: time, bar that can be dragged by touch, total length.
+  Widget _timeline() {
     final duration = _duration;
     final position = _seekTarget ?? _position;
     final known = duration > Duration.zero;
     final double value = known ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0).toDouble() : 0.0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+    return Row(
       children: [
-        Row(
-          children: [
-            if (!touch) ...[
-              Icon(_userPaused ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 26, color: C.accent),
-              const SizedBox(width: 10),
-            ],
-            Text(formatTime(position), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-            Expanded(
-              child: SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackHeight: 5,
-                  activeTrackColor: C.accent,
-                  inactiveTrackColor: const Color(0x44FFFFFF),
-                  thumbColor: C.accent,
-                  overlayColor: const Color(0x33FFC400),
-                  thumbShape: RoundSliderThumbShape(enabledThumbRadius: touch ? 8 : 5),
-                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
-                ),
-                child: Slider(
-                  value: value,
-                  onChangeStart: known
-                      ? (_) {
-                          _scrubbing = true;
-                          _hideTimer?.cancel();
-                        }
-                      : null,
-                  onChanged: known ? (v) => _previewSeek(duration * v) : null,
-                  onChangeEnd: known
-                      ? (v) {
-                          _scrubbing = false;
-                          _commitSeek(duration * v);
-                        }
-                      : null,
-                ),
+        Text(formatTime(position), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+        Expanded(
+          child: ExcludeFocus(
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 5,
+                activeTrackColor: C.accent,
+                inactiveTrackColor: const Color(0x44FFFFFF),
+                thumbColor: C.accent,
+                overlayColor: const Color(0x33FFC400),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
+              ),
+              child: Slider(
+                value: value,
+                onChangeStart: known
+                    ? (_) {
+                        _scrubbing = true;
+                        _hideTimer?.cancel();
+                      }
+                    : null,
+                onChanged: known ? (v) => _previewSeek(duration * v) : null,
+                onChangeEnd: known
+                    ? (v) {
+                        _scrubbing = false;
+                        _commitSeek(duration * v);
+                      }
+                    : null,
               ),
             ),
-            Text(formatTime(duration), style: const TextStyle(fontSize: 15, color: Color(0xFFD5DAE3))),
-          ],
+          ),
         ),
-        const SizedBox(height: 6),
-        if (touch)
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              _Pill(icon: Icons.subtitles_rounded, label: 'Audio and subtitles', onTap: _openOptions),
-              _Pill(icon: Icons.speed_rounded, label: 'Speed ${_speed}x', onTap: _openOptions),
-              if (_index < widget.entries.length - 1)
-                _Pill(icon: Icons.skip_next_rounded, label: 'Next episode', onTap: _nextEpisode),
-            ],
-          )
-        else
-          const Text(
-              'OK  Pause / Play      Left / Right  Jump 10 s (hold to jump further)      Down  Audio, subtitles, speed      Back  Exit',
-              style: TextStyle(fontSize: 12.5, color: C.dim)),
+        Text(formatTime(duration), style: const TextStyle(fontSize: 15, color: Color(0xFFD5DAE3))),
       ],
     );
   }
 }
 
-/// Round, tappable control drawn over the picture.
+/// Round, tappable control drawn over the picture (touch only).
 class _RoundButton extends StatelessWidget {
   const _RoundButton({required this.icon, required this.onTap, this.size = 48});
   final IconData icon;
@@ -1334,37 +1442,6 @@ class _RoundButton extends StatelessWidget {
           width: size,
           height: size,
           child: Icon(icon, size: size * 0.58, color: Colors.white),
-        ),
-      ),
-    );
-  }
-}
-
-class _Pill extends StatelessWidget {
-  const _Pill({required this.icon, required this.label, required this.onTap});
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0x99202430),
-      borderRadius: BorderRadius.circular(22),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        canRequestFocus: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 18, color: C.accent),
-              const SizedBox(width: 8),
-              Text(label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
-            ],
-          ),
         ),
       ),
     );

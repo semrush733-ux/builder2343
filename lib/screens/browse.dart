@@ -8,6 +8,7 @@ import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../xtream.dart';
+import 'movie.dart';
 import 'player.dart';
 import 'series.dart';
 
@@ -207,16 +208,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
       await Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => PlayerScreen(api: api, entries: entries, index: index, live: true)));
     } else {
-      final entries = [
-        PlayEntry(
-          title: item.name,
-          urls: [api.movieUrlFor(item)],
-          resumeKey: '${item.kind.name}:${item.id}',
-          item: item,
-        ),
-      ];
-      await Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => PlayerScreen(api: api, entries: entries, index: 0, live: false)));
+      // Movies open on their details page first; "Watch now" there starts the player.
+      await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MovieScreen(api: api, movie: item)));
     }
     if (mounted) setState(() {});
   }
