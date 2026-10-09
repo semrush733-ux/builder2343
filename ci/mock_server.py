@@ -44,6 +44,21 @@ SERIES_INFO = {
 }
 
 
+# A plain M3U playlist (no Xtream login). "M3U Two" has no .ts on this server: the app must try .m3u8.
+PLAYLIST = '''#EXTM3U
+#EXTINF:-1 tvg-id="one" tvg-logo="{b}/logo.png" group-title="UK",M3U One
+{b}/live/demo/demo/1.ts
+#EXTINF:-1 tvg-id="two" group-title="UK",M3U Two, HLS only
+{b}/live/demo/demo/2.ts
+#EXTINF:-1 tvg-logo="{b}/logo.png" group-title="Sports",M3U Sports
+{b}/live/demo/demo/4.ts
+#EXTINF:-1 tvg-logo="{b}/poster.jpg" group-title="Films",M3U Movie
+{b}/movie/demo/demo/10.mp4
+#EXTINF:-1 group-title="Shows",M3U Show S01 E01
+{b}/series/demo/demo/31.mp4
+'''.format(b=BASE)
+
+
 def b64(text):
     return base64.b64encode(text.encode()).decode()
 
@@ -134,6 +149,8 @@ class Handler(BaseHTTPRequestHandler):
         path = url.path
         if path == '/player_api.php':
             return self.api(q)
+        if path == '/playlist.m3u':
+            return self.send_text(PLAYLIST, 'audio/x-mpegurl')
         if path in ('/logo.png', '/poster.jpg'):
             return self.send_file(path[1:], 'image/png' if path.endswith('png') else 'image/jpeg')
         m = re.match(r'^/hls/(seg\d+\.ts)$', path)

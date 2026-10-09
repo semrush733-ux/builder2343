@@ -29,7 +29,7 @@ String kindTitle(XKind kind) {
 class BrowseScreen extends StatefulWidget {
   const BrowseScreen({super.key, required this.api, required this.kind});
 
-  final XtreamApi api;
+  final Source api;
   final XKind kind;
 
   @override
@@ -187,18 +187,18 @@ class _BrowseScreenState extends State<BrowseScreen> {
   Future<void> _openItem(List<XItem> items, int index) async {
     final api = widget.api;
     final item = items[index];
-    if (widget.kind == XKind.series) {
+    if (widget.kind == XKind.series && item.url.isEmpty) {
       await Navigator.of(context)
           .push(MaterialPageRoute<void>(builder: (_) => SeriesScreen(api: api, series: item)));
     } else if (_live) {
-      final first = Store.liveFormat;
-      final second = first == 'ts' ? 'm3u8' : 'ts';
+      final format = Store.liveFormat;
       final entries = [
         for (final i in items)
           PlayEntry(
             title: i.name,
-            urls: [api.liveUrl(i.id, first), api.liveUrl(i.id, second)],
-            epgId: i.id,
+            urls: api.liveUrlsFor(i, format),
+            // Playlist entries (direct address) have no TV guide.
+            epgId: i.url.isEmpty ? i.id : null,
             logo: i.icon,
             item: i,
           ),
@@ -207,7 +207,12 @@ class _BrowseScreenState extends State<BrowseScreen> {
           MaterialPageRoute<void>(builder: (_) => PlayerScreen(api: api, entries: entries, index: index, live: true)));
     } else {
       final entries = [
-        PlayEntry(title: item.name, urls: [api.vodUrl(item.id, item.ext)], resumeKey: 'vod:${item.id}', item: item),
+        PlayEntry(
+          title: item.name,
+          urls: [api.movieUrlFor(item)],
+          resumeKey: '${item.kind.name}:${item.id}',
+          item: item,
+        ),
       ];
       await Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => PlayerScreen(api: api, entries: entries, index: 0, live: false)));

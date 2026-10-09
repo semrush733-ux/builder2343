@@ -73,7 +73,7 @@ jobs:
         run: |
           set -o pipefail
           flutter build apk --release --target-platform android-x64 \
-            --dart-define=B1G_SERVER=http://10.0.2.2:8787 --dart-define=B1G_PREFILL_USER=demo --dart-define=B1G_PREFILL_PASS=demo \
+            --dart-define=B1G_PREFILL_SERVER=http://10.0.2.2:8787 --dart-define=B1G_PREFILL_USER=demo --dart-define=B1G_PREFILL_PASS=demo \
             2>&1 | tee out/logs/build-test.log
           mkdir -p out-smoke
           cp build/app/outputs/flutter-apk/app-release.apk out-smoke/b1g-smoke.apk

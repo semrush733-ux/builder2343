@@ -20,12 +20,44 @@ class Store {
   static String get server => _p.getString('server') ?? '';
   static String get username => _p.getString('username') ?? '';
   static String get password => _p.getString('password') ?? '';
-  static bool get loggedIn => (_p.getBool('logged_in') ?? false) && server.isNotEmpty && username.isNotEmpty;
+
+  /// Address of the M3U playlist when the app is used with a playlist link.
+  static String get m3uUrl => _p.getString('m3u_url') ?? '';
+
+  /// True when the saved login is an M3U playlist link, false for Xtream Codes.
+  static bool get isM3u => _p.getString('mode') == 'm3u';
+
+  static bool get loggedIn {
+    if (!(_p.getBool('logged_in') ?? false)) return false;
+    return isM3u ? m3uUrl.isNotEmpty : (server.isNotEmpty && username.isNotEmpty);
+  }
+
+  /// Favourites and resume positions belong to one account: a different
+  /// account starts clean.
+  static Future<void> _switchAccount(String identity) async {
+    if (_p.getString('identity') == identity) return;
+    for (final kind in XKind.values) {
+      await _p.remove('fav_${kind.name}');
+    }
+    await _p.remove('resume');
+    _fav.clear();
+    _resume = null;
+    await _p.setString('identity', identity);
+  }
 
   static Future<void> saveSession(String server, String username, String password) async {
+    await _switchAccount('xtream|$server|$username');
+    await _p.setString('mode', 'xtream');
     await _p.setString('server', server);
     await _p.setString('username', username);
     await _p.setString('password', password);
+    await _p.setBool('logged_in', true);
+  }
+
+  static Future<void> saveM3uSession(String url) async {
+    await _switchAccount('m3u|$url');
+    await _p.setString('mode', 'm3u');
+    await _p.setString('m3u_url', url);
     await _p.setBool('logged_in', true);
   }
 

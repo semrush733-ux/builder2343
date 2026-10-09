@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:b1gtv/m3u.dart';
 import 'package:b1gtv/screens/player.dart';
 import 'package:b1gtv/store.dart';
 import 'package:b1gtv/xtream.dart';
@@ -142,6 +143,74 @@ void main() {
     expect(api.episodeUrl('7', 'mkv'), 'http://example.com:8080/series/bob/p%40ss%20word/7.mkv');
   });
 
+  group('M3U playlist', () {
+    const text = '''#EXTM3U url-tvg="http://x/epg.xml"
+#EXTINF:-1 tvg-id="bbc1" tvg-name="BBC One HD" tvg-logo="http://x/bbc.png" group-title="UK",BBC One, HD
+http://example.com:8080/bob/pw/101
+#EXTINF:-1 group-title="UK",ITV
+#EXTVLCOPT:http-user-agent=Test
+http://example.com:8080/live/bob/pw/102.ts
+
+#EXTINF:-1 tvg-logo="http://x/film.jpg" group-title="Action",Big Film (2024)
+http://example.com:8080/movie/bob/pw/9.mkv
+#EXTINF:-1 group-title="Drama",Show S01 E01
+http://example.com:8080/series/bob/pw/55.mp4
+#EXTINF:-1,No group
+https://cdn.example.com/stream/playlist.m3u8?token=abc
+#EXTINF:-1,Not playable
+rtmp://example.com/live
+#EXTINF:-1 tvg-name="Only tvg name" group-title="UK",
+http://example.com:8080/bob/pw/103
+''';
+
+    test('entries are sorted into live TV, movies and series', () {
+      final data = parseM3u(text);
+      expect(data.count(XKind.live), 4);
+      expect(data.count(XKind.vod), 1);
+      expect(data.count(XKind.series), 1);
+      final live = data.items[XKind.live]!;
+      expect(live[0].name, 'BBC One, HD');
+      expect(live[0].icon, 'http://x/bbc.png');
+      expect(live[0].categoryId, 'UK');
+      expect(live[0].url, 'http://example.com:8080/bob/pw/101');
+      expect(live[1].name, 'ITV');
+      expect(live[2].categoryId, 'Other');
+      expect(live[3].name, 'Only tvg name');
+      expect(data.items[XKind.vod]!.single.name, 'Big Film (2024)');
+      expect(data.categories[XKind.live]!.map((c) => c.name).toList(), ['UK', 'Other']);
+      expect(data.categories[XKind.series]!.single.name, 'Drama');
+    });
+
+    test('Windows line endings and an empty list', () {
+      final data = parseM3u('#EXTM3U\r\n#EXTINF:-1,One\r\nhttp://a/b/1.ts\r\n');
+      expect(data.items[XKind.live]!.single.url, 'http://a/b/1.ts');
+      expect(parseM3u('<html>not a playlist</html>').total, 0);
+    });
+
+    test('kind is taken from the address', () {
+      expect(kindOfUrl('http://a/live/u/p/1.ts'), XKind.live);
+      expect(kindOfUrl('http://a/u/p/1'), XKind.live);
+      expect(kindOfUrl('http://a/movie/u/p/1.mkv'), XKind.vod);
+      expect(kindOfUrl('http://a/files/film.MP4?x=1'), XKind.vod);
+      expect(kindOfUrl('http://a/series/u/p/1.mp4'), XKind.series);
+    });
+
+    test('fallback addresses for live channels', () {
+      final source = M3uSource('http://example.com/list.m3u');
+      XItem item(String url) => XItem(kind: XKind.live, id: url, name: 'x', url: url);
+      expect(source.liveUrlsFor(item('http://a/live/u/p/1.ts'), 'ts'),
+          ['http://a/live/u/p/1.ts', 'http://a/live/u/p/1.m3u8']);
+      expect(source.liveUrlsFor(item('http://a/u/p/1'), 'ts'), ['http://a/u/p/1']);
+      expect(source.liveUrlsFor(item('https://cdn/x/playlist.m3u8?t=1'), 'ts'), ['https://cdn/x/playlist.m3u8?t=1']);
+      expect(source.label, 'example.com');
+    });
+
+    test('a favourite from a playlist keeps its address', () {
+      const item = XItem(kind: XKind.live, id: 'http://a/1', name: 'One', url: 'http://a/1');
+      expect(XItem.fromJson(jsonDecode(jsonEncode(item.toJson())))!.url, 'http://a/1');
+    });
+  });
+
   test('time format', () {
     expect(formatTime(const Duration(seconds: 65)), '1:05');
     expect(formatTime(const Duration(hours: 1, minutes: 2, seconds: 3)), '1:02:03');
@@ -161,6 +230,21 @@ void main() {
       expect(Store.loggedIn, false);
       expect(Store.username, 'bob');
       expect(Store.password, '');
+    });
+
+    test('playlist login, and a different account starts without old favourites', () async {
+      await Store.saveSession('http://s', 'bob', 'pw');
+      Store.toggleFavourite(const XItem(kind: XKind.live, id: '1', name: 'One'));
+      Store.setResume('vod:1', 50);
+      expect(Store.isM3u, false);
+      await Store.saveSession('http://s', 'bob', 'pw2');
+      expect(Store.favourites(XKind.live).length, 1);
+      await Store.saveM3uSession('http://example.com/list.m3u');
+      expect(Store.isM3u, true);
+      expect(Store.loggedIn, true);
+      expect(Store.m3uUrl, 'http://example.com/list.m3u');
+      expect(Store.favourites(XKind.live), isEmpty);
+      expect(Store.resume('vod:1'), 0);
     });
 
     test('favourites toggle', () {

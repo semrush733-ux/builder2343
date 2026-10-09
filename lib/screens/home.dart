@@ -14,7 +14,7 @@ String formatDate(DateTime d) => '${d.day} ${_months[d.month - 1]} ${d.year}';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.api, this.account});
 
-  final XtreamApi api;
+  final Source api;
   final XAccount? account;
 
   @override
@@ -65,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: C.panel,
         title: const Text('Sign out?'),
-        content: const Text('You will need your username and password to sign in again.'),
+        content: const Text('You will need your login details to sign in again.'),
         actions: [
           TextButton(
             autofocus: true,
@@ -88,6 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String get _accountLine {
     final a = _account;
     if (a == null) return _offline ? 'No connection to the server' : '';
+    if (a.note.isNotEmpty) return a.note;
     final parts = <String>[
       if (a.isTrial) 'Trial',
       a.expires == null ? 'No expiry date' : 'Valid until ${formatDate(a.expires!)}',
@@ -110,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(widget.api.username, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    Text(widget.api.label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                     if (_accountLine.isNotEmpty)
                       Text(_accountLine,
                           style: TextStyle(fontSize: 13, color: _offline && _account == null ? C.danger : C.dim)),

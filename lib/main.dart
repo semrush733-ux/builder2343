@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'config.dart';
+import 'm3u.dart';
 import 'screens/home.dart';
 import 'screens/login.dart';
 import 'store.dart';
@@ -27,9 +28,9 @@ class B1GApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Widget home = Store.loggedIn
-        ? HomeScreen(api: XtreamApi(Store.server, Store.username, Store.password))
-        : const LoginScreen();
+    final Source source =
+        Store.isM3u ? M3uSource(Store.m3uUrl) : XtreamApi(Store.server, Store.username, Store.password);
+    final Widget home = Store.loggedIn ? HomeScreen(api: source) : const LoginScreen();
     return MaterialApp(
       title: kAppName,
       debugShowCheckedModeBanner: false,

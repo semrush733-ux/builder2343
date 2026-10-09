@@ -10,7 +10,7 @@ import 'player.dart';
 class SeriesScreen extends StatefulWidget {
   const SeriesScreen({super.key, required this.api, required this.series});
 
-  final XtreamApi api;
+  final Source api;
   final XItem series;
 
   @override
@@ -54,7 +54,7 @@ class _SeriesScreenState extends State<SeriesScreen> {
         PlayEntry(
           title: widget.series.name,
           subtitle: 'S${e.season} E${e.number}  ·  ${e.title}',
-          urls: [api.episodeUrl(e.id, e.ext)],
+          urls: [api.episodeUrlFor(e)],
           resumeKey: 'ep:${e.id}',
         ),
     ];

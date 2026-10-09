@@ -92,6 +92,7 @@ class XItem {
     this.ext = '',
     this.rating = '',
     this.num = 0,
+    this.url = '',
   });
 
   final XKind kind;
@@ -102,6 +103,9 @@ class XItem {
   final String ext;
   final String rating;
   final int num;
+
+  /// Direct stream address. Only set for items that come from an M3U playlist.
+  final String url;
 
   static XItem? fromApi(XKind kind, Map m) {
     final id = str(kind == XKind.series ? m['series_id'] : m['stream_id']);
@@ -128,6 +132,7 @@ class XItem {
         'e': ext,
         'r': rating,
         'num': num,
+        if (url.isNotEmpty) 'u': url,
       };
 
   static XItem? fromJson(dynamic j) {
@@ -144,6 +149,7 @@ class XItem {
       ext: str(j['e']),
       rating: str(j['r']),
       num: toInt(j['num']),
+      url: str(j['u']),
     );
   }
 }
@@ -184,8 +190,18 @@ class XEpg {
 }
 
 class XAccount {
-  const XAccount({required this.status, this.expires, this.maxConnections = 0, this.isTrial = false, this.formats = const []});
+  const XAccount({
+    required this.status,
+    this.expires,
+    this.maxConnections = 0,
+    this.isTrial = false,
+    this.formats = const [],
+    this.note = '',
+  });
   final String status;
+
+  /// Shown on the home screen instead of the expiry date (M3U playlists have none).
+  final String note;
   final DateTime? expires;
   final int maxConnections;
   final bool isTrial;
@@ -331,12 +347,41 @@ XSeriesInfo parseSeriesInfo(dynamic data) {
   return XSeriesInfo(plot: plot, cover: cover, genre: genre, seasons: sorted);
 }
 
-class XtreamApi {
+/// Where channels, movies and series come from: an Xtream Codes login
+/// ([XtreamApi]) or an M3U playlist link (M3uSource in m3u.dart).
+abstract class Source {
+  /// Short name shown on the home screen.
+  String get label;
+
+  /// Checks the login / loads the playlist.
+  Future<XAccount> login();
+
+  Future<List<XCategory>> categories(XKind kind);
+
+  /// All items of a kind, or only one category when [categoryId] is given.
+  Future<List<XItem>> items(XKind kind, {String? categoryId});
+
+  Future<XSeriesInfo> seriesInfo(String seriesId);
+
+  Future<List<XEpg>> shortEpg(String streamId);
+
+  /// Stream addresses of a live channel, the one to try first at the front.
+  List<String> liveUrlsFor(XItem item, String preferredFormat);
+
+  String movieUrlFor(XItem item);
+
+  String episodeUrlFor(XEpisode episode);
+}
+
+class XtreamApi implements Source {
   XtreamApi(this.server, this.username, this.password);
 
   final String server;
   final String username;
   final String password;
+
+  @override
+  String get label => username;
 
   static const _actions = {
     XKind.live: ['get_live_categories', 'get_live_streams'],
@@ -370,15 +415,17 @@ class XtreamApi {
     return _decodeJson(bytes);
   }
 
+  @override
   Future<XAccount> login() async {
     return parseAccount(await _json(const {}, timeout: const Duration(seconds: 20)));
   }
 
+  @override
   Future<List<XCategory>> categories(XKind kind) async {
     return parseCategories(await _json({'action': _actions[kind]![0]}));
   }
 
-  /// All items of a kind, or only one category when [categoryId] is given.
+  @override
   Future<List<XItem>> items(XKind kind, {String? categoryId}) async {
     final bytes = await _bytes({
       'action': _actions[kind]![1],
@@ -388,10 +435,12 @@ class XtreamApi {
     return parseItems(_decodeJson(bytes), kind);
   }
 
+  @override
   Future<XSeriesInfo> seriesInfo(String seriesId) async {
     return parseSeriesInfo(await _json({'action': 'get_series_info', 'series_id': seriesId}));
   }
 
+  @override
   Future<List<XEpg>> shortEpg(String streamId) async {
     final data = await _json({'action': 'get_short_epg', 'stream_id': streamId, 'limit': '4'},
         timeout: const Duration(seconds: 12));
@@ -405,4 +454,16 @@ class XtreamApi {
   String vodUrl(String id, String ext) => '$server/movie/$_auth/$id.${ext.isEmpty ? 'mp4' : ext}';
 
   String episodeUrl(String id, String ext) => '$server/series/$_auth/$id.${ext.isEmpty ? 'mp4' : ext}';
+
+  @override
+  List<String> liveUrlsFor(XItem item, String preferredFormat) {
+    final other = preferredFormat == 'ts' ? 'm3u8' : 'ts';
+    return [liveUrl(item.id, preferredFormat), liveUrl(item.id, other)];
+  }
+
+  @override
+  String movieUrlFor(XItem item) => vodUrl(item.id, item.ext);
+
+  @override
+  String episodeUrlFor(XEpisode episode) => episodeUrl(episode.id, episode.ext);
 }

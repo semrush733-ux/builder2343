@@ -5,7 +5,7 @@ address. The customer signs in with the details of their IPTV account (Xtream Co
 
 | | |
 |---|---|
-| Sign in | Server address, username, password - or paste a playlist link (`.../get.php?username=..&password=..`) |
+| Sign in | **Xtream Codes** (server address, username, password) or **M3U link** (any M3U / M3U8 playlist address) |
 | Live TV | Categories, channel list, search, favourites, TV guide (now / next) |
 | Movies / Series | Poster grid, seasons and episodes, resume where you stopped, next episode starts by itself |
 | Player | ExoPlayer with hardware decoding, automatic reconnect, `.ts` with fallback to `.m3u8` |
@@ -38,7 +38,8 @@ safe - updates must always be signed with the same key.
 
 ```
 lib/                    the app (Dart)
-  xtream.dart           server API
+  xtream.dart           Xtream Codes API and the common Source interface
+  m3u.dart              M3U playlist reader
   store.dart            saved login, favourites, resume positions
   screens/              login, home, browse, series, player
 android_overlay/        TV manifest, activity, icons and banner (copied over Flutter's Android template)
@@ -49,5 +50,10 @@ test/                   unit tests
 
 ## Not in this version
 
-Plain M3U playlists without an Xtream login, a full-week TV guide grid, subtitles / audio-track
-menu, catch-up, parental PIN, iPhone / Samsung / LG builds.
+A full-week TV guide grid, subtitles / audio-track menu, catch-up, parental PIN,
+iPhone / Samsung / LG builds.
+
+With an M3U link the playlist is downloaded on every app start. A playlist has no TV guide and no
+series pages (every episode is its own entry). A link from an Xtream Codes panel
+(`.../get.php?username=..&password=..`) is recognised and used through the panel's API instead,
+which gives the TV guide and series pages back.

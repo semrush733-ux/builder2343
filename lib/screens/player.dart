@@ -59,7 +59,7 @@ class PlayerScreen extends StatefulWidget {
     required this.live,
   });
 
-  final XtreamApi api;
+  final Source api;
   final List<PlayEntry> entries;
   final int index;
   final bool live;
