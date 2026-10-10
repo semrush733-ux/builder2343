@@ -1,0 +1,514 @@
+10-10 08:34:53.414   999  1300 D ImsResolver: maybeAddedImsService, packageName: com.b1g.b1gtv
+10-10 08:34:53.416   999   999 D CarrierSvcBindHelper: onPackageModified: com.b1g.b1gtv
+10-10 08:34:53.425   999  1300 D ImsResolver: maybeAddedImsService, packageName: com.b1g.b1gtv
+10-10 08:34:53.437   506   520 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.b1g.b1gtv/.MainActivity} with LAUNCH_SINGLE_TOP from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+10-10 08:34:53.439   800   833 V WindowManagerShell: Transition requested: android.os.BinderProxy@8171a4f TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=8 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.b1g.b1gtv/.MainActivity } baseActivity=ComponentInfo{com.b1g.b1gtv/com.b1g.b1gtv.MainActivity} topActivity=ComponentInfo{com.b1g.b1gtv/com.b1g.b1g
+10-10 08:34:53.447   506   537 I ActivityManager: Start proc 2260:com.b1g.b1gtv/u0a141 for next-top-activity {com.b1g.b1gtv/com.b1g.b1gtv.MainActivity}
+10-10 08:34:53.469   506  1034 D CoreBackPreview: Window{d40f571 u0 Splash Screen com.b1g.b1gtv}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@aa8bbd7, mPriority=0, mIsAnimationCallback=false}
+10-10 08:34:53.483  2260  2260 I com.b1g.b1gtv: Using CollectorTypeCC GC.
+10-10 08:34:53.483  2260  2260 W com.b1g.b1gtv: Unexpected CPU variant for x86: x86_64.
+10-10 08:34:53.483  2260  2260 W com.b1g.b1gtv: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, tremont, kabylake, default
+10-10 08:34:53.588  2260  2260 E com.b1g.b1gtv: Not starting debugger since process cannot load the jdwp agent.
+10-10 08:34:53.606   506   523 V WindowManager: Sent Transition #5 createdAt=10-10 08:34:53.434 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=8 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.b1g.b1gtv/.MainActivity } baseActivity=ComponentInfo{com.b1g.b1gtv/com.b1g.b1gtv.MainActivity} topActivity=ComponentInfo{com.b1g.b1gtv/com.b1g.b
+10-10 08:34:53.606   506   523 V WindowManager:     info={id=5 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{RemoteToken{5e3d05c Task{c9c45ce #8 type=standard I=com.b1g.b1gtv/.MainActivity}}} m=OPEN f=NONE leash=Surface(name=Task=8)/@0xbead130 sb=Rect(0, 0 - 1920, 1080) eb=Rect(0, 0 - 1920, 1080) d=0},{WCT{RemoteToken{b0608eb Task{27823aa #1 type=home}}} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(nam
+10-10 08:34:53.620  2260  2260 D nativeloader: Configuring clns-6 for other apk /data/app/~~yIPuxTRl41ji-wEO9RFQQQ==/com.b1g.b1gtv-GQh5lMcDIYMXMj12oLfkOg==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~yIPuxTRl41ji-wEO9RFQQQ==/com.b1g.b1gtv-GQh5lMcDIYMXMj12oLfkOg==/lib/x86_64:/data/app/~~yIPuxTRl41ji-wEO9RFQQQ==/com.b1g.b1gtv-GQh5lMcDIYMXMj12oLfkOg==/base.apk!/lib/x86_
+10-10 08:34:53.627  2260  2260 V GraphicsEnvironment: ANGLE GameManagerService for com.b1g.b1gtv: false
+10-10 08:34:53.627  2260  2260 V GraphicsEnvironment: com.b1g.b1gtv is not listed in per-application setting
+10-10 08:34:53.730  2260  2260 W com.b1g.b1gtv: type=1400 audit(0.0:15): avc:  denied  { read } for  name="max_map_count" dev="proc" ino=48251 scontext=u:r:untrusted_app:s0:c141,c256,c512,c768 tcontext=u:object_r:proc_max_map_count:s0 tclass=file permissive=0 app=com.b1g.b1gtv
+10-10 08:34:53.804  2260  2285 I flutter : [IMPORTANT:flutter/shell/platform/android/android_context_gl_impeller.cc(104)] Using the Impeller rendering backend (OpenGLES).
+10-10 08:34:53.821   506   520 D CoreBackPreview: Window{7231643 u0 com.b1g.b1gtv/com.b1g.b1gtv.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@6cbcec, mPriority=0, mIsAnimationCallback=false}
+10-10 08:34:54.223  2260  2260 I flutter : B1G screen=login
+10-10 08:34:54.230  2260  2260 W com.b1g.b1gtv: type=1400 audit(0.0:16): avc:  denied  { search } for  name="net" dev="sysfs" ino=6878 scontext=u:r:untrusted_app:s0:c141,c256,c512,c768 tcontext=u:object_r:sysfs_net:s0 tclass=dir permissive=0 app=com.b1g.b1gtv
+10-10 08:34:54.239  2260  2260 I flutter : B1G backend register hwid=yes mac=no
+10-10 08:34:54.657   506   523 I ActivityTaskManager: Displayed com.b1g.b1gtv/.MainActivity for user 0: +1s230ms
+10-10 08:34:54.657   506   523 I ActivityTaskManager: Fully drawn com.b1g.b1gtv/.MainActivity: +1s230ms
+10-10 08:34:54.723   506  1034 I ImeTracker: com.b1g.b1gtv:48e91a3d: onRequestHide at ORIGIN_SERVER_HIDE_INPUT reason HIDE_UNSPECIFIED_WINDOW
+10-10 08:34:54.723   506  1034 I ImeTracker: com.b1g.b1gtv:48e91a3d: onCancelled at PHASE_SERVER_SHOULD_HIDE
+10-10 08:34:54.731   506   520 D CoreBackPreview: Window{d40f571 u0 Splash Screen com.b1g.b1gtv EXITING}: Setting back callback null
+10-10 08:34:54.731   506   520 W InputManager-JNI: Input channel object 'd40f571 Splash Screen com.b1g.b1gtv (client)' was disposed without first being removed with the input manager!
+10-10 08:34:54.787  2260  2260 I flutter : B1G backend registered
+10-10 08:34:55.301  2260  2260 I flutter : B1G backend config server=none update=0 app=1
+10-10 08:34:58.960  2260  2353 D ProfileInstaller: Installing profile for com.b1g.b1gtv
+10-10 08:34:59.530  2260  2260 I flutter : B1G login ok mode=xtream
+10-10 08:34:59.563  2260  2260 I flutter : B1G screen=home
+10-10 08:35:04.008  2260  2260 I flutter : B1G browse live categories=2
+10-10 08:35:04.516  2260  2260 I flutter : B1G browse live items=5
+10-10 08:35:09.511  2260  2260 I flutter : B1G open index=0 format=ts try=0
+10-10 08:35:09.527  2260  2260 I flutter : B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+10-10 08:35:09.547  2260  2260 I flutter : media_kit: Emulator detected.
+10-10 08:35:09.547  2260  2260 I flutter : media_kit: Enforcing S/W rendering.
+10-10 08:35:09.558  2260  2260 I flutter : B1G mpv: playlist: Reading plaintext playlist.
+10-10 08:35:10.180  2260  2260 I flutter : B1G engine: lavf: Failed to create file cache.
+10-10 08:35:10.181  2260  2260 I flutter : B1G tracks audio=1 subtitles=0
+10-10 08:35:10.182  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (h264 1280x720 25.000fps)
+10-10 08:35:10.182  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=1 (aac 2ch 48000Hz)
+10-10 08:35:10.218  2260  2437 D com.b1g.b1gtv: PlayerBase::PlayerBase()
+10-10 08:35:10.218  2260  2437 D com.b1g.b1gtv: TrackPlayerBase::TrackPlayerBase()
+10-10 08:35:10.251  2260  2260 I flutter : B1G mpv: cplayer: AO: [opensles] 48000Hz stereo 2ch float
+10-10 08:35:10.251  2260  2260 I flutter : B1G mpv: cplayer: VO: [null] 1280x720 yuv420p
+10-10 08:35:10.262  2260  2450 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:35:10.265  2260  2260 I flutter : VideoOutput.Resize
+10-10 08:35:10.265  2260  2260 I flutter : {rect: {top: 0, left: 0, width: 1280, height: 720}, wid: 12454, handle: 133321409491760, id: 0}
+10-10 08:35:10.342  2260  2260 I flutter : B1G engine: vo/gpu/opengl: Could not create EGL context for GLES 2.x +!
+10-10 08:35:10.342  2260  2260 I flutter : B1G engine: vo/gpu/opengl: Could not create a GL context.
+10-10 08:35:10.342  2260  2260 I flutter : B1G engine: vo/gpu: Failed initializing any suitable GPU context!
+10-10 08:35:10.342  2260  2260 I flutter : B1G engine: cplayer: Error opening/initializing the selected video_out (--vo) device.
+10-10 08:35:10.342  2260  2260 I flutter : B1G engine: vo/gpu/opengl: Could not create EGL context for GLES 2.x +!
+10-10 08:35:10.342  2260  2260 I flutter : B1G engine: vo/gpu/opengl: Could not create a GL context.
+10-10 08:35:10.342  2260  2260 I flutter : B1G engine: vo/gpu: Failed initializing any suitable GPU context!
+10-10 08:35:10.342  2260  2260 I flutter : B1G engine: cplayer: Error opening/initializing the VO window.
+10-10 08:35:10.342  2260  2260 I flutter : B1G mpv: cplayer: Video: no video
+10-10 08:35:10.622  2260  2260 I flutter : B1G ready index=0 format=ts video=1280x720 mode=gpu
+10-10 08:35:10.622  2260  2260 I flutter : B1G playing index=0 pos=0
+10-10 08:35:10.623  2260  2260 I flutter : B1G mpv: cplayer: Track switched:
+10-10 08:35:10.623  2260  2260 I flutter : B1G mpv: cplayer: Video --vid=1 (h264 1280x720 25.000fps)
+10-10 08:35:10.623  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=1 (aac 2ch 48000Hz)
+10-10 08:35:15.444  2260  2260 I flutter : B1G playing index=0 pos=5
+10-10 08:35:20.446  2260  2260 I flutter : B1G playing index=0 pos=10
+10-10 08:35:25.448  2260  2260 I flutter : B1G playing index=0 pos=15
+10-10 08:35:30.451  2260  2260 I flutter : B1G playing index=0 pos=20
+10-10 08:35:35.453  2260  2260 I flutter : B1G playing index=0 pos=25
+10-10 08:35:36.485  2260  2260 I flutter : B1G panel=channels
+10-10 08:35:40.219  2260  2260 I flutter : B1G panel=options
+10-10 08:35:40.455  2260  2260 I flutter : B1G playing index=0 pos=30
+10-10 08:35:45.458  2260  2260 I flutter : B1G playing index=0 pos=35
+10-10 08:35:48.507  2260  2260 I flutter : B1G video mode=direct
+10-10 08:35:48.507  2260  2260 I flutter : B1G open index=0 format=ts try=0
+10-10 08:35:48.517  2260  2450 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:35:48.554  2260  2260 I flutter : VideoOutput.Resize
+10-10 08:35:48.554  2260  2260 I flutter : {rect: {top: 0, left: 0, width: 1280, height: 720}, wid: 0, handle: 133321409491760, id: 0}
+10-10 08:35:48.569  2260  2260 I flutter : B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+10-10 08:35:48.603  2260  2260 I flutter : B1G mpv: playlist: Reading plaintext playlist.
+10-10 08:35:48.694  2260  2260 I flutter : B1G engine: stream: Failed to open [address]
+10-10 08:35:48.699  2260  2260 I flutter : B1G engine: Failed to open [address]
+10-10 08:35:51.512  2260  2260 I flutter : B1G open failed
+10-10 08:35:51.514  2260  2260 I flutter : VideoOutput.Resize
+10-10 08:35:51.514  2260  2260 I flutter : {rect: {top: 0, left: 0, width: 1, height: 1}, wid: 0, handle: 133321409595360, id: 0}
+10-10 08:35:53.518  2260  2260 I flutter : B1G open index=0 format=ts try=1
+10-10 08:35:53.579  2260  2260 I flutter : B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+10-10 08:35:53.638  2260  2260 I flutter : B1G mpv: playlist: Reading plaintext playlist.
+10-10 08:35:54.234  2260  2260 I flutter : B1G engine: lavf: Failed to create file cache.
+10-10 08:35:54.237  2260  2260 I flutter : B1G tracks audio=1 subtitles=0
+10-10 08:35:54.237  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (h264 1280x720 25.000fps)
+10-10 08:35:54.237  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=1 (aac 2ch 48000Hz)
+10-10 08:35:54.313  2260  2662 D com.b1g.b1gtv: PlayerBase::PlayerBase()
+10-10 08:35:54.314  2260  2662 D com.b1g.b1gtv: TrackPlayerBase::TrackPlayerBase()
+10-10 08:35:54.327  2260  2260 I flutter : B1G mpv: cplayer: AO: [opensles] 48000Hz stereo 2ch float
+10-10 08:35:54.328  2260  2260 I flutter : B1G mpv: cplayer: VO: [null] 1280x720 yuv420p
+10-10 08:35:54.347  2260  2260 I flutter : VideoOutput.Resize
+10-10 08:35:54.347  2260  2260 I flutter : {rect: {top: 0, left: 0, width: 1280, height: 720}, wid: 12458, handle: 133321409548000, id: 2}
+10-10 08:35:54.348  2260  2673 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:35:54.383  2260  2676 D MediaCodec: flushMediametrics
+10-10 08:35:54.383  2260  2676 I MediaCodec: [c2.goldfish.h264.decoder] setting surface generation to 2314241
+10-10 08:35:54.460  2260  2676 D CCodecBufferChannel: [c2.goldfish.h264.decoder#369] MediaCodec discarded an unknown buffer
+10-10 08:35:54.461  2260  2676 D CCodecBufferChannel: [c2.goldfish.h264.decoder#369] MediaCodec discarded an unknown buffer
+10-10 08:35:54.461  2260  2676 D CCodecBufferChannel: [c2.goldfish.h264.decoder#369] MediaCodec discarded an unknown buffer
+10-10 08:35:54.462  2260  2676 D CCodecBufferChannel: [c2.goldfish.h264.decoder#369] MediaCodec discarded an unknown buffer
+10-10 08:35:54.462  2260  2676 D CCodecBufferChannel: [c2.goldfish.h264.decoder#369] MediaCodec discarded an unknown buffer
+10-10 08:35:54.462  2260  2676 D CCodecBufferChannel: [c2.goldfish.h264.decoder#369] MediaCodec discarded an unknown buffer
+10-10 08:35:54.462  2260  2676 D CCodecBufferChannel: [c2.goldfish.h264.decoder#369] MediaCodec discarded an unknown buffer
+10-10 08:35:54.708  2260  2260 I flutter : B1G mpv: vd: Using hardware decoding (mediacodec).
+10-10 08:35:54.708  2260  2260 I flutter : B1G mpv: cplayer: VO: [mediacodec_embed] 1280x720 mediacodec
+10-10 08:35:54.854  2260  2260 I flutter : B1G ready index=0 format=ts video=1280x720 mode=direct
+10-10 08:35:54.854  2260  2260 I flutter : B1G playing index=0 pos=0
+10-10 08:35:54.910  2260  2260 I flutter : B1G mpv: cplayer: Track switched:
+10-10 08:35:54.916  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (h264 1280x720 25.000fps)
+10-10 08:35:54.916  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=1 (aac 2ch 48000Hz)
+10-10 08:35:59.796  2260  2260 I flutter : B1G playing index=0 pos=5
+10-10 08:36:02.393  2260  2260 I flutter : B1G player closed
+10-10 08:36:02.400  2260  2673 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:36:02.425  2260  2676 I MediaCodec: [c2.goldfish.h264.decoder] setting surface generation to 2314242
+10-10 08:36:02.466  2260  2676 D CCodecBufferChannel: [c2.goldfish.h264.decoder#369] MediaCodec discarded an unknown buffer
+10-10 08:36:02.466  2260  2676 D CCodecBufferChannel: [c2.goldfish.h264.decoder#369] MediaCodec discarded an unknown buffer
+10-10 08:36:02.466  2260  2676 D CCodecBufferChannel: [c2.goldfish.h264.decoder#369] MediaCodec discarded an unknown buffer
+10-10 08:36:02.466  2260  2676 D CCodecBufferChannel: [c2.goldfish.h264.decoder#369] MediaCodec discarded an unknown buffer
+10-10 08:36:02.492  2260  2260 I flutter : VideoOutput.Resize
+10-10 08:36:02.492  2260  2260 I flutter : {rect: {top: 0, left: 0, width: 1280, height: 720}, wid: 0, handle: 133321409548000, id: 2}
+10-10 08:36:02.552  2260  2676 D MediaCodec: flushMediametrics
+10-10 08:36:02.553  2260  2676 D MediaCodec: flushMediametrics
+10-10 08:36:02.553  2260  2676 W MediaCodec: no metrics handle found
+10-10 08:48:32.750  2260  2260 I flutter : B1G browse live categories=2
+10-10 08:48:32.779  2260  2260 I flutter : B1G browse live items=5
+10-10 08:49:00.275  2260  2260 I flutter : B1G browse vod categories=1
+10-10 08:49:00.793  2260  2260 I flutter : B1G browse vod items=2
+10-10 08:49:04.932  2260  2260 I flutter : B1G screen=movie details=true cast=true trailer=true
+10-10 08:49:05.936  2260  2260 I flutter : B1G tmdb cast=4 stills=3 trailer=true
+10-10 08:49:17.361  2260  2260 I flutter : B1G open index=0 format=mp4 try=0
+10-10 08:49:17.398  2260  2260 I flutter : B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+10-10 08:49:17.431  2260  2260 I flutter : B1G mpv: playlist: Reading plaintext playlist.
+10-10 08:49:18.036  2260  2260 I flutter : B1G engine: lavf: Failed to create file cache.
+10-10 08:49:18.046  2260  2260 I flutter : B1G tracks audio=2 subtitles=1
+10-10 08:49:18.046  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+10-10 08:49:18.046  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+10-10 08:49:18.046  2260  2260 I flutter : B1G mpv: cplayer: Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+10-10 08:49:18.046  2260  2260 I flutter : B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+10-10 08:49:18.157  2260  5089 D com.b1g.b1gtv: PlayerBase::PlayerBase()
+10-10 08:49:18.162  2260  5089 D com.b1g.b1gtv: TrackPlayerBase::TrackPlayerBase()
+10-10 08:49:18.215  2260  5104 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:49:18.218  2260  2260 I flutter : B1G mpv: cplayer: AO: [opensles] 48000Hz stereo 2ch float
+10-10 08:49:18.230  2260  2260 I flutter : B1G mpv: cplayer: VO: [null] 640x360 yuv420p
+10-10 08:49:18.236  2260  2260 I flutter : VideoOutput.Resize
+10-10 08:49:18.236  2260  2260 I flutter : {rect: {top: 0, left: 0, width: 640, height: 360}, wid: 12502, handle: 133321409752240, id: 3}
+10-10 08:49:18.277  2260  5106 D MediaCodec: flushMediametrics
+10-10 08:49:18.277  2260  5106 I MediaCodec: [c2.goldfish.h264.decoder] setting surface generation to 2314243
+10-10 08:49:18.326  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:49:18.326  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:49:18.326  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:49:18.326  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:49:18.329  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:49:18.329  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:49:18.329  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:49:18.329  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:49:18.541  2260  2260 I flutter : B1G mpv: vd: Using hardware decoding (mediacodec).
+10-10 08:49:18.541  2260  2260 I flutter : B1G mpv: cplayer: VO: [mediacodec_embed] 640x360 mediacodec
+10-10 08:49:18.738  2260  2260 I flutter : B1G ready index=0 format=mp4 video=640x360 mode=direct
+10-10 08:49:18.738  2260  2260 I flutter : B1G playing index=0 pos=0
+10-10 08:49:18.741  2260  2260 I flutter : B1G mpv: cplayer: Track switched:
+10-10 08:49:18.741  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+10-10 08:49:18.741  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+10-10 08:49:18.741  2260  2260 I flutter : B1G mpv: cplayer: Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+10-10 08:49:18.741  2260  2260 I flutter : B1G mpv: cplayer: Subs  --sid=1 --slang=eng (*) (mov_text)
+10-10 08:49:23.610  2260  2260 I flutter : B1G playing index=0 pos=5
+10-10 08:49:28.800  2260  2260 I flutter : B1G playing index=0 pos=10
+10-10 08:49:33.529  2260  2260 I flutter : B1G panel=options
+10-10 08:49:33.910  2260  2260 I flutter : B1G playing index=0 pos=15
+10-10 08:49:37.911  2260  2260 I flutter : B1G audio track=urd
+10-10 08:49:37.928  2260  5104 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:49:37.973  2260  2260 I flutter : B1G mpv: cplayer: Track switched:
+10-10 08:49:37.973  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+10-10 08:49:37.973  2260  2260 I flutter : B1G mpv: cplayer: Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+10-10 08:49:37.973  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+10-10 08:49:37.973  2260  2260 I flutter : B1G mpv: cplayer: Subs  --sid=1 --slang=eng (*) (mov_text)
+10-10 08:49:39.624  2260  2260 I flutter : B1G playing index=0 pos=20
+10-10 08:49:42.115  2260  2260 I flutter : B1G subtitle track=eng
+10-10 08:49:42.185  2260  2260 I flutter : B1G mpv: cplayer: Track switched:
+10-10 08:49:42.185  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+10-10 08:49:42.186  2260  2260 I flutter : B1G mpv: cplayer: Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+10-10 08:49:42.186  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+10-10 08:49:42.186  2260  2260 I flutter : B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+10-10 08:49:42.191  2260  5104 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:49:44.970  2260  2260 I flutter : B1G playing index=0 pos=25
+10-10 08:49:49.984  2260  2260 I flutter : B1G playing index=0 pos=30
+10-10 08:49:55.072  2260  2260 I flutter : B1G playing index=0 pos=35
+10-10 08:49:59.203  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:49:59.203  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:49:59.203  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:49:59.203  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:49:59.208  2260  5104 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:50:03.324  2260  2260 I flutter : B1G playing index=0 pos=100
+10-10 08:50:07.231  2260  2260 I flutter : B1G paused
+10-10 08:50:07.236  2260  5104 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:50:11.473  2260  2260 I flutter : B1G player closed
+10-10 08:50:11.478  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:50:11.479  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:50:11.479  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:50:11.481  2260  5106 I MediaCodec: [c2.goldfish.h264.decoder] setting surface generation to 2314244
+10-10 08:50:11.535  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:50:11.535  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:50:11.535  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:50:11.535  2260  5106 D CCodecBufferChannel: [c2.goldfish.h264.decoder#864] MediaCodec discarded an unknown buffer
+10-10 08:50:11.623  2260  5106 D MediaCodec: flushMediametrics
+10-10 08:50:11.623  2260  5106 D MediaCodec: flushMediametrics
+10-10 08:50:11.623  2260  5106 W MediaCodec: no metrics handle found
+10-10 08:50:11.660  2260  2260 I flutter : VideoOutput.Resize
+10-10 08:50:11.660  2260  2260 I flutter : {rect: {top: 0, left: 0, width: 640, height: 360}, wid: 0, handle: 133321409752240, id: 3}
+10-10 08:50:14.245  2260  2260 I flutter : B1G open index=0 format=mp4 try=0
+10-10 08:50:14.293  2260  2260 I flutter : B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+10-10 08:50:14.342  2260  2260 I flutter : B1G mpv: playlist: Reading plaintext playlist.
+10-10 08:50:14.959  2260  2260 I flutter : B1G engine: lavf: Failed to create file cache.
+10-10 08:50:14.961  2260  2260 I flutter : B1G tracks audio=2 subtitles=1
+10-10 08:50:14.964  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+10-10 08:50:14.964  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+10-10 08:50:14.964  2260  2260 I flutter : B1G mpv: cplayer: Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+10-10 08:50:14.964  2260  2260 I flutter : B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+10-10 08:50:15.098  2260  5347 D com.b1g.b1gtv: PlayerBase::PlayerBase()
+10-10 08:50:15.099  2260  5347 D com.b1g.b1gtv: TrackPlayerBase::TrackPlayerBase()
+10-10 08:50:15.118  2260  2260 I flutter : B1G mpv: cplayer: AO: [opensles] 48000Hz stereo 2ch float
+10-10 08:50:15.125  2260  2260 I flutter : B1G mpv: cplayer: VO: [null] 640x360 yuv420p
+10-10 08:50:15.129  2260  2260 I flutter : B1G ready index=0 format=mp4 video=0x0 mode=direct
+10-10 08:50:15.140  2260  5356 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:50:15.142  2260  2260 I flutter : VideoOutput.Resize
+10-10 08:50:15.142  2260  2260 I flutter : {rect: {top: 0, left: 0, width: 640, height: 360}, wid: 12474, handle: 133321409482880, id: 4}
+10-10 08:50:15.142  2260  2260 I flutter : B1G mpv: cplayer: Track switched:
+10-10 08:50:15.144  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+10-10 08:50:15.144  2260  2260 I flutter : B1G mpv: cplayer: Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+10-10 08:50:15.144  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+10-10 08:50:15.144  2260  2260 I flutter : B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+10-10 08:50:15.144  2260  2260 I flutter : B1G mpv: cplayer: Track switched:
+10-10 08:50:15.144  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+10-10 08:50:15.145  2260  2260 I flutter : B1G mpv: cplayer: Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+10-10 08:50:15.145  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+10-10 08:50:15.145  2260  2260 I flutter : B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+10-10 08:50:15.220  2260  5358 D MediaCodec: flushMediametrics
+10-10 08:50:15.222  2260  5358 I MediaCodec: [c2.goldfish.h264.decoder] setting surface generation to 2314245
+10-10 08:50:15.347  2260  5358 D CCodecBufferChannel: [c2.goldfish.h264.decoder#396] MediaCodec discarded an unknown buffer
+10-10 08:50:15.348  2260  5358 D CCodecBufferChannel: [c2.goldfish.h264.decoder#396] MediaCodec discarded an unknown buffer
+10-10 08:50:15.351  2260  2260 I flutter : B1G playing index=0 pos=0
+10-10 08:50:15.544  2260  2260 I flutter : B1G mpv: vd: Using hardware decoding (mediacodec).
+10-10 08:50:15.545  2260  2260 I flutter : B1G mpv: cplayer: VO: [mediacodec_embed] 640x360 mediacodec
+10-10 08:50:20.675  2260  2260 I flutter : B1G playing index=0 pos=5
+10-10 08:50:25.696  2260  2260 I flutter : B1G playing index=0 pos=10
+10-10 08:50:30.771  2260  2260 I flutter : B1G playing index=0 pos=15
+10-10 08:50:35.779  2260  2260 I flutter : B1G playing index=0 pos=20
+10-10 08:50:40.873  2260  2260 I flutter : B1G playing index=0 pos=25
+10-10 08:50:43.105  2260  2260 I flutter : B1G player closed
+10-10 08:50:43.124  2260  5356 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:50:43.127  2260  5358 D CCodecBufferChannel: [c2.goldfish.h264.decoder#396] MediaCodec discarded an unknown buffer
+10-10 08:50:43.127  2260  5358 D CCodecBufferChannel: [c2.goldfish.h264.decoder#396] MediaCodec discarded an unknown buffer
+10-10 08:50:43.127  2260  5358 D CCodecBufferChannel: [c2.goldfish.h264.decoder#396] MediaCodec discarded an unknown buffer
+10-10 08:50:43.135  2260  5358 I MediaCodec: [c2.goldfish.h264.decoder] setting surface generation to 2314246
+10-10 08:50:43.241  2260  5358 D CCodecBufferChannel: [c2.goldfish.h264.decoder#396] MediaCodec discarded an unknown buffer
+10-10 08:50:43.244  2260  5358 D CCodecBufferChannel: [c2.goldfish.h264.decoder#396] MediaCodec discarded an unknown buffer
+10-10 08:50:43.244  2260  5358 D CCodecBufferChannel: [c2.goldfish.h264.decoder#396] MediaCodec discarded an unknown buffer
+10-10 08:50:43.244  2260  5358 D CCodecBufferChannel: [c2.goldfish.h264.decoder#396] MediaCodec discarded an unknown buffer
+10-10 08:50:43.256  2260  5358 D MediaCodec: flushMediametrics
+10-10 08:50:43.256  2260  5358 D MediaCodec: flushMediametrics
+10-10 08:50:43.257  2260  5358 W MediaCodec: no metrics handle found
+10-10 08:50:43.292  2260  2260 I flutter : VideoOutput.Resize
+10-10 08:50:43.292  2260  2260 I flutter : {rect: {top: 0, left: 0, width: 640, height: 360}, wid: 0, handle: 133321409482880, id: 4}
+10-10 08:50:50.929  2260  2260 I flutter : B1G browse series categories=1
+10-10 08:50:51.449  2260  2260 I flutter : B1G browse series items=1
+10-10 08:50:55.585  2260  2260 I flutter : B1G series seasons=2
+10-10 08:50:58.495  2260  2260 I flutter : B1G open index=0 format=mp4 try=0
+10-10 08:50:58.507  2260  2260 I flutter : B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+10-10 08:50:58.575  2260  2260 I flutter : B1G mpv: playlist: Reading plaintext playlist.
+10-10 08:50:59.187  2260  2260 I flutter : B1G engine: lavf: Failed to create file cache.
+10-10 08:50:59.191  2260  2260 I flutter : B1G tracks audio=2 subtitles=1
+10-10 08:50:59.191  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+10-10 08:50:59.191  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+10-10 08:50:59.191  2260  2260 I flutter : B1G mpv: cplayer: Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+10-10 08:50:59.192  2260  2260 I flutter : B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+10-10 08:50:59.263  2260  5510 D com.b1g.b1gtv: PlayerBase::PlayerBase()
+10-10 08:50:59.263  2260  5510 D com.b1g.b1gtv: TrackPlayerBase::TrackPlayerBase()
+10-10 08:50:59.279  2260  5519 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:50:59.280  2260  2260 I flutter : B1G mpv: cplayer: AO: [opensles] 48000Hz stereo 2ch float
+10-10 08:50:59.285  2260  2260 I flutter : B1G mpv: cplayer: VO: [null] 640x360 yuv420p
+10-10 08:50:59.289  2260  2260 I flutter : VideoOutput.Resize
+10-10 08:50:59.289  2260  2260 I flutter : {rect: {top: 0, left: 0, width: 640, height: 360}, wid: 12482, handle: 133321409666400, id: 5}
+10-10 08:50:59.361  2260  5521 D MediaCodec: flushMediametrics
+10-10 08:50:59.361  2260  5521 I MediaCodec: [c2.goldfish.h264.decoder] setting surface generation to 2314247
+10-10 08:50:59.415  2260  5519 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:50:59.419  2260  5521 D CCodecBufferChannel: [c2.goldfish.h264.decoder#97] MediaCodec discarded an unknown buffer
+10-10 08:50:59.421  2260  5521 D CCodecBufferChannel: [c2.goldfish.h264.decoder#97] MediaCodec discarded an unknown buffer
+10-10 08:50:59.421  2260  5521 D CCodecBufferChannel: [c2.goldfish.h264.decoder#97] MediaCodec discarded an unknown buffer
+10-10 08:50:59.658  2260  2260 I flutter : B1G mpv: vd: Using hardware decoding (mediacodec).
+10-10 08:50:59.660  2260  2260 I flutter : B1G mpv: cplayer: VO: [mediacodec_embed] 640x360 mediacodec
+10-10 08:50:59.900  2260  2260 I flutter : B1G ready index=0 format=mp4 video=640x360 mode=direct
+10-10 08:50:59.900  2260  2260 I flutter : B1G playing index=0 pos=0
+10-10 08:50:59.917  2260  5519 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:50:59.924  2260  2260 I flutter : B1G mpv: cplayer: Track switched:
+10-10 08:50:59.924  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+10-10 08:50:59.925  2260  2260 I flutter : B1G mpv: cplayer: Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+10-10 08:50:59.925  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+10-10 08:50:59.925  2260  2260 I flutter : B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+10-10 08:50:59.927  2260  2260 I flutter : B1G mpv: cplayer: Track switched:
+10-10 08:50:59.927  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+10-10 08:50:59.927  2260  2260 I flutter : B1G mpv: cplayer: Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+10-10 08:50:59.927  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+10-10 08:50:59.927  2260  2260 I flutter : B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+10-10 08:51:04.635  2260  2260 I flutter : B1G playing index=0 pos=5
+10-10 08:51:05.897  2260  2260 I flutter : B1G player closed
+10-10 08:51:05.912  2260  5519 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:51:05.929  2260  5521 I MediaCodec: [c2.goldfish.h264.decoder] setting surface generation to 2314248
+10-10 08:51:05.968  2260  5521 D CCodecBufferChannel: [c2.goldfish.h264.decoder#97] MediaCodec discarded an unknown buffer
+10-10 08:51:05.968  2260  5521 D CCodecBufferChannel: [c2.goldfish.h264.decoder#97] MediaCodec discarded an unknown buffer
+10-10 08:51:05.968  2260  5521 D CCodecBufferChannel: [c2.goldfish.h264.decoder#97] MediaCodec discarded an unknown buffer
+10-10 08:51:05.968  2260  5521 D CCodecBufferChannel: [c2.goldfish.h264.decoder#97] MediaCodec discarded an unknown buffer
+10-10 08:51:06.006  2260  5521 D MediaCodec: flushMediametrics
+10-10 08:51:06.008  2260  5521 D MediaCodec: flushMediametrics
+10-10 08:51:06.008  2260  5521 W MediaCodec: no metrics handle found
+10-10 08:51:06.055  2260  2260 I flutter : VideoOutput.Resize
+10-10 08:51:06.055  2260  2260 I flutter : {rect: {top: 0, left: 0, width: 640, height: 360}, wid: 0, handle: 133321409666400, id: 5}
+10-10 08:51:17.161  2260  2260 I flutter : B1G screen=device
+10-10 08:51:28.733  2260  2260 I flutter : B1G screen=login
+10-10 08:51:33.334  2260  2260 I ImeTracker: com.b1g.b1gtv:a341e541: onRequestShow at ORIGIN_CLIENT_SHOW_SOFT_INPUT reason SHOW_SOFT_INPUT
+10-10 08:51:33.393  2260  2260 I ImeTracker: com.b1g.b1gtv:d10e030a: onRequestShow at ORIGIN_CLIENT_SHOW_SOFT_INPUT reason SHOW_SOFT_INPUT
+10-10 08:51:33.539   506   568 D CoreBackPreview: Window{7231643 u0 com.b1g.b1gtv/com.b1g.b1gtv.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@b1a64fb, mPriority=0, mIsAnimationCallback=false}
+10-10 08:51:33.540   506   568 I ImeTracker: com.b1g.b1gtv:a341e541: onFailed at PHASE_WM_SHOW_IME_RUNNER
+10-10 08:51:34.029  2260  2260 I ImeTracker: com.b1g.b1gtv:d10e030a: onShown
+10-10 08:51:34.162  2260  2260 W FrameTracker: Missed App frame:UNKNOWN: 328, 331219, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.b1g.b1gtv>
+10-10 08:51:37.833  2260  2260 I ImeTracker: com.b1g.b1gtv:b96027f7: onRequestHide at ORIGIN_CLIENT_HIDE_SOFT_INPUT reason HIDE_SOFT_INPUT
+10-10 08:51:37.836   506  2683 D CoreBackPreview: Window{7231643 u0 com.b1g.b1gtv/com.b1g.b1gtv.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@a75fcdb, mPriority=0, mIsAnimationCallback=false}
+10-10 08:51:37.903  2260  2260 I ImeTracker: com.b1g.b1gtv:2ba0e750: onRequestHide at ORIGIN_CLIENT_HIDE_SOFT_INPUT reason HIDE_SOFT_INPUT_BY_INSETS_API
+10-10 08:51:37.904   506   568 I ImeTracker: com.b1g.b1gtv:2ba0e750: onCancelled at PHASE_SERVER_SHOULD_HIDE
+10-10 08:51:37.904  2260  2260 I ImeTracker: com.b1g.b1gtv:b96027f7: onHidden
+10-10 08:51:38.095  2260  2260 W FrameTracker: Missed SF frame:UNKNOWN: 66, 331426, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.b1g.b1gtv>
+10-10 08:51:38.344  2260  2260 I flutter : B1G login failed: XtreamAuthException
+10-10 08:51:41.486  2260  2260 I ImeTracker: com.b1g.b1gtv:180b3182: onRequestShow at ORIGIN_CLIENT_SHOW_SOFT_INPUT reason SHOW_SOFT_INPUT
+10-10 08:51:41.516   506   858 D CoreBackPreview: Window{7231643 u0 com.b1g.b1gtv/com.b1g.b1gtv.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@82b6e45, mPriority=0, mIsAnimationCallback=false}
+10-10 08:51:41.651  2260  2260 I ImeTracker: com.b1g.b1gtv:180b3182: onShown
+10-10 08:51:41.773  2260  2260 W FrameTracker: Missed SF frame:UNKNOWN: 66, 331779, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.b1g.b1gtv>
+10-10 08:51:45.824  2260  2260 I ImeTracker: com.b1g.b1gtv:58015fc3: onRequestHide at ORIGIN_CLIENT_HIDE_SOFT_INPUT reason HIDE_SOFT_INPUT
+10-10 08:51:45.838   506   568 D CoreBackPreview: Window{7231643 u0 com.b1g.b1gtv/com.b1g.b1gtv.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@e117325, mPriority=0, mIsAnimationCallback=false}
+10-10 08:51:45.865  2260  2260 I ImeTracker: com.b1g.b1gtv:b0aa94b6: onRequestHide at ORIGIN_CLIENT_HIDE_SOFT_INPUT reason HIDE_SOFT_INPUT_BY_INSETS_API
+10-10 08:51:45.866   506  1451 I ImeTracker: com.b1g.b1gtv:b0aa94b6: onCancelled at PHASE_SERVER_SHOULD_HIDE
+10-10 08:51:45.866  2260  2260 I ImeTracker: com.b1g.b1gtv:58015fc3: onHidden
+10-10 08:51:46.039  2260  2260 W FrameTracker: Missed App frame:UNKNOWN: 74, 332045, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.b1g.b1gtv>
+10-10 08:51:46.039  2260  2260 W FrameTracker: Missed SF frame:UNKNOWN: 74, 332045, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.b1g.b1gtv>
+10-10 08:51:46.406  2260  2260 I flutter : B1G login ok mode=xtream
+10-10 08:51:46.445  2260  2260 I flutter : B1G screen=home
+10-10 08:51:56.212  2260  2260 I flutter : B1G screen=login
+10-10 08:52:02.676  2260  2260 I flutter : B1G login mode=m3u
+10-10 08:52:05.507  2260  2260 I ImeTracker: com.b1g.b1gtv:be862813: onRequestShow at ORIGIN_CLIENT_SHOW_SOFT_INPUT reason SHOW_SOFT_INPUT
+10-10 08:52:05.515  2260  2260 I ImeTracker: com.b1g.b1gtv:a5b73729: onRequestShow at ORIGIN_CLIENT_SHOW_SOFT_INPUT reason SHOW_SOFT_INPUT
+10-10 08:52:05.519   506  1677 D CoreBackPreview: Window{7231643 u0 com.b1g.b1gtv/com.b1g.b1gtv.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@3b77298, mPriority=0, mIsAnimationCallback=false}
+10-10 08:52:05.520   506  5662 I ImeTracker: com.b1g.b1gtv:be862813: onFailed at PHASE_WM_SHOW_IME_RUNNER
+10-10 08:52:05.682  2260  2260 I ImeTracker: com.b1g.b1gtv:a5b73729: onShown
+10-10 08:52:05.819  2260  2260 W FrameTracker: Missed SF frame:UNKNOWN: 66, 336141, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.b1g.b1gtv>
+10-10 08:52:08.360  2260  2260 I ImeTracker: com.b1g.b1gtv:ea4c88e3: onRequestHide at ORIGIN_CLIENT_HIDE_SOFT_INPUT reason HIDE_SOFT_INPUT
+10-10 08:52:08.363   506   568 D CoreBackPreview: Window{7231643 u0 com.b1g.b1gtv/com.b1g.b1gtv.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@9cdfcb0, mPriority=0, mIsAnimationCallback=false}
+10-10 08:52:08.423  2260  2260 I ImeTracker: com.b1g.b1gtv:dcf2bee1: onRequestHide at ORIGIN_CLIENT_HIDE_SOFT_INPUT reason HIDE_SOFT_INPUT_BY_INSETS_API
+10-10 08:52:08.424   506   568 I ImeTracker: com.b1g.b1gtv:dcf2bee1: onCancelled at PHASE_SERVER_SHOULD_HIDE
+10-10 08:52:08.426  2260  2260 I ImeTracker: com.b1g.b1gtv:ea4c88e3: onHidden
+10-10 08:52:08.575  2260  2260 W FrameTracker: Missed App frame:UNKNOWN: 74, 336320, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.b1g.b1gtv>
+10-10 08:52:08.575  2260  2260 W FrameTracker: Missed SF frame:UNKNOWN: 74, 336320, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.b1g.b1gtv>
+10-10 08:52:08.891  2260  2260 I flutter : B1G login ok mode=m3u M3U playlist  ·  3 channels, 1 movie, 1 episode
+10-10 08:52:08.915  2260  2260 I flutter : B1G screen=home
+10-10 08:52:13.006  2260  2260 I flutter : B1G browse live categories=2
+10-10 08:52:13.006  2260  2260 I flutter : B1G browse live items=3
+10-10 08:52:13.054  2260  2270 I com.b1g.b1gtv: Background concurrent copying GC freed 36335(1429KB) AllocSpace objects, 26(1352KB) LOS objects, 49% free, 2547KB/5095KB, paused 9.536ms,12us total 59.558ms
+10-10 08:52:17.661  2260  2260 I flutter : B1G open index=0 format=ts try=0
+10-10 08:52:17.675  2260  2260 I flutter : B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+10-10 08:52:17.703  2260  2260 I flutter : B1G mpv: playlist: Reading plaintext playlist.
+10-10 08:52:18.237  2260  2260 I flutter : B1G engine: lavf: Failed to create file cache.
+10-10 08:52:18.238  2260  2260 I flutter : B1G tracks audio=1 subtitles=0
+10-10 08:52:18.238  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (h264 1280x720 25.000fps)
+10-10 08:52:18.238  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=1 (aac 2ch 48000Hz)
+10-10 08:52:18.276  2260  5967 D com.b1g.b1gtv: PlayerBase::PlayerBase()
+10-10 08:52:18.276  2260  5967 D com.b1g.b1gtv: TrackPlayerBase::TrackPlayerBase()
+10-10 08:52:18.300  2260  2260 I flutter : B1G mpv: cplayer: AO: [opensles] 48000Hz stereo 2ch float
+10-10 08:52:18.304  2260  2260 I flutter : B1G mpv: cplayer: VO: [null] 1280x720 yuv420p
+10-10 08:52:18.307  2260  2260 I flutter : VideoOutput.Resize
+10-10 08:52:18.307  2260  2260 I flutter : {rect: {top: 0, left: 0, width: 1280, height: 720}, wid: 13098, handle: 133321409355600, id: 6}
+10-10 08:52:18.376  2260  5981 D MediaCodec: flushMediametrics
+10-10 08:52:18.376  2260  5981 I MediaCodec: [c2.goldfish.h264.decoder] setting surface generation to 2314249
+10-10 08:52:18.386  2260  5981 D CCodecBufferChannel: [c2.goldfish.h264.decoder#895] MediaCodec discarded an unknown buffer
+10-10 08:52:18.386  2260  5981 D CCodecBufferChannel: [c2.goldfish.h264.decoder#895] MediaCodec discarded an unknown buffer
+10-10 08:52:18.386  2260  5981 D CCodecBufferChannel: [c2.goldfish.h264.decoder#895] MediaCodec discarded an unknown buffer
+10-10 08:52:18.386  2260  5981 D CCodecBufferChannel: [c2.goldfish.h264.decoder#895] MediaCodec discarded an unknown buffer
+10-10 08:52:18.390  2260  5978 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:52:18.442  2260  2260 I flutter : B1G mpv: vd: Using hardware decoding (mediacodec).
+10-10 08:52:18.444  2260  2260 I flutter : B1G mpv: cplayer: VO: [mediacodec_embed] 1280x720 mediacodec
+10-10 08:52:18.622  2260  2260 I flutter : B1G ready index=0 format=ts video=1280x720 mode=direct
+10-10 08:52:18.622  2260  2260 I flutter : B1G playing index=0 pos=0
+10-10 08:52:18.623  2260  2260 I flutter : B1G mpv: cplayer: Track switched:
+10-10 08:52:18.623  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (h264 1280x720 25.000fps)
+10-10 08:52:18.623  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=1 (aac 2ch 48000Hz)
+10-10 08:52:23.438  2260  2260 I flutter : B1G playing index=0 pos=5
+10-10 08:52:26.159  2260  2260 I flutter : B1G open index=1 format=ts try=0
+10-10 08:52:26.165  2260  5981 D CCodecBufferChannel: [c2.goldfish.h264.decoder#895] MediaCodec discarded an unknown buffer
+10-10 08:52:26.165  2260  5981 D CCodecBufferChannel: [c2.goldfish.h264.decoder#895] MediaCodec discarded an unknown buffer
+10-10 08:52:26.165  2260  5981 D CCodecBufferChannel: [c2.goldfish.h264.decoder#895] MediaCodec discarded an unknown buffer
+10-10 08:52:26.169  2260  5981 I MediaCodec: [c2.goldfish.h264.decoder] setting surface generation to 2314250
+10-10 08:52:26.192  2260  5978 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:52:26.216  2260  5981 D CCodecBufferChannel: [c2.goldfish.h264.decoder#895] MediaCodec discarded an unknown buffer
+10-10 08:52:26.218  2260  5981 D CCodecBufferChannel: [c2.goldfish.h264.decoder#895] MediaCodec discarded an unknown buffer
+10-10 08:52:26.218  2260  5981 D CCodecBufferChannel: [c2.goldfish.h264.decoder#895] MediaCodec discarded an unknown buffer
+10-10 08:52:26.218  2260  5981 D CCodecBufferChannel: [c2.goldfish.h264.decoder#895] MediaCodec discarded an unknown buffer
+10-10 08:52:26.238  2260  2260 I flutter : VideoOutput.Resize
+10-10 08:52:26.238  2260  2260 I flutter : {rect: {top: 0, left: 0, width: 1280, height: 720}, wid: 0, handle: 133321409355600, id: 6}
+10-10 08:52:26.254  2260  5981 D MediaCodec: flushMediametrics
+10-10 08:52:26.254  2260  5981 D MediaCodec: flushMediametrics
+10-10 08:52:26.254  2260  5981 W MediaCodec: no metrics handle found
+10-10 08:52:26.390  2260  2260 I flutter : B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+10-10 08:52:26.486  2260  2260 I flutter : B1G mpv: playlist: Reading plaintext playlist.
+10-10 08:52:27.011  2260  2260 I flutter : B1G engine: stream: Failed to open [address]
+10-10 08:52:27.011  2260  2260 I flutter : B1G engine: Failed to open [address]
+10-10 08:52:29.662  2260  2260 I flutter : B1G open failed
+10-10 08:52:29.663  2260  2260 I flutter : VideoOutput.Resize
+10-10 08:52:29.663  2260  2260 I flutter : {rect: {top: 0, left: 0, width: 1, height: 1}, wid: 0, handle: 133321409284560, id: 0}
+10-10 08:52:31.667  2260  2260 I flutter : B1G open index=1 format=m3u8 try=1
+10-10 08:52:31.687  2260  2260 I flutter : B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+10-10 08:52:31.891  2260  2260 I flutter : B1G mpv: playlist: Reading plaintext playlist.
+10-10 08:52:33.528  2260  2260 I flutter : B1G engine: lavf: Failed to create file cache.
+10-10 08:52:33.529  2260  2260 I flutter : B1G tracks audio=1 subtitles=0
+10-10 08:52:33.548  2260  2260 I flutter : B1G mpv: cplayer: (+) Video --vid=1 (h264 1280x720 25.000fps)
+10-10 08:52:33.548  2260  2260 I flutter : B1G mpv: cplayer: (+) Audio --aid=1 (aac 2ch 48000Hz)
+10-10 08:52:33.615  2260  6048 D com.b1g.b1gtv: PlayerBase::PlayerBase()
+10-10 08:52:33.615  2260  6048 D com.b1g.b1gtv: TrackPlayerBase::TrackPlayerBase()
+10-10 08:52:33.641  2260  2260 I flutter : B1G mpv: cplayer: AO: [opensles] 48000Hz stereo 2ch float
+10-10 08:52:33.642  2260  6061 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:52:33.644  2260  2260 I flutter : B1G mpv: cplayer: VO: [null] 1280x720 yuv420p
+10-10 08:52:33.666  2260  2260 I flutter : VideoOutput.Resize
+10-10 08:52:33.666  2260  2260 I flutter : {rect: {top: 0, left: 0, width: 1280, height: 720}, wid: 13102, handle: 133321409682384, id: 8}
+10-10 08:52:33.728  2260  6064 D MediaCodec: flushMediametrics
+10-10 08:52:33.728  2260  6064 I MediaCodec: [c2.goldfish.h264.decoder] setting surface generation to 2314251
+10-10 08:52:33.757  2260  6061 D com.b1g.b1gtv: PlayerBase::stop() from IPlayer
+10-10 08:52:57.664  2260  2260 I flutter : B1G open timed out
+10-10 08:52:57.664  2260  2260 I flutter : B1G direct mode did not start, back to standard mode
+10-10 08:52:59.675  2260  2260 I flutter : B1G open index=1 format=ts try=2
+10-10 08:53:01.667  2260  2260 I flutter : B1G engine close timed out
+10-10 08:53:03.676  2260  2260 I flutter : B1G engine close timed out
+10-10 08:53:03.734  2260  2260 I flutter : media_kit: Emulator detected.
+10-10 08:53:03.734  2260  2260 I flutter : media_kit: Enforcing S/W rendering.
+10-10 08:55:27.800  2260  2260 I flutter : B1G player closed
+10-10 08:55:31.802  2260  2260 I flutter : B1G engine close timed out
+10-10 08:55:33.230  2260  2260 I flutter : B1G browse vod categories=1
+10-10 08:55:33.230  2260  2260 I flutter : B1G browse vod items=1
+10-10 08:55:37.646  2260  2260 I flutter : B1G screen=movie details=false cast=false trailer=false
+10-10 08:55:40.678  2260  2260 I flutter : B1G open index=0 format=mp4 try=0
+10-10 08:55:40.698  2260  2260 I flutter : media_kit: Emulator detected.
+10-10 08:55:40.698  2260  2260 I flutter : media_kit: Enforcing S/W rendering.
+10-10 08:58:17.080  2260  2260 I flutter : B1G panel=options
+10-10 08:58:27.357  2260  2260 I flutter : B1G video mode=direct
+10-10 08:58:27.357  2260  2260 I flutter : B1G open index=0 format=mp4 try=0
+10-10 08:58:31.371  2260  2260 I flutter : B1G engine close timed out
+10-10 08:59:36.031  2260  2260 I flutter : B1G player closed
+10-10 08:59:40.032  2260  2260 I flutter : B1G engine close timed out
+10-10 08:59:49.045  2260  2260 I flutter : B1G screen=login
+10-10 09:00:00.097  2260  2260 I flutter : B1G login server-playlist id=1 type=xtream
+10-10 09:00:00.691  2260  2260 I flutter : B1G login ok mode=xtream
+10-10 09:00:00.692  2260  2260 I flutter : B1G screen=home
+10-10 09:00:04.220   506  1451 I ActivityManager: Force stopping com.b1g.b1gtv appid=10141 user=0: from pid 7438
+10-10 09:00:04.223   506  1451 I ActivityManager: Killing 2260:com.b1g.b1gtv/u0a141 (adj 0): stop com.b1g.b1gtv due to from pid 7438
+10-10 09:00:04.227   506  1451 W ActivityTaskManager: Force removing ActivityRecord{c31aad0 u0 com.b1g.b1gtv/.MainActivity t8 f}}: app died, no saved state
+10-10 09:00:04.228   800   833 V WindowManagerShell: Transition requested: android.os.BinderProxy@891060b TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=8 displayId=0 isRunning=false baseIntent=Intent { flg=0x10000000 cmp=com.b1g.b1gtv/.MainActivity } baseActivity=null topActivity=null origActivity=null realActivity=ComponentInfo{com.b1g.b1gtv/com.b1g.b1gtv.MainActivi
+10-10 09:00:04.269   506  1752 I WindowManager: WIN DEATH: Window{7231643 u0 com.b1g.b1gtv/com.b1g.b1gtv.MainActivity}
+10-10 09:00:04.270   506  1752 W InputManager-JNI: Input channel object '7231643 com.b1g.b1gtv/com.b1g.b1gtv.MainActivity (client)' was disposed without first being removed with the input manager!
+10-10 09:00:04.274   506  1034 I ImeTracker: com.b1g.b1gtv:c204bba3: onRequestHide at ORIGIN_SERVER_HIDE_INPUT reason HIDE_REMOVE_CLIENT
+10-10 09:00:04.278   506  1034 I ImeTracker: com.b1g.b1gtv:c204bba3: onCancelled at PHASE_SERVER_SHOULD_HIDE
+10-10 09:00:04.284   506  1677 V ActivityManager: Got obituary of 2260:com.b1g.b1gtv
+10-10 09:00:04.287   999   999 D CarrierSvcBindHelper: onHandleForceStop: [com.b1g.b1gtv]
+10-10 09:00:04.565   506   523 V WindowManager: Sent Transition #6 createdAt=10-10 09:00:04.227 via request=TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=8 displayId=0 isRunning=false baseIntent=Intent { flg=0x10000000 cmp=com.b1g.b1gtv/.MainActivity } baseActivity=null topActivity=null origActivity=null realActivity=ComponentInfo{com.b1g.b1gtv/com.b1g.b1gtv.MainActi
+10-10 09:00:04.569   506   523 V WindowManager:     info={id=6 t=CLOSE f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{RemoteToken{5e3d05c Task{c9c45ce #8 type=standard I=com.b1g.b1gtv/.MainActivity}}} m=CLOSE f=NONE leash=Surface(name=Task=8)/@0xbead130 sb=Rect(0, 0 - 1920, 1080) eb=Rect(0, 0 - 1920, 1080) d=0},{WCT{RemoteToken{b0608eb Task{27823aa #1 type=home}}} m=TO_FRONT f=SHOW_WALLPAPER leash=Surface(
+10-10 09:00:04.592   506   527 W WindowManager: Failed to deliver inset control state change to w=Window{7231643 u0 com.b1g.b1gtv/com.b1g.b1gtv.MainActivity EXITING}
+10-10 09:00:04.594   506   789 W WindowManager: Exception thrown during dispatchAppVisibility Window{7231643 u0 com.b1g.b1gtv/com.b1g.b1gtv.MainActivity EXITING}
+10-10 09:00:05.299   800   833 V WindowManagerShell: Transition requested: android.os.BinderProxy@646045f TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=9 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.b1g.b1gtv/.MainActivity } baseActivity=ComponentInfo{com.b1g.b1gtv/com.b1g.b1gtv.MainActivity} topActivity=ComponentInfo{com.b1g.b1gtv/com.b1g.b1g
+10-10 09:00:05.299   506   567 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.b1g.b1gtv/.MainActivity} with LAUNCH_SINGLE_TOP from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+10-10 09:00:05.308   506   537 I ActivityManager: Start proc 7454:com.b1g.b1gtv/u0a141 for next-top-activity {com.b1g.b1gtv/com.b1g.b1gtv.MainActivity}
+10-10 09:00:05.312   506   789 D CoreBackPreview: Window{ae39a6a u0 Splash Screen com.b1g.b1gtv}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@12e2ff8, mPriority=0, mIsAnimationCallback=false}
+10-10 09:00:05.354  7454  7454 I com.b1g.b1gtv: Using CollectorTypeCC GC.
+10-10 09:00:05.355  7454  7454 W com.b1g.b1gtv: Unexpected CPU variant for x86: x86_64.
+10-10 09:00:05.355  7454  7454 W com.b1g.b1gtv: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, tremont, kabylake, default
+10-10 09:00:05.356  7454  7454 E com.b1g.b1gtv: Not starting debugger since process cannot load the jdwp agent.
+10-10 09:00:05.370   506   523 V WindowManager: Sent Transition #7 createdAt=10-10 09:00:05.293 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=9 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.b1g.b1gtv/.MainActivity } baseActivity=ComponentInfo{com.b1g.b1gtv/com.b1g.b1gtv.MainActivity} topActivity=ComponentInfo{com.b1g.b1gtv/com.b1g.b
+10-10 09:00:05.371   506   523 V WindowManager:     info={id=7 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{RemoteToken{621c50d Task{38ea399 #9 type=standard I=com.b1g.b1gtv/.MainActivity}}} m=OPEN f=NONE leash=Surface(name=Task=9)/@0x5182cd1 sb=Rect(0, 0 - 1920, 1080) eb=Rect(0, 0 - 1920, 1080) d=0},{WCT{RemoteToken{b0608eb Task{27823aa #1 type=home}}} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(nam
+10-10 09:00:05.417  7454  7454 D nativeloader: Configuring clns-6 for other apk /data/app/~~yIPuxTRl41ji-wEO9RFQQQ==/com.b1g.b1gtv-GQh5lMcDIYMXMj12oLfkOg==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~yIPuxTRl41ji-wEO9RFQQQ==/com.b1g.b1gtv-GQh5lMcDIYMXMj12oLfkOg==/lib/x86_64:/data/app/~~yIPuxTRl41ji-wEO9RFQQQ==/com.b1g.b1gtv-GQh5lMcDIYMXMj12oLfkOg==/base.apk!/lib/x86_
+10-10 09:00:05.431  7454  7454 V GraphicsEnvironment: ANGLE GameManagerService for com.b1g.b1gtv: false
+10-10 09:00:05.431  7454  7454 V GraphicsEnvironment: com.b1g.b1gtv is not listed in per-application setting
+10-10 09:00:05.522  7454  7454 W com.b1g.b1gtv: type=1400 audit(0.0:18): avc:  denied  { read } for  name="max_map_count" dev="proc" ino=48251 scontext=u:r:untrusted_app:s0:c141,c256,c512,c768 tcontext=u:object_r:proc_max_map_count:s0 tclass=file permissive=0 app=com.b1g.b1gtv
+10-10 09:00:05.553  7454  7478 I flutter : [IMPORTANT:flutter/shell/platform/android/android_context_gl_impeller.cc(104)] Using the Impeller rendering backend (OpenGLES).
+10-10 09:00:05.571   506   567 D CoreBackPreview: Window{cf24496 u0 com.b1g.b1gtv/com.b1g.b1gtv.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@b051eb3, mPriority=0, mIsAnimationCallback=false}
+10-10 09:00:05.981  7454  7454 I flutter : B1G screen=home
+10-10 09:00:06.476   506   523 I ActivityTaskManager: Displayed com.b1g.b1gtv/.MainActivity for user 0: +1s184ms
+10-10 09:00:06.476   506   523 I ActivityTaskManager: Fully drawn com.b1g.b1gtv/.MainActivity: +1s184ms
+10-10 09:00:06.488   506   567 I ImeTracker: com.b1g.b1gtv:e0378b2a: onRequestHide at ORIGIN_SERVER_HIDE_INPUT reason HIDE_UNSPECIFIED_WINDOW
+10-10 09:00:06.488   506   567 I ImeTracker: com.b1g.b1gtv:e0378b2a: onCancelled at PHASE_SERVER_SHOULD_HIDE
+10-10 09:00:06.612   506  1677 D CoreBackPreview: Window{ae39a6a u0 Splash Screen com.b1g.b1gtv EXITING}: Setting back callback null
+10-10 09:00:06.613   506   567 W InputManager-JNI: Input channel object 'ae39a6a Splash Screen com.b1g.b1gtv (client)' was disposed without first being removed with the input manager!
+10-10 09:00:06.625  7454  7454 I flutter : B1G backend config server=set update=999 app=1
+10-10 09:00:06.627  7454  7454 I flutter : B1G update prompt version=999
+10-10 09:00:10.995  7454  7506 D ProfileInstaller: Skipping profile installation for com.b1g.b1gtv
+10-10 09:00:22.898  7454  7454 I flutter : B1G screen=login
+10-10 09:00:22.899  7454  7454 I flutter : B1G login mode=account (website)
+10-10 09:00:27.852  7454  7454 I flutter : B1G login ok mode=xtream
+10-10 09:00:27.895  7454  7454 I flutter : B1G screen=home
+10-10 09:00:41.264  7454  7454 I flutter : B1G update download start
+10-10 09:00:51.890  7454  7454 I flutter : B1G update downloaded bytes=36722686
+10-10 09:00:51.907   506   567 I ActivityTaskManager: START u0 {act=android.intent.action.VIEW dat=content://com.b1g.b1gtv.files/... typ=application/vnd.android.package-archive flg=0x10000001 cmp=com.android.packageinstaller/.InstallStart} with LAUNCH_MULTIPLE from uid 10141 (BAL_ALLOW_VISIBLE_WINDOW) result code=0
+10-10 09:00:51.912  7454  7454 I flutter : B1G update installer started=true allowed=false
+10-10 09:00:51.914   800   833 V WindowManagerShell: Transition requested: android.os.BinderProxy@47b83f8 TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=10 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.VIEW dat=content://com.b1g.b1gtv.files/... typ=application/vnd.android.package-archive flg=0x10800001 cmp=com.android.packageinstaller/.Instal
+10-10 09:00:52.180   506  1034 I ActivityTaskManager: START u0 {act=android.intent.action.VIEW dat=content://com.b1g.b1gtv.files/... typ=application/vnd.android.package-archive flg=0x2000001 cmp=com.android.packageinstaller/.InstallStaging (has extras)} with LAUNCH_MULTIPLE from uid 10066 (BAL_ALLOW_VISIBLE_WINDOW) result code=0
+10-10 09:00:53.501   506   523 V WindowManager: Sent Transition #8 createdAt=10-10 09:00:51.894 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=10 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.VIEW dat=content://com.b1g.b1gtv.files/... typ=application/vnd.android.package-archive flg=0x10800001 cmp=com.android.packageinstaller/.Inst
+10-10 09:00:54.414   800   833 V WindowManagerShell: Transition requested: android.os.BinderProxy@877873c TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=10 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.VIEW dat=content://com.b1g.b1gtv.files/... typ=application/vnd.android.package-archive flg=0x10800001 cmp=com.android.packageinstaller/.Instal
+10-10 09:00:55.258   506   523 V WindowManager: Sent Transition #9 createdAt=10-10 09:00:54.398 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=10 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.VIEW dat=content://com.b1g.b1gtv.files/... typ=application/vnd.android.package-archive flg=0x10800001 cmp=com.android.packageinstaller/.Inst

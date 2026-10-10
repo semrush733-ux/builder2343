@@ -1,0 +1,249 @@
+B1G screen=login
+B1G backend register hwid=yes mac=no
+B1G backend registered
+B1G backend config server=none update=0 app=1
+B1G login ok mode=xtream
+B1G screen=home
+B1G browse live categories=2
+B1G browse live items=5
+B1G open index=0 format=ts try=0
+B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+B1G mpv: playlist: Reading plaintext playlist.
+B1G engine: lavf: Failed to create file cache.
+B1G tracks audio=1 subtitles=0
+B1G mpv: cplayer: (+) Video --vid=1 (h264 1280x720 25.000fps)
+B1G mpv: cplayer: (+) Audio --aid=1 (aac 2ch 48000Hz)
+B1G mpv: cplayer: AO: [opensles] 48000Hz stereo 2ch float
+B1G mpv: cplayer: VO: [null] 1280x720 yuv420p
+B1G engine: vo/gpu/opengl: Could not create EGL context for GLES 2.x +!
+B1G engine: vo/gpu/opengl: Could not create a GL context.
+B1G engine: vo/gpu: Failed initializing any suitable GPU context!
+B1G engine: cplayer: Error opening/initializing the selected video_out (--vo) device.
+B1G engine: vo/gpu/opengl: Could not create EGL context for GLES 2.x +!
+B1G engine: vo/gpu/opengl: Could not create a GL context.
+B1G engine: vo/gpu: Failed initializing any suitable GPU context!
+B1G engine: cplayer: Error opening/initializing the VO window.
+B1G mpv: cplayer: Video: no video
+B1G ready index=0 format=ts video=1280x720 mode=gpu
+B1G playing index=0 pos=0
+B1G mpv: cplayer: Track switched:
+B1G mpv: cplayer: Video --vid=1 (h264 1280x720 25.000fps)
+B1G mpv: cplayer: (+) Audio --aid=1 (aac 2ch 48000Hz)
+B1G playing index=0 pos=5
+B1G playing index=0 pos=10
+B1G playing index=0 pos=15
+B1G playing index=0 pos=20
+B1G playing index=0 pos=25
+B1G panel=channels
+B1G panel=options
+B1G playing index=0 pos=30
+B1G playing index=0 pos=35
+B1G video mode=direct
+B1G open index=0 format=ts try=0
+B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+B1G mpv: playlist: Reading plaintext playlist.
+B1G engine: stream: Failed to open [address]
+B1G engine: Failed to open [address]
+B1G open failed
+B1G open index=0 format=ts try=1
+B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+B1G mpv: playlist: Reading plaintext playlist.
+B1G engine: lavf: Failed to create file cache.
+B1G tracks audio=1 subtitles=0
+B1G mpv: cplayer: (+) Video --vid=1 (h264 1280x720 25.000fps)
+B1G mpv: cplayer: (+) Audio --aid=1 (aac 2ch 48000Hz)
+B1G mpv: cplayer: AO: [opensles] 48000Hz stereo 2ch float
+B1G mpv: cplayer: VO: [null] 1280x720 yuv420p
+B1G mpv: vd: Using hardware decoding (mediacodec).
+B1G mpv: cplayer: VO: [mediacodec_embed] 1280x720 mediacodec
+B1G ready index=0 format=ts video=1280x720 mode=direct
+B1G playing index=0 pos=0
+B1G mpv: cplayer: Track switched:
+B1G mpv: cplayer: (+) Video --vid=1 (h264 1280x720 25.000fps)
+B1G mpv: cplayer: (+) Audio --aid=1 (aac 2ch 48000Hz)
+B1G playing index=0 pos=5
+B1G player closed
+B1G browse live categories=2
+B1G browse live items=5
+B1G browse vod categories=1
+B1G browse vod items=2
+B1G screen=movie details=true cast=true trailer=true
+B1G tmdb cast=4 stills=3 trailer=true
+B1G open index=0 format=mp4 try=0
+B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+B1G mpv: playlist: Reading plaintext playlist.
+B1G engine: lavf: Failed to create file cache.
+B1G tracks audio=2 subtitles=1
+B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+B1G mpv: cplayer: (+) Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+B1G mpv: cplayer: Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+B1G mpv: cplayer: AO: [opensles] 48000Hz stereo 2ch float
+B1G mpv: cplayer: VO: [null] 640x360 yuv420p
+B1G mpv: vd: Using hardware decoding (mediacodec).
+B1G mpv: cplayer: VO: [mediacodec_embed] 640x360 mediacodec
+B1G ready index=0 format=mp4 video=640x360 mode=direct
+B1G playing index=0 pos=0
+B1G mpv: cplayer: Track switched:
+B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+B1G mpv: cplayer: (+) Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+B1G mpv: cplayer: Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+B1G mpv: cplayer: Subs  --sid=1 --slang=eng (*) (mov_text)
+B1G playing index=0 pos=5
+B1G playing index=0 pos=10
+B1G panel=options
+B1G playing index=0 pos=15
+B1G audio track=urd
+B1G mpv: cplayer: Track switched:
+B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+B1G mpv: cplayer: Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+B1G mpv: cplayer: (+) Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+B1G mpv: cplayer: Subs  --sid=1 --slang=eng (*) (mov_text)
+B1G playing index=0 pos=20
+B1G subtitle track=eng
+B1G mpv: cplayer: Track switched:
+B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+B1G mpv: cplayer: Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+B1G mpv: cplayer: (+) Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+B1G playing index=0 pos=25
+B1G playing index=0 pos=30
+B1G playing index=0 pos=35
+B1G playing index=0 pos=100
+B1G paused
+B1G player closed
+B1G open index=0 format=mp4 try=0
+B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+B1G mpv: playlist: Reading plaintext playlist.
+B1G engine: lavf: Failed to create file cache.
+B1G tracks audio=2 subtitles=1
+B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+B1G mpv: cplayer: (+) Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+B1G mpv: cplayer: Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+B1G mpv: cplayer: AO: [opensles] 48000Hz stereo 2ch float
+B1G mpv: cplayer: VO: [null] 640x360 yuv420p
+B1G ready index=0 format=mp4 video=0x0 mode=direct
+B1G mpv: cplayer: Track switched:
+B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+B1G mpv: cplayer: Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+B1G mpv: cplayer: (+) Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+B1G mpv: cplayer: Track switched:
+B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+B1G mpv: cplayer: Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+B1G mpv: cplayer: (+) Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+B1G playing index=0 pos=0
+B1G mpv: vd: Using hardware decoding (mediacodec).
+B1G mpv: cplayer: VO: [mediacodec_embed] 640x360 mediacodec
+B1G playing index=0 pos=5
+B1G playing index=0 pos=10
+B1G playing index=0 pos=15
+B1G playing index=0 pos=20
+B1G playing index=0 pos=25
+B1G player closed
+B1G browse series categories=1
+B1G browse series items=1
+B1G series seasons=2
+B1G open index=0 format=mp4 try=0
+B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+B1G mpv: playlist: Reading plaintext playlist.
+B1G engine: lavf: Failed to create file cache.
+B1G tracks audio=2 subtitles=1
+B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+B1G mpv: cplayer: (+) Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+B1G mpv: cplayer: Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+B1G mpv: cplayer: AO: [opensles] 48000Hz stereo 2ch float
+B1G mpv: cplayer: VO: [null] 640x360 yuv420p
+B1G mpv: vd: Using hardware decoding (mediacodec).
+B1G mpv: cplayer: VO: [mediacodec_embed] 640x360 mediacodec
+B1G ready index=0 format=mp4 video=640x360 mode=direct
+B1G playing index=0 pos=0
+B1G mpv: cplayer: Track switched:
+B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+B1G mpv: cplayer: Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+B1G mpv: cplayer: (+) Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+B1G mpv: cplayer: Track switched:
+B1G mpv: cplayer: (+) Video --vid=1 (*) (h264 640x360 25.000fps)
+B1G mpv: cplayer: Audio --aid=1 --alang=eng (*) (aac 2ch 48000Hz)
+B1G mpv: cplayer: (+) Audio --aid=2 --alang=urd (aac 2ch 48000Hz)
+B1G mpv: cplayer: (+) Subs  --sid=1 --slang=eng (*) (mov_text)
+B1G playing index=0 pos=5
+B1G player closed
+B1G screen=device
+B1G screen=login
+B1G login failed: XtreamAuthException
+B1G login ok mode=xtream
+B1G screen=home
+B1G screen=login
+B1G login mode=m3u
+B1G login ok mode=m3u M3U playlist  ·  3 channels, 1 movie, 1 episode
+B1G screen=home
+B1G browse live categories=2
+B1G browse live items=3
+B1G open index=0 format=ts try=0
+B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+B1G mpv: playlist: Reading plaintext playlist.
+B1G engine: lavf: Failed to create file cache.
+B1G tracks audio=1 subtitles=0
+B1G mpv: cplayer: (+) Video --vid=1 (h264 1280x720 25.000fps)
+B1G mpv: cplayer: (+) Audio --aid=1 (aac 2ch 48000Hz)
+B1G mpv: cplayer: AO: [opensles] 48000Hz stereo 2ch float
+B1G mpv: cplayer: VO: [null] 1280x720 yuv420p
+B1G mpv: vd: Using hardware decoding (mediacodec).
+B1G mpv: cplayer: VO: [mediacodec_embed] 1280x720 mediacodec
+B1G ready index=0 format=ts video=1280x720 mode=direct
+B1G playing index=0 pos=0
+B1G mpv: cplayer: Track switched:
+B1G mpv: cplayer: (+) Video --vid=1 (h264 1280x720 25.000fps)
+B1G mpv: cplayer: (+) Audio --aid=1 (aac 2ch 48000Hz)
+B1G playing index=0 pos=5
+B1G open index=1 format=ts try=0
+B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+B1G mpv: playlist: Reading plaintext playlist.
+B1G engine: stream: Failed to open [address]
+B1G engine: Failed to open [address]
+B1G open failed
+B1G open index=1 format=m3u8 try=1
+B1G engine: media_kit: error: property not found _setProperty(osc, 1)
+B1G mpv: playlist: Reading plaintext playlist.
+B1G engine: lavf: Failed to create file cache.
+B1G tracks audio=1 subtitles=0
+B1G mpv: cplayer: (+) Video --vid=1 (h264 1280x720 25.000fps)
+B1G mpv: cplayer: (+) Audio --aid=1 (aac 2ch 48000Hz)
+B1G mpv: cplayer: AO: [opensles] 48000Hz stereo 2ch float
+B1G mpv: cplayer: VO: [null] 1280x720 yuv420p
+B1G open timed out
+B1G direct mode did not start, back to standard mode
+B1G open index=1 format=ts try=2
+B1G engine close timed out
+B1G engine close timed out
+B1G player closed
+B1G engine close timed out
+B1G browse vod categories=1
+B1G browse vod items=1
+B1G screen=movie details=false cast=false trailer=false
+B1G open index=0 format=mp4 try=0
+B1G panel=options
+B1G video mode=direct
+B1G open index=0 format=mp4 try=0
+B1G engine close timed out
+B1G player closed
+B1G engine close timed out
+B1G screen=login
+B1G login server-playlist id=1 type=xtream
+B1G login ok mode=xtream
+B1G screen=home
+B1G screen=home
+B1G backend config server=set update=999 app=1
+B1G update prompt version=999
+B1G screen=login
+B1G login mode=account (website)
+B1G login ok mode=xtream
+B1G screen=home
+B1G update download start
+B1G update downloaded bytes=36722686
+B1G update installer started=true allowed=false

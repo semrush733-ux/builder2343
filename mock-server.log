@@ -1,0 +1,95 @@
+mock IPTV server on port 8787, media in /home/runner/work/builder2343/builder2343/ci/media
+POST /wp-json/b1g/v1/device/register fields=hwid,platform
+08:34:54 "POST /wp-json/b1g/v1/device/register HTTP/1.1" 200 -
+08:34:54 "GET /wp-json/b1g/v1/device/status?device_id=B1G-TEST01&pairing_code=123456 HTTP/1.1" 200 -
+08:34:54 "GET /wp-json/b1g/v1/app/config?platform=android-tv&version_code=1&device_id=B1G-TEST01 HTTP/1.1" 200 -
+08:34:54 "GET /wp-json/b1g/v1/device/playlists?device_id=B1G-TEST01&pairing_code=123456 HTTP/1.1" 200 -
+08:34:59 "GET /player_api.php?username=demo&password=demo HTTP/1.1" 200 -
+08:35:03 "GET /player_api.php?username=demo&password=demo&action=get_live_categories HTTP/1.1" 200 -
+08:35:04 "GET /player_api.php?username=demo&password=demo&action=get_live_streams HTTP/1.1" 200 -
+08:35:04 "GET /logo.png HTTP/1.1" 200 -
+08:35:09 "GET /logo.png HTTP/1.1" 200 -
+LIVE open
+08:35:09 "GET /live/demo/demo/1.ts HTTP/1.1" 200 -
+08:35:11 "GET /player_api.php?username=demo&password=demo&action=get_short_epg&stream_id=1&limit=4 HTTP/1.1" 200 -
+LIVE refused: max connections
+08:35:48 "GET /live/demo/demo/1.ts HTTP/1.1" 403 -
+LIVE close after 4587520 bytes
+LIVE open
+08:35:53 "GET /live/demo/demo/1.ts HTTP/1.1" 200 -
+LIVE close after 1294336 bytes
+08:39:08 "GET /wp-json/b1g/v1/device/playlists?device_id=B1G-TEST01&pairing_code=123456 HTTP/1.1" 200 -
+08:39:16 "GET /wp-json/b1g/v1/device/playlists?device_id=B1G-TEST01&pairing_code=123456 HTTP/1.1" 200 -
+08:47:16 "GET /wp-json/b1g/v1/device/playlists?device_id=B1G-TEST01&pairing_code=123456 HTTP/1.1" 200 -
+08:47:17 "GET /wp-json/b1g/v1/device/playlists?device_id=B1G-TEST01&pairing_code=123456 HTTP/1.1" 200 -
+08:48:32 "GET /player_api.php?username=demo&password=demo&action=get_live_categories HTTP/1.1" 200 -
+08:48:32 "GET /player_api.php?username=demo&password=demo&action=get_live_streams HTTP/1.1" 200 -
+08:48:59 "GET /player_api.php?username=demo&password=demo&action=get_vod_categories HTTP/1.1" 200 -
+08:49:00 "GET /player_api.php?username=demo&password=demo&action=get_vod_streams HTTP/1.1" 200 -
+08:49:01 "GET /poster.jpg HTTP/1.1" 200 -
+08:49:04 "GET /poster.jpg HTTP/1.1" 200 -
+08:49:04 "GET /player_api.php?username=demo&password=demo&action=get_vod_info&vod_id=10 HTTP/1.1" 200 -
+08:49:05 "GET /3/search/movie?api_key=test&query=Test+Movie&year=2026 HTTP/1.1" 200 -
+08:49:05 "GET /3/movie/555?api_key=test&append_to_response=credits%2Cvideos%2Cimages&include_image_language=en%2Cnull HTTP/1.1" 200 -
+08:49:06 "GET /t/p/w185/p1.jpg HTTP/1.1" 200 -
+08:49:06 "GET /t/p/w185/p2.jpg HTTP/1.1" 200 -
+08:49:06 "GET /t/p/w780/s3.jpg HTTP/1.1" 200 -
+08:49:06 "GET /t/p/w185/p4.jpg HTTP/1.1" 200 -
+08:49:06 "GET /t/p/w780/s1.jpg HTTP/1.1" 200 -
+08:49:06 "GET /t/p/w780/s2.jpg HTTP/1.1" 200 -
+08:49:12 "GET /t/p/w780/s1.jpg HTTP/1.1" 200 -
+08:49:17 "GET /poster.jpg HTTP/1.1" 200 -
+08:49:17 "GET /movie/demo/demo/10.mp4 HTTP/1.1" 206 -
+08:49:18 "GET /movie/demo/demo/10.mp4 HTTP/1.1" 206 -
+08:49:18 "GET /movie/demo/demo/10.mp4 HTTP/1.1" 206 -
+08:49:38 "GET /movie/demo/demo/10.mp4 HTTP/1.1" 206 -
+08:49:42 "GET /movie/demo/demo/10.mp4 HTTP/1.1" 206 -
+08:50:14 "GET /movie/demo/demo/10.mp4 HTTP/1.1" 206 -
+08:50:15 "GET /movie/demo/demo/10.mp4 HTTP/1.1" 206 -
+08:50:15 "GET /movie/demo/demo/10.mp4 HTTP/1.1" 206 -
+08:50:15 "GET /movie/demo/demo/10.mp4 HTTP/1.1" 206 -
+08:50:15 "GET /movie/demo/demo/10.mp4 HTTP/1.1" 206 -
+08:50:50 "GET /player_api.php?username=demo&password=demo&action=get_series_categories HTTP/1.1" 200 -
+08:50:51 "GET /player_api.php?username=demo&password=demo&action=get_series HTTP/1.1" 200 -
+08:50:55 "GET /poster.jpg HTTP/1.1" 200 -
+08:50:55 "GET /player_api.php?username=demo&password=demo&action=get_series_info&series_id=20 HTTP/1.1" 200 -
+08:50:58 "GET /series/demo/demo/31.mp4 HTTP/1.1" 206 -
+08:50:59 "GET /series/demo/demo/31.mp4 HTTP/1.1" 206 -
+08:51:00 "GET /series/demo/demo/31.mp4 HTTP/1.1" 206 -
+08:51:28 "GET /wp-json/b1g/v1/device/playlists?device_id=B1G-TEST01&pairing_code=123456 HTTP/1.1" 200 -
+08:51:38 "GET /player_api.php?username=demo&password=nope HTTP/1.1" 200 -
+08:51:46 "GET /player_api.php?username=demo&password=demo HTTP/1.1" 200 -
+08:51:56 "GET /wp-json/b1g/v1/device/playlists?device_id=B1G-TEST01&pairing_code=123456 HTTP/1.1" 200 -
+08:52:08 "GET /playlist.m3u HTTP/1.1" 200 -
+LIVE open
+08:52:17 "GET /live/demo/demo/1.ts HTTP/1.1" 200 -
+LIVE close after 1261568 bytes
+08:52:26 "GET /live/demo/demo/2.ts HTTP/1.1" 404 -
+08:52:32 "GET /live/demo/demo/2.m3u8 HTTP/1.1" 200 -
+08:52:32 "GET /live/demo/demo/2.m3u8 HTTP/1.1" 200 -
+08:52:33 "GET /hls/seg000.ts HTTP/1.1" 206 -
+08:52:33 "GET /hls/seg001.ts HTTP/1.1" 206 -
+08:52:33 "GET /hls/seg002.ts HTTP/1.1" 206 -
+08:52:33 "GET /hls/seg003.ts HTTP/1.1" 206 -
+08:52:34 "GET /hls/seg004.ts HTTP/1.1" 206 -
+08:52:34 "GET /hls/seg005.ts HTTP/1.1" 206 -
+08:52:34 "GET /hls/seg006.ts HTTP/1.1" 206 -
+08:52:34 "GET /hls/seg007.ts HTTP/1.1" 206 -
+08:52:34 "GET /hls/seg008.ts HTTP/1.1" 206 -
+08:52:34 "GET /hls/seg009.ts HTTP/1.1" 206 -
+08:52:34 "GET /hls/seg010.ts HTTP/1.1" 206 -
+08:52:34 "GET /hls/seg011.ts HTTP/1.1" 206 -
+08:52:34 "GET /hls/seg012.ts HTTP/1.1" 206 -
+08:52:35 "GET /hls/seg013.ts HTTP/1.1" 206 -
+08:52:35 "GET /hls/seg014.ts HTTP/1.1" 206 -
+08:55:37 "GET /3/search/movie?api_key=test&query=M3U+Movie HTTP/1.1" 200 -
+08:59:42 "GET /test/site-lists-on HTTP/1.1" 200 -
+08:59:49 "GET /wp-json/b1g/v1/device/playlists?device_id=B1G-TEST01&pairing_code=123456 HTTP/1.1" 200 -
+09:00:00 "GET /player_api.php?username=demo&password=demo HTTP/1.1" 200 -
+09:00:04 "GET /test/config-on HTTP/1.1" 200 -
+09:00:06 "GET /wp-json/b1g/v1/device/status?device_id=B1G-TEST01&pairing_code=123456 HTTP/1.1" 200 -
+09:00:06 "GET /wp-json/b1g/v1/app/config?platform=android-tv&version_code=1&device_id=B1G-TEST01 HTTP/1.1" 200 -
+09:00:06 "GET /player_api.php?username=demo&password=demo HTTP/1.1" 200 -
+09:00:23 "GET /wp-json/b1g/v1/device/playlists?device_id=B1G-TEST01&pairing_code=123456 HTTP/1.1" 200 -
+09:00:27 "GET /player_api.php?username=demo&password=demo HTTP/1.1" 200 -
+09:00:41 "GET /app/B1G.apk HTTP/1.1" 200 -
