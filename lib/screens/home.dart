@@ -419,12 +419,58 @@ class _BigTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 54, color: C.accent),
+            _FloatIcon(icon: icon),
             const Spacer(),
             Text(title, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
             Text(subtitle, style: const TextStyle(fontSize: 14, color: C.dim)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The tile's icon in a rounded badge that floats gently up and down,
+/// so the home boxes feel alive without being distracting.
+class _FloatIcon extends StatefulWidget {
+  const _FloatIcon({required this.icon});
+  final IconData icon;
+
+  @override
+  State<_FloatIcon> createState() => _FloatIconState();
+}
+
+class _FloatIconState extends State<_FloatIcon> with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (context, child) {
+          final t = Curves.easeInOut.transform(_c.value);
+          return Transform.translate(offset: Offset(0, -7 * t), child: child);
+        },
+        child: Container(
+          width: 78,
+          height: 78,
+          decoration: BoxDecoration(
+            color: const Color(0x14FFFFFF),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [
+              BoxShadow(color: Color(0x2EFFC400), blurRadius: 26, offset: Offset(0, 12)),
+            ],
+          ),
+          child: Icon(widget.icon, size: 46, color: C.accent),
         ),
       ),
     );

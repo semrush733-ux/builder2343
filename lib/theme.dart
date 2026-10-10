@@ -47,26 +47,31 @@ class Logo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The brand logo (white-text variant for the dark UI). If the asset ever
-    // fails to load, the old wordmark appears instead of a blank space.
-    return Image.asset(
-      'assets/logo.png',
-      height: size * 1.7,
-      filterQuality: FilterQuality.medium,
-      errorBuilder: (_, __, ___) => Container(
-        padding: EdgeInsets.symmetric(horizontal: size * 0.32, vertical: size * 0.06),
-        decoration: BoxDecoration(color: C.accent, borderRadius: BorderRadius.circular(size * 0.22)),
-        child: Text(
-          'B1G',
+    // Brand wordmark: "Cloud TV".
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Cloud',
           style: TextStyle(
-            color: Colors.black,
+            color: C.text,
+            fontSize: size,
+            height: 1.15,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -size * 0.02,
+          ),
+        ),
+        SizedBox(width: size * 0.22),
+        Text(
+          'TV',
+          style: TextStyle(
+            color: C.accent,
             fontSize: size,
             height: 1.15,
             fontWeight: FontWeight.w900,
-            letterSpacing: size * 0.02,
           ),
         ),
-      ),
+      ],
     );
   }
 }
