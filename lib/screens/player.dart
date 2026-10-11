@@ -118,6 +118,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   // thing to the right" of a button left of the middle, and the bar lost the remote.
   final FocusNode _focus = FocusNode(debugLabel: 'player', skipTraversal: true);
   final FocusNode _mainButton = FocusNode(debugLabel: 'player-main-button');
+  // Movies: the time bar above the buttons. Up from the buttons lands here, Left / Right jump.
+  // skipTraversal keeps it out of the button-by-button Left / Right of the bar.
+  final FocusNode _timelineNode = FocusNode(debugLabel: 'player-timeline', skipTraversal: true);
   String _buttonLabel = '';
   String _videoSize = '';
 
@@ -269,6 +272,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     log('player closed');
     _keepScreenOn(false);
     _mainButton.dispose();
+    _timelineNode.dispose();
     _focus.dispose();
     super.dispose();
   }
@@ -1153,12 +1157,32 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (_onControls) {
       // The focused button gets OK. Any key keeps the bar on screen.
       if (down) _showOverlay();
+      final left = k == LogicalKeyboardKey.arrowLeft;
+      final right = k == LogicalKeyboardKey.arrowRight;
+      // On the time bar: Left / Right jump back / forward, OK pauses, Down goes back to the buttons.
+      if (_timelineNode.hasPrimaryFocus) {
+        if (up) return KeyEventResult.handled;
+        if (left || right) {
+          _seek(right ? 1 : -1);
+        } else if (k == LogicalKeyboardKey.arrowDown) {
+          if (down) _mainButton.requestFocus();
+        } else if (_isOk(k)) {
+          if (down) _togglePause();
+        } else {
+          return KeyEventResult.ignored;
+        }
+        return KeyEventResult.handled;
+      }
+      // Movies: Up from the buttons goes to the time bar.
+      if (!up && k == LogicalKeyboardKey.arrowUp && !widget.live && _duration > Duration.zero) {
+        if (down) _timelineNode.requestFocus();
+        return KeyEventResult.handled;
+      }
       // Left / Right step along the bar here, button by button. Leaving it to Flutter's
       // "nearest thing in that direction" search could get stuck on the big Pause button.
-      if (!up && (k == LogicalKeyboardKey.arrowRight || k == LogicalKeyboardKey.arrowLeft)) {
+      if (!up && (left || right)) {
         final current = FocusManager.instance.primaryFocus;
         if (current != null) {
-          final right = k == LogicalKeyboardKey.arrowRight;
           final moved = right ? current.nextFocus() : current.previousFocus();
           if (!moved) current.focusInDirection(right ? TraversalDirection.right : TraversalDirection.left);
         }
@@ -1559,18 +1583,25 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       children: [
         Text(formatTime(position), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
         Expanded(
-          child: ExcludeFocus(
+          child: Focus(
+            focusNode: _timelineNode,
+            onFocusChange: (has) {
+              if (has) _buttonLabel = 'Left / Right to jump back or forward, Down for the buttons';
+              if (mounted) setState(() {});
+            },
             child: SliderTheme(
               data: SliderTheme.of(context).copyWith(
-                trackHeight: 5,
                 activeTrackColor: C.accent,
                 inactiveTrackColor: const Color(0x44FFFFFF),
                 thumbColor: C.accent,
-                overlayColor: const Color(0x33FFC400),
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-                overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
+                trackHeight: _timelineNode.hasPrimaryFocus ? 8 : 5,
+                thumbShape: RoundSliderThumbShape(enabledThumbRadius: _timelineNode.hasPrimaryFocus ? 12 : 7),
+                overlayShape: RoundSliderOverlayShape(overlayRadius: _timelineNode.hasPrimaryFocus ? 22 : 18),
+                overlayColor: _timelineNode.hasPrimaryFocus ? const Color(0x66FFC400) : const Color(0x33FFC400),
               ),
-              child: Slider(
+              // The slider itself never takes the remote: the time bar's own focus does.
+              child: ExcludeFocus(
+                child: Slider(
                 value: value,
                 onChangeStart: known
                     ? (_) {
@@ -1585,6 +1616,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                         _commitSeek(duration * v);
                       }
                     : null,
+              ),
               ),
             ),
           ),
