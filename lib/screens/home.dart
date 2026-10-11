@@ -12,6 +12,7 @@ import 'browse.dart';
 import 'catchup.dart';
 import 'device.dart';
 import 'login.dart';
+import 'settings.dart';
 import 'update_web.dart' if (dart.library.io) 'update.dart';
 
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -331,6 +332,22 @@ class _HomeScreenState extends State<HomeScreen> {
                         Icon(Icons.playlist_play_rounded, size: 18, color: C.dim),
                         SizedBox(width: 8),
                         Text('Playlists', style: TextStyle(fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TvFocus(
+                  onTap: () => Navigator.of(context)
+                      .push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen())),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.settings_rounded, size: 18, color: C.dim),
+                        SizedBox(width: 8),
+                        Text('Settings', style: TextStyle(fontSize: 14)),
                       ],
                     ),
                   ),

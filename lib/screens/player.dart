@@ -63,8 +63,6 @@ String formatOfUrl(String url) {
 const _fits = [BoxFit.contain, BoxFit.cover, BoxFit.fill];
 const _fitNames = ['Fit', 'Fill', 'Stretch'];
 const _speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
-const _videoModes = ['gpu', 'direct'];
-const _videoModeNames = ['Standard', 'Direct'];
 
 /// Full-screen player.
 ///
@@ -187,7 +185,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   void initState() {
     super.initState();
     _index = widget.index < 0 || widget.index >= widget.entries.length ? 0 : widget.index;
-    _engineName = ExoEngine.available ? Store.engine : 'mpv';
+    _resetEngine();
     WidgetsBinding.instance.addObserver(this);
     _keepScreenOn(true);
     _watchdog = Timer.periodic(const Duration(seconds: 2), (_) => _checkHealth());
@@ -481,6 +479,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _lastPosition = Duration.zero;
     if (_index < widget.entries.length - 1) {
       _index++;
+      _resetEngine();
       _urlIndex = 0;
       _fails = 0;
       _playedThisUrl = false;
@@ -489,6 +488,30 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _accepting = false;
       _close();
     }
+  }
+
+  /// Moves this video to the other player, once per video. False when that was done already.
+  bool _switchEngine() {
+    if (!ExoEngine.available || _engineSwitched) return false;
+    _engineSwitched = true;
+    _engineName = _engineName == 'exo' ? 'mpv' : 'exo';
+    log('switching engine to $_engineName');
+    _fails = 0;
+    _urlIndex = 0;
+    _playedThisUrl = false;
+    setState(() => _status = 'Trying the other player…');
+    _retryTimer?.cancel();
+    _retryTimer = Timer(const Duration(milliseconds: 600), () {
+      if (mounted && !_suspended) _open(startAt: widget.live ? null : _lastPosition);
+    });
+    return true;
+  }
+
+  /// Every new video (next channel, next episode) starts on the customer's player again,
+  /// even when the previous one had to move to the other player.
+  void _resetEngine() {
+    _engineName = ExoEngine.available ? Store.engine : 'mpv';
+    _engineSwitched = false;
   }
 
   void _failed({bool countsAsFailure = true}) {
@@ -505,23 +528,13 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         _playedThisUrl = false;
       }
     }
+    // The first player could not start this video at all (every address tried): hand it to the
+    // other player straight away instead of retrying, so the picture comes quickly.
+    if (_fails >= 3 && !_playedThisUrl && _switchEngine()) return;
     if (_fails > _maxFails) {
       log('gave up index=$_index');
       // This engine gave up: let the other engine try once before showing the error.
-      if (ExoEngine.available && !_engineSwitched) {
-        _engineSwitched = true;
-        _engineName = _engineName == 'exo' ? 'mpv' : 'exo';
-        log('switching engine to $_engineName');
-        _fails = 0;
-        _urlIndex = 0;
-        _playedThisUrl = false;
-        setState(() => _status = 'Trying the other player…');
-        _retryTimer?.cancel();
-        _retryTimer = Timer(const Duration(seconds: 1), () {
-          if (mounted && !_suspended) _open(startAt: widget.live ? null : _lastPosition);
-        });
-        return;
-      }
+      if (_switchEngine()) return;
       if (!_focus.hasPrimaryFocus) _focus.requestFocus();
       setState(() {
         _dead = true;
@@ -775,19 +788,6 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _open(startAt: widget.live ? null : _position);
   }
 
-  void _chooseVideoMode(int index) {
-    if (Store.videoMode == _videoModes[index]) return;
-    Store.setVideoMode(_videoModes[index]);
-    log('video mode=${_videoModes[index]}');
-    _reopenHere();
-  }
-
-  /// The control-bar button flips between Direct and Standard directly.
-  void _cycleVideoMode() {
-    final next = (_videoModes.indexOf(Store.videoMode) + 1) % _videoModes.length;
-    _chooseVideoMode(next);
-  }
-
   void _chooseFit(int fit) {
     _fit = fit;
     log('fit=${_fitNames[fit]}');
@@ -849,24 +849,6 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                 selected: _fit,
                 onTap: (i) => pick(() => _chooseFit(i)),
               ),
-              if (ExoEngine.available) ...[
-                const _PanelHeading('Player'),
-                _PanelChips(
-                  labels: const ['ExoPlayer', 'MPV'],
-                  selected: _engineName == 'exo' ? 0 : 1,
-                  onTap: (i) => pick(() => _chooseEngine(i == 0 ? 'exo' : 'mpv')),
-                ),
-                const _PanelNote('ExoPlayer uses the TV\'s own video chip. Try MPV if a channel will not play.'),
-              ],
-              if (_engineName == 'mpv') ...[
-                const _PanelHeading('Video mode'),
-                _PanelChips(
-                  labels: _videoModeNames,
-                  selected: _videoModes.indexOf(Store.videoMode),
-                  onTap: (i) => pick(() => _chooseVideoMode(i)),
-                ),
-                const _PanelNote('Direct is lighter for TV sticks. Use Standard if a video shows no picture.'),
-              ],
             ],
           );
         },
@@ -1000,6 +982,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   void _tuneTo(int index) {
     _zapTimer?.cancel();
     _saveResume();
+    _resetEngine();
     setState(() {
       _index = index;
       _zapTarget = null;
@@ -1126,17 +1109,6 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (mounted) Navigator.of(context).pop();
   }
 
-  /// The customer's engine choice: remembered, and the stream reopens at the same place.
-  void _chooseEngine(String name) {
-    if (!ExoEngine.available || name == _engineName) return;
-    _engineName = name;
-    _engineSwitched = false;
-    Store.setEngine(name);
-    log('engine=$name');
-    _reopenHere();
-  }
-
-  void _cycleEngine() => _chooseEngine(_engineName == 'exo' ? 'mpv' : 'exo');
 
   bool _isOk(LogicalKeyboardKey k) =>
       k == LogicalKeyboardKey.select ||
@@ -1439,11 +1411,6 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _button(Icons.audiotrack_rounded, 'Audio language', _openOptions, node: widget.live && !many ? _mainButton : null),
       _button(Icons.closed_caption_rounded, 'Subtitles', _openOptions),
       _button(Icons.aspect_ratio_rounded, 'Picture: ${_fitNames[_fit]}', _cycleFit),
-      if (ExoEngine.available)
-        _button(Icons.smart_display_rounded, 'Player: ${_engineName == 'exo' ? 'ExoPlayer' : 'MPV'}', _cycleEngine),
-      if (_engineName == 'mpv')
-        _button(Icons.memory_rounded,
-            'Video mode: ${_videoModeNames[_videoModes.indexOf(Store.videoMode)]}', _cycleVideoMode),
       _button(Icons.high_quality_rounded, 'Quality', _openQuality),
       if (!widget.live) _button(Icons.speed_rounded, 'Speed ${_speed}x', _openOptions),
       if (widget.live && item != null)
