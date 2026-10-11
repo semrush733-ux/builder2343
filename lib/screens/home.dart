@@ -367,12 +367,34 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 16),
             Row(
               children: [
-                const Expanded(
-                  child: Text('Hold OK on a channel or title to add it to Favourites.',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: C.dim, fontSize: 13)),
-                ),
+                if (Backend.deviceId.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xCC11141B),
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: const Color(0x22FFFFFF)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.tv_rounded, size: 15, color: C.accent),
+                        const SizedBox(width: 8),
+                        const Text('Device ID  ', style: TextStyle(fontSize: 12.5, color: C.dim)),
+                        Text(Backend.deviceId,
+                            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                        if (Backend.pairingCode.isNotEmpty) ...[
+                          Container(
+                              width: 1, height: 14, margin: const EdgeInsets.symmetric(horizontal: 12), color: C.dim),
+                          const Text('Device Key  ', style: TextStyle(fontSize: 12.5, color: C.dim)),
+                          Text(Backend.pairingCode,
+                              style: const TextStyle(
+                                  fontSize: 13.5, fontWeight: FontWeight.w800, color: C.accent, letterSpacing: 0.5)),
+                        ],
+                      ],
+                    ),
+                  ),
+                const Spacer(),
                 const SizedBox(width: 12),
                 if (Backend.updateAvailable) ...[
                   TvFocus(
@@ -434,7 +456,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _BigTile extends StatelessWidget {
+class _BigTile extends StatefulWidget {
   const _BigTile({
     required this.icon,
     required this.title,
@@ -454,27 +476,54 @@ class _BigTile extends StatelessWidget {
   final bool autofocus;
 
   @override
+  State<_BigTile> createState() => _BigTileState();
+}
+
+/// The box the remote is on leans a little towards the viewer (a light 3D tilt) and grows a
+/// touch; the others stand straight.
+class _BigTileState extends State<_BigTile> {
+  bool _focused = false;
+
+  @override
   Widget build(BuildContext context) {
-    return TvFocus(
-      autofocus: autofocus,
-      radius: 18,
-      color: colors.last,
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(15),
-          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors),
-        ),
-        padding: const EdgeInsets.all(26),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _FloatIcon(icon: icon, order: order),
-            const Spacer(),
-            Text(title, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 4),
-            Text(subtitle, style: const TextStyle(fontSize: 14, color: C.dim)),
-          ],
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onFocusChange: (f) => setState(() => _focused = f),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(end: _focused ? 1 : 0),
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        builder: (context, t, child) {
+          final m = Matrix4.identity()
+            ..setEntry(3, 2, 0.0012)
+            ..rotateX(0.06 * t)
+            ..rotateY(-0.14 * t)
+            ..scaleByDouble(1 + 0.04 * t, 1 + 0.04 * t, 1, 1);
+          return Transform(alignment: Alignment.center, transform: m, child: child);
+        },
+        child: TvFocus(
+          autofocus: widget.autofocus,
+          radius: 18,
+          color: widget.colors.last,
+          onTap: widget.onTap,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(15),
+              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: widget.colors),
+            ),
+            padding: const EdgeInsets.all(26),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _FloatIcon(icon: widget.icon, order: widget.order),
+                const Spacer(),
+                Text(widget.title, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                Text(widget.subtitle, style: const TextStyle(fontSize: 14, color: C.dim)),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -494,13 +543,11 @@ class _FloatIcon extends StatefulWidget {
   State<_FloatIcon> createState() => _FloatIconState();
 }
 
-/// A 3D icon: it flies in from a corner of the screen spinning, then floats, sways in depth
-/// and turns a full circle every few seconds. Each tile is a little out of step with the others.
+/// A 3D icon: it flies in from a corner of the screen spinning, once, and then stays still.
 class _FloatIconState extends State<_FloatIcon> with TickerProviderStateMixin {
   static const _corners = [Offset(-150, -130), Offset(150, -130), Offset(-150, 130), Offset(150, 130)];
 
   late final AnimationController _enter = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500));
-  late final AnimationController _loop = AnimationController(vsync: this, duration: const Duration(milliseconds: 6000));
 
   @override
   void initState() {
@@ -508,16 +555,12 @@ class _FloatIconState extends State<_FloatIcon> with TickerProviderStateMixin {
     Future<void>.delayed(Duration(milliseconds: 150 + widget.order * 220), () {
       if (!mounted) return;
       _enter.forward();
-      // Start the loop at a different phase per tile, so the four do not move in step.
-      _loop.value = (widget.order * 0.23) % 1.0;
-      _loop.repeat();
     });
   }
 
   @override
   void dispose() {
     _enter.dispose();
-    _loop.dispose();
     super.dispose();
   }
 
@@ -568,7 +611,7 @@ class _FloatIconState extends State<_FloatIcon> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: AnimatedBuilder(
-        animation: Listenable.merge([_enter, _loop]),
+        animation: _enter,
         builder: (context, child) {
           // Fly in: from the corner, small, spinning on two axes, settling with a small overshoot.
           final e = Curves.easeOutBack.transform(_enter.value);
@@ -579,21 +622,11 @@ class _FloatIconState extends State<_FloatIcon> with TickerProviderStateMixin {
           final enterSpinX = (1 - e) * math.pi / 2;
           final scale = 0.3 + 0.7 * e;
 
-          // Then: float up and down, sway in depth, and one full turn near the end of each cycle.
-          final t = _loop.value;
-          final wave = math.sin(t * 2 * math.pi);
-          final float = -8 * (0.5 + 0.5 * wave);
-          var turnY = 0.32 * math.sin(t * 4 * math.pi);
-          if (t > 0.78) {
-            turnY += Curves.easeInOutCubic.transform((t - 0.78) / 0.22) * 2 * math.pi;
-          }
-          final tiltX = 0.12 * math.cos(t * 2 * math.pi);
-
           final m = Matrix4.identity()
             ..setEntry(3, 2, 0.0016) // perspective
-            ..translateByDouble(fly.dx, fly.dy + float * _enter.value, 0, 1)
-            ..rotateY(enterSpinY + turnY * _enter.value)
-            ..rotateX(enterSpinX + tiltX * _enter.value)
+            ..translateByDouble(fly.dx, fly.dy, 0, 1)
+            ..rotateY(enterSpinY)
+            ..rotateX(enterSpinX)
             ..scaleByDouble(scale, scale, scale, 1);
           return Opacity(
             opacity: fade,
