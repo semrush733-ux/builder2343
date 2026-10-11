@@ -196,9 +196,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           FILES=""
-          if [ -f out/B1G.apk ]; then FILES="out/B1G.apk"; fi
-          TITLE="B1G - build #$BUILD_NUMBER"
-          if [ -z "$FILES" ]; then TITLE="B1G - build #$BUILD_NUMBER FAILED (APK below is from an earlier build)"; fi
+          # CloudPlayer.apk is the name to share; B1G.apk stays for links already handed out.
+          if [ -f out/B1G.apk ]; then cp out/B1G.apk out/CloudPlayer.apk; FILES="out/CloudPlayer.apk out/B1G.apk"; fi
+          TITLE="Cloud Player - build #$BUILD_NUMBER"
+          if [ -z "$FILES" ]; then TITLE="Cloud Player - build #$BUILD_NUMBER FAILED (APK below is from an earlier build)"; fi
           publish() {
             if gh release view b1g-latest >/dev/null 2>&1; then
               if [ -n "$FILES" ]; then gh release upload b1g-latest $FILES --clobber || return 1; fi

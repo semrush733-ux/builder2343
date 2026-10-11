@@ -123,6 +123,9 @@ class Tmdb {
   static bool get enabled => kTmdbKey.isNotEmpty;
   static final Map<String, TmdbMovie?> _cache = {};
 
+  /// Forgets every looked-up film (used by "Clear app cache" on the website).
+  static void clearCache() => _cache.clear();
+
   static Future<dynamic> _get(String path, Map<String, String> query) async {
     final uri = Uri.parse('$kTmdbBase$path').replace(queryParameters: {'api_key': kTmdbKey, ...query});
     final res = await http.get(uri, headers: const {'Accept': 'application/json'}).timeout(const Duration(seconds: 12));

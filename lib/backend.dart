@@ -3,12 +3,14 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 import 'package:flutter/foundation.dart' show ValueNotifier;
+import 'package:flutter/painting.dart' show PaintingBinding;
 import 'package:flutter/services.dart' show MethodChannel;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
 import 'theme.dart' show log;
+import 'tmdb.dart' show Tmdb;
 
 /// Address of the B1G website backend (WordPress plugin "B1G App Platform").
 /// Override at build time with --dart-define=B1G_API_BASE=https://yoursite.com/wp-json/b1g/v1
@@ -182,6 +184,11 @@ class Backend {
     _p = await SharedPreferences.getInstance();
     deviceId = _p!.getString('b1g_device_id') ?? '';
     pairingCode = _p!.getString('b1g_pairing') ?? '';
+    // Device IDs are "CLT-..." now; the website renamed the old "B1G-..." ones too.
+    if (deviceId.startsWith('B1G-')) {
+      deviceId = 'CLT-${deviceId.substring(4)}';
+      await _p!.setString('b1g_device_id', deviceId);
+    }
     licStatus = _p!.getString('b1g_lic_status') ?? '';
     licType = _p!.getString('b1g_lic_type') ?? '';
     licDaysLeft = _p!.getInt('b1g_lic_days') ?? 0;
@@ -315,6 +322,11 @@ class Backend {
           await _p?.setString('b1g_server_name', name);
         }
       }
+      final epoch = int.tryParse((c is Map ? c['cache_epoch'] : null)?.toString() ?? '') ?? 0;
+      if (epoch > 0 && epoch != (_p?.getInt('b1g_cache_epoch') ?? 0)) {
+        await clearAppCache();
+        await _p?.setInt('b1g_cache_epoch', epoch);
+      }
       update = BUpdate.fromJson(data['update']);
       log('backend config server=${serverUrl.isEmpty ? 'none' : 'set'} '
           'update=${update?.versionCode ?? 0} app=$appVersionCode');
@@ -324,6 +336,21 @@ class Backend {
     } catch (e) {
       log('backend config failed: ${e.runtimeType}');
     }
+  }
+
+  /// "Clear app cache" from the website: pictures, channel logos, film details
+  /// and downloaded files go; login, playlists, favourites and licence stay.
+  static Future<void> clearAppCache() async {
+    final images = PaintingBinding.instance.imageCache;
+    images.clear();
+    images.clearLiveImages();
+    Tmdb.clearCache();
+    try {
+      await _device.invokeMethod<dynamic>('clearCache');
+    } catch (_) {
+      // Web / tests: there is no app cache folder.
+    }
+    log('cache cleared (website)');
   }
 
   // ---- API ----

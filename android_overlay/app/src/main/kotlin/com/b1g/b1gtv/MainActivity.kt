@@ -104,6 +104,16 @@ class MainActivity : FlutterActivity() {
                     result.success(deviceIds())
                 } else if (call.method == "cacheDir") {
                     result.success(cacheDir.absolutePath)
+                } else if (call.method == "clearCache") {
+                    // "Clear app cache" from the website: empties the app's cache folder
+                    // (downloaded updates, image and player caches). App data stays.
+                    try {
+                        cacheDir.listFiles()?.forEach { it.deleteRecursively() }
+                        externalCacheDir?.listFiles()?.forEach { it.deleteRecursively() }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
                 } else if (call.method == "canInstall") {
                     // From Android 8 the customer allows "install unknown apps" per app, once.
                     result.success(

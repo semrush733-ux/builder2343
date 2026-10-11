@@ -12,11 +12,12 @@
     <application
         android:label="Cloud Player"
         android:name="${applicationName}"
-        android:icon="@drawable/tv_banner"
+        android:icon="@mipmap/ic_launcher"
         android:banner="@drawable/tv_banner"
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
+            android:banner="@drawable/tv_banner"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""

@@ -86,7 +86,7 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
     try {
       final dir = await Backend.cacheDir();
       if (dir.isEmpty) throw const FileSystemException('no cache folder');
-      final file = File('$dir/updates/B1G-update.apk');
+      final file = File('$dir/updates/CloudPlayer-update.apk');
       await file.parent.create(recursive: true);
       if (await file.exists()) await file.delete();
 

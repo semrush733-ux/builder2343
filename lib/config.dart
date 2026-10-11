@@ -11,7 +11,7 @@ const String kPrefillUser = String.fromEnvironment('B1G_PREFILL_USER');
 const String kPrefillPass = String.fromEnvironment('B1G_PREFILL_PASS');
 
 /// Sent with every request, so the server can recognise the app.
-const String kUserAgent = 'B1G/1.0 (Android TV)';
+const String kUserAgent = 'CloudPlayer/1.0 (Android TV)';
 
 /// Extra engine messages in the device log (test builds only).
 const bool kVerbose = bool.fromEnvironment('B1G_VERBOSE');
