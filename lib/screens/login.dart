@@ -60,6 +60,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   int _startMode() {
     if (_locked) return _xtream;
+    // With a server set on the website the screen is a plain login:
+    // username and password only, no Xtream / M3U choice.
+    if (_hasSiteServer) return _account;
     if (Store.isM3u && Store.m3uUrl.isNotEmpty) return _m3uLink;
     if (_hasSiteServer &&
         (Store.viaSite ||
@@ -78,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
     var mode = _mode;
-    if (_mode == _xtream && _hasSiteServer && _server.text.trim().isEmpty) mode = _account;
+    if (_hasSiteServer) mode = _account;
     if (_mode == _account && !_hasSiteServer) mode = _xtream;
     final changed = mode != _mode;
     final serverHadFocus = _serverNode.hasFocus;
@@ -404,8 +407,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                         style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
                                       ),
                                     ),
-                                    Text(pl.isXtream ? 'Xtream' : 'M3U',
-                                        style: const TextStyle(fontSize: 12, color: C.dim)),
                                   ],
                                 ),
                               ),
@@ -416,14 +417,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: TextStyle(fontSize: 12.5, color: C.dim)),
                         const SizedBox(height: 8),
                       ],
-                      if (!_locked) ...[
+                      if (!_locked && !_hasSiteServer) ...[
                         Row(
                           children: [
-                            if (_hasSiteServer) ...[
-                              _tab(Backend.serverName.isEmpty ? 'Account' : Backend.serverName, _account,
-                                  _accountTabNode),
-                              const SizedBox(width: 8),
-                            ],
                             _tab('Xtream Codes', _xtream, _xtreamTabNode),
                             const SizedBox(width: 8),
                             _tab('M3U link', _m3uLink, _m3uTabNode),

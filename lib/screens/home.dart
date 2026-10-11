@@ -259,7 +259,58 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Padding(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Faded entertainment picture far behind everything...
+          Opacity(
+            opacity: 0.42,
+            child: Image.asset(
+              'assets/home_bg.webp',
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+              filterQuality: FilterQuality.low,
+              errorBuilder: (_, __, ___) => const SizedBox(),
+            ),
+          ),
+          // ...softened towards the edges so the tiles and text stay easy to read...
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0, -0.1),
+                radius: 1.05,
+                colors: [Color(0x330A0C10), Color(0xE60A0C10)],
+              ),
+            ),
+          ),
+          // ...and a large, very faint "Cloud Player" behind the tiles.
+          const IgnorePointer(
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 30),
+                  child: Text(
+                    'Cloud Player',
+                    style: TextStyle(
+                      fontSize: 190,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -6,
+                      color: Color(0x14FFFFFF),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          _homeContent(),
+        ],
+      ),
+    );
+  }
+
+  Widget _homeContent() {
+    return Padding(
         padding: const EdgeInsets.fromLTRB(44, 26, 44, 22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -420,8 +471,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }
 
