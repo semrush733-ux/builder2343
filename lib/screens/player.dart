@@ -1151,8 +1151,19 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
 
     if (_onControls) {
-      // The focused button gets OK and Left / Right. Any key keeps the bar on screen.
+      // The focused button gets OK. Any key keeps the bar on screen.
       if (down) _showOverlay();
+      // Left / Right step along the bar here, button by button. Leaving it to Flutter's
+      // "nearest thing in that direction" search could get stuck on the big Pause button.
+      if (!up && (k == LogicalKeyboardKey.arrowRight || k == LogicalKeyboardKey.arrowLeft)) {
+        final current = FocusManager.instance.primaryFocus;
+        if (current != null) {
+          final right = k == LogicalKeyboardKey.arrowRight;
+          final moved = right ? current.nextFocus() : current.previousFocus();
+          if (!moved) current.focusInDirection(right ? TraversalDirection.right : TraversalDirection.left);
+        }
+        return KeyEventResult.handled;
+      }
       return KeyEventResult.ignored;
     }
 
