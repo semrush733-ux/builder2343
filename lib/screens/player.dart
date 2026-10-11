@@ -1270,6 +1270,15 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (up) return KeyEventResult.ignored;
 
     if (widget.live) {
+      // The bar is on screen but the remote is not on it yet (it appeared by itself after a
+      // channel change): Left / Right go onto its buttons instead of opening a side panel.
+      if (_overlay && !_dead && (k == LogicalKeyboardKey.arrowLeft || k == LogicalKeyboardKey.arrowRight)) {
+        if (down) {
+          _mainButton.requestFocus();
+          _showOverlay();
+        }
+        return KeyEventResult.handled;
+      }
       if (k == LogicalKeyboardKey.arrowLeft) {
         if (down) _openChannels();
         return KeyEventResult.handled;
