@@ -12,6 +12,7 @@ import 'browse.dart';
 import 'catchup.dart';
 import 'device.dart';
 import 'login.dart';
+import 'playlists.dart';
 import 'settings.dart';
 import 'update_web.dart' if (dart.library.io) 'update.dart';
 
@@ -94,73 +95,8 @@ class _HomeScreenState extends State<HomeScreen> {
   /// "Playlists" above the tiles: shows the lists on this device's account
   /// (added on the website) and switches to the chosen one.
   Future<void> _choosePlaylist() async {
-    List<BPlaylist> lists = const [];
-    String? error;
-    try {
-      lists = await Backend.playlists();
-    } catch (e) {
-      error = e.toString();
-    }
-    if (!mounted) return;
-
-    final choice = await showDialog<BPlaylist>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: C.panel,
-        title: const Text('Playlists'),
-        content: SizedBox(
-          width: 420,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Text('Now playing:  ${widget.api.label}',
-                    style: const TextStyle(color: C.dim, fontSize: 13.5)),
-              ),
-              if (error != null)
-                Text(error, style: const TextStyle(color: C.danger, fontSize: 13.5))
-              else if (lists.isEmpty)
-                const Text('No playlists on your account yet.\nAdd one from the website (Upload Playlist / QR).',
-                    style: TextStyle(color: C.dim, fontSize: 13.5, height: 1.4))
-              else
-                for (var i = 0; i < lists.length; i++)
-                  TvFocus(
-                    autofocus: i == 0,
-                    radius: 9,
-                    color: C.card,
-                    onTap: () => Navigator.of(ctx).pop(lists[i]),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.playlist_play_rounded, size: 18, color: C.accent),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(lists[i].name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700)),
-                          ),
-                          Text(lists[i].isXtream ? 'Xtream' : 'M3U',
-                              style: const TextStyle(fontSize: 12, color: C.dim)),
-                        ],
-                      ),
-                    ),
-                  ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            autofocus: error != null || lists.isEmpty,
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
+    final choice = await Navigator.of(context).push<BPlaylist>(
+        MaterialPageRoute(builder: (_) => PlaylistsScreen(current: widget.api.label)));
     if (choice == null || !mounted) return;
 
     ScaffoldMessenger.of(context)
@@ -339,7 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
                 TvFocus(
                   onTap: () => Navigator.of(context)
-                      .push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen())),
+                      .push(MaterialPageRoute<void>(builder: (_) => SettingsScreen(api: widget.api))),
                   child: const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     child: Row(

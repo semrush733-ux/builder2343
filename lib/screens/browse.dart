@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import '../engine.dart';
+import '../parental.dart';
 import '../input_mode.dart';
 import '../store.dart';
 import '../theme.dart';
@@ -145,7 +146,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     final request = ++_pvRequest;
     PlaybackEngine engine;
     try {
-      engine = ExoEngine.available && Store.engine == 'exo'
+      engine = ExoEngine.available && Store.liveEngine == 'exo'
           ? await ExoEngine.create(live: true)
           : MpvEngine(live: true, direct: false);
     } catch (_) {
@@ -282,11 +283,17 @@ class _BrowseScreenState extends State<BrowseScreen> {
     _focusTimer?.cancel();
     if (id == _selected && _items != null && id != _favId && id != _recentId) return;
     final request = ++_request;
+    // A locked category opens only with the parental PIN.
+    if (!id.startsWith('*') && Store.isLocked(widget.kind, id) && !Store.parentalUnlocked) {
+      if (!await askParentalPin(context)) return;
+      if (!mounted) return;
+    }
+    final cached = _cache[id];
     final ready = id == _favId
         ? List<XItem>.of(Store.favourites(widget.kind))
         : id == _recentId
             ? List<XItem>.of(Store.recents(widget.kind))
-            : _cache[id];
+            : cached?.where(Store.allowed).toList();
     setState(() {
       _selected = id;
       _selectedName = name;
@@ -311,7 +318,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
       }
       _cache[id] = items;
       if (!mounted || request != _request) return;
-      setState(() => _items = items);
+      setState(() => _items = items.where(Store.allowed).toList());
       log('browse ${widget.kind.name} items=${items.length}');
     } catch (e) {
       if (!mounted || request != _request) return;
@@ -324,6 +331,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
   void _focusCategory(String id, String name) {
     _focusTimer?.cancel();
     if (id == _selected) return;
+    // Locked categories open only on OK (with the PIN), never by moving over them.
+    if (!id.startsWith('*') && Store.isLocked(widget.kind, id) && !Store.parentalUnlocked) return;
     _focusTimer = Timer(const Duration(milliseconds: 500), () {
       if (mounted) _select(id, name);
     });
@@ -345,7 +354,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
       final all = await _loadAll();
       if (!mounted || request != _request) return;
       final needle = q.toLowerCase();
-      final found = all.where((i) => i.name.toLowerCase().contains(needle)).take(400).toList();
+      final found =
+          all.where((i) => Store.allowed(i) && i.name.toLowerCase().contains(needle)).take(400).toList();
       setState(() => _items = found);
       log('browse ${widget.kind.name} search=${found.length}');
     } catch (e) {
@@ -749,8 +759,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   Widget _categories() {
     if (_catsError != null) return ErrorBox(message: _catsError!, onRetry: _loadCategories, autofocus: true);
-    final cats = _cats;
-    if (cats == null) return const Loading();
+    final all = _cats;
+    if (all == null) return const Loading();
+    final cats = all.where((c) => !Store.isHidden(widget.kind, c.id)).toList();
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 16),
       itemCount: cats.length + 4,
@@ -795,7 +806,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
           );
         }
         final cat = cats[index - 4];
+        final locked = Store.isLocked(widget.kind, cat.id) && !Store.parentalUnlocked;
         return _CategoryRow(
+          icon: locked ? Icons.lock_rounded : null,
           name: cat.name,
           selected: _selected == cat.id,
           onTap: () => _select(cat.id, cat.name),

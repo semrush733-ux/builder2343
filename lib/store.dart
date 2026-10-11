@@ -201,6 +201,49 @@ class Store {
   }
   static void setEngine(String engine) => _p.setString('player_engine2', engine);
 
+  /// Player for Live TV, chosen separately from the one for films and series ([engine]).
+  static String get liveEngine {
+    final v = _p.getString('live_engine') ?? '';
+    if (v == 'exo' || v == 'mpv') return v;
+    return 'exo';
+  }
+  static void setLiveEngine(String engine) => _p.setString('live_engine', engine);
+
+  // ---- parental control and category management (per account) ----
+
+  /// The PIN that unlocks locked categories; empty = parental control off.
+  static String get parentalPin => _p.getString('parental_pin') ?? '';
+  static void setParentalPin(String pin) => _p.setString('parental_pin', pin);
+
+  /// The PIN was typed since the app started: locked categories stay open until the app closes.
+  static bool parentalUnlocked = false;
+
+  static String _catKey(XKind kind, String id) => '${kind.name}|$id';
+  static String get _accountKey => _p.getString('identity') ?? '';
+
+  static Set<String> _catSet(String name) => (_p.getStringList('$name|$_accountKey') ?? const <String>[]).toSet();
+
+  static void _setCat(String name, XKind kind, String id, bool on) {
+    final set = _catSet(name);
+    final key = _catKey(kind, id);
+    on ? set.add(key) : set.remove(key);
+    _p.setStringList('$name|$_accountKey', set.toList());
+  }
+
+  /// Categories the customer switched off in Settings › Manage categories.
+  static bool isHidden(XKind kind, String id) => _catSet('hidden_cats').contains(_catKey(kind, id));
+  static void setHidden(XKind kind, String id, bool hidden) => _setCat('hidden_cats', kind, id, hidden);
+
+  /// Categories behind the parental PIN.
+  static bool isLocked(XKind kind, String id) =>
+      parentalPin.isNotEmpty && _catSet('locked_cats').contains(_catKey(kind, id));
+  static bool isLockMarked(XKind kind, String id) => _catSet('locked_cats').contains(_catKey(kind, id));
+  static void setLocked(XKind kind, String id, bool locked) => _setCat('locked_cats', kind, id, locked);
+
+  /// May this item be listed? Not in a hidden category, and not in a locked one while locked.
+  static bool allowed(XItem item) =>
+      !isHidden(item.kind, item.categoryId) && (parentalUnlocked || !isLocked(item.kind, item.categoryId));
+
   /// Subtitle language picked last time; empty = subtitles off.
   static String get subtitleLanguage => _p.getString('sub_lang') ?? '';
   static void setSubtitleLanguage(String code) => _p.setString('sub_lang', code);

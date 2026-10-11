@@ -510,7 +510,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   /// Every new video (next channel, next episode) starts on the customer's player again,
   /// even when the previous one had to move to the other player.
   void _resetEngine() {
-    _engineName = ExoEngine.available ? Store.engine : 'mpv';
+    _engineName = ExoEngine.available ? (widget.live ? Store.liveEngine : Store.engine) : 'mpv';
     _engineSwitched = false;
   }
 
