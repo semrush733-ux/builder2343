@@ -638,10 +638,10 @@ class _FloatIconState extends State<_FloatIcon> with TickerProviderStateMixin {
 
           final m = Matrix4.identity()
             ..setEntry(3, 2, 0.0016) // perspective
-            ..translate(fly.dx, fly.dy + float * _enter.value)
+            ..translateByDouble(fly.dx, fly.dy + float * _enter.value, 0, 1)
             ..rotateY(enterSpinY + turnY * _enter.value)
             ..rotateX(enterSpinX + tiltX * _enter.value)
-            ..scale(scale, scale, scale);
+            ..scaleByDouble(scale, scale, scale, 1);
           return Opacity(
             opacity: fade,
             child: Transform(alignment: Alignment.center, transform: m, child: child),
