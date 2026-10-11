@@ -109,14 +109,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              width: 300,
+              width: MediaQuery.of(context).size.width < 900 ? 240 : 300,
               color: C.panel,
-              padding: const EdgeInsets.fromLTRB(18, 24, 18, 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              padding: const EdgeInsets.fromLTRB(14, 18, 14, 10),
+              // A scrolling list, so every option can be reached on small (phone) screens too.
+              child: ListView(
                 children: [
                   Row(
                     children: [
+                      TvFocus(
+                        radius: 20,
+                        color: C.panel,
+                        onTap: () => Navigator.of(context).maybePop(),
+                        child: const Padding(
+                          padding: EdgeInsets.all(6),
+                          child: Icon(Icons.arrow_back_rounded, color: C.text, size: 24),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       const _OnceIcon(icon: Icons.settings_rounded, color: C.accent, size: 28, order: 0),
                       const SizedBox(width: 12),
                       Text(t('Settings'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
@@ -155,7 +165,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(36, 28, 36, 20),
+                padding: MediaQuery.of(context).size.width < 900
+                    ? const EdgeInsets.fromLTRB(18, 16, 16, 10)
+                    : const EdgeInsets.fromLTRB(36, 28, 36, 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
