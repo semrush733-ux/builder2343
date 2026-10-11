@@ -276,7 +276,16 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       set('cache-pause-initial', 'no'),
       // ...and after a hiccup wait for only one second of video before carrying on.
       set('cache-pause-wait', widget.live ? '1' : '2'),
-      set('demuxer-readahead-secs', widget.live ? '10' : '30'),
+      set('demuxer-readahead-secs', widget.live ? '10' : '60'),
+      // How much of the stream may sit in memory: enough for a long buffer on
+      // movies, tighter on live so cheap 1 GB boxes never run out of memory.
+      set('demuxer-max-bytes', widget.live ? '64MiB' : '192MiB'),
+      set('demuxer-max-back-bytes', widget.live ? '16MiB' : '64MiB'),
+      // Movies: keep what was already watched in the buffer, so jumping back
+      // a few minutes is instant instead of re-downloading.
+      if (!widget.live) set('demuxer-seekable-cache', 'yes'),
+      // Decode straight into display memory - one copy less per frame.
+      set('vd-lavc-dr', 'yes'),
       // Live: look at one second of the stream to learn what is in it (the default is up to five).
       if (widget.live) set('demuxer-lavf-analyzeduration', '1'),
       // Movies: jump to the nearest key picture, which is immediate on a network stream.
