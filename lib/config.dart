@@ -1,5 +1,5 @@
 /// App-wide settings.
-const String kAppName = 'B1G';
+const String kAppName = 'Cloud Player';
 
 /// When the build sets a server address (config/server.txt), the login screen
 /// hides the server field and customers only type username and password.

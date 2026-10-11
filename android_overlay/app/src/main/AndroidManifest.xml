@@ -10,7 +10,7 @@
 
     <!-- IPTV servers are mostly plain http, so clear-text traffic must be allowed. -->
     <application
-        android:label="B1G"
+        android:label="Cloud Player"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:banner="@drawable/tv_banner"

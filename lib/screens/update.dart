@@ -178,7 +178,7 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
         body = [
           Text(
             u.force
-                ? 'Version $version is needed to keep using B1G.'
+                ? 'Version $version is needed to keep using Cloud Player.'
                 : 'Version $version is ready. Your login and favourites stay as they are.',
             style: const TextStyle(fontSize: 14.5, color: C.dim, height: 1.4),
           ),
@@ -231,8 +231,8 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
         body = [
           Text(
             _needsPermission
-                ? 'Your device asks once for permission: allow B1G to install apps '
-                    '(on Fire TV: Settings › My Fire TV › Developer options › Install unknown apps › B1G › ON), '
+                ? 'Your device asks once for permission: allow Cloud Player to install apps '
+                    '(on Fire TV: Settings › My Fire TV › Developer options › Install unknown apps › Cloud Player › ON), '
                     'then press "Install" here.'
                 : 'Choose "Update" or "Install" in the window your device shows. The app closes and opens again.',
             style: const TextStyle(fontSize: 14.5, color: C.dim, height: 1.4),

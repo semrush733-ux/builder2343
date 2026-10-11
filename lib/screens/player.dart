@@ -187,7 +187,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Player _createPlayer() {
     final player = Player(
       configuration: PlayerConfiguration(
-        title: 'B1G',
+        title: 'Cloud Player',
         bufferSize: 48 * 1024 * 1024,
         logLevel: kVerbose ? MPVLogLevel.info : MPVLogLevel.error,
       ),

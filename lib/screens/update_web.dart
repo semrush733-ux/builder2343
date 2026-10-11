@@ -17,7 +17,7 @@ Future<void> showUpdateDialog(BuildContext context, BUpdate update) {
       title: Text('Version ${update.versionName} is out'),
       content: Text(
         update.notes.isEmpty
-            ? 'A newer B1G app is available for your TV and Android devices. Install it from our website.'
+            ? 'A newer Cloud Player app is available for your TV and Android devices. Install it from our website.'
             : update.notes,
         style: const TextStyle(color: C.dim, height: 1.4),
       ),

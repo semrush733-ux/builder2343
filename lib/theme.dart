@@ -63,7 +63,7 @@ class Logo extends StatelessWidget {
         ),
         SizedBox(width: size * 0.22),
         Text(
-          'TV',
+          'Player',
           style: TextStyle(
             color: C.accent,
             fontSize: size,

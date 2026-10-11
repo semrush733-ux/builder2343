@@ -312,7 +312,7 @@ class DeviceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!Backend.registered) {
-      return const Text('Connecting to the B1G service…',
+      return const Text('Connecting to the Cloud Player service…',
           style: TextStyle(color: C.dim, fontSize: 13));
     }
     final qrSize = compact ? 112.0 : 148.0;
@@ -413,8 +413,8 @@ Future<void> showDeviceDialog(BuildContext context) {
                 Expanded(
                   child: Text(
                     Backend.appVersionName.isEmpty
-                        ? 'B1G'
-                        : 'B1G ${Backend.appVersionName}  ·  build ${Backend.appVersionCode}',
+                        ? 'Cloud Player'
+                        : 'Cloud Player ${Backend.appVersionName}  ·  build ${Backend.appVersionCode}',
                     style: const TextStyle(fontSize: 12.5, color: C.dim),
                   ),
                 ),
