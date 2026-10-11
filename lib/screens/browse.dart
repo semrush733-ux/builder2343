@@ -415,7 +415,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            width: 236,
+            width: _live ? 206 : 236,
             color: C.panel,
             padding: const EdgeInsets.fromLTRB(12, 18, 12, 0),
             child: Column(
@@ -472,8 +472,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
                         ? Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              SizedBox(width: 340, child: _content()),
-                              const SizedBox(width: 16),
+                              SizedBox(width: 280, child: _content()),
+                              const SizedBox(width: 14),
                               Expanded(child: Padding(padding: const EdgeInsets.only(bottom: 14), child: _previewPane())),
                             ],
                           )
@@ -507,7 +507,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     final fav = item != null && Store.isFavourite(item);
 
     return LayoutBuilder(builder: (context, box) {
-      final videoH = math.min(box.maxWidth * 9 / 16, box.maxHeight * 0.52);
+      final videoH = math.min(box.maxWidth * 9 / 16, box.maxHeight * 0.6);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -654,7 +654,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                             ],
                             const SizedBox(height: 8),
                           ],
-                          for (final e in later.take(4))
+                          for (final e in later.take(3))
                             Padding(
                               padding: const EdgeInsets.only(bottom: 5),
                               child: Row(
@@ -686,8 +686,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
                             const SizedBox(width: 8),
                             _paneButton(Icons.calendar_view_day_rounded, 'TV Guide', _openGuide),
                             const SizedBox(width: 8),
-                            _paneButton(fav ? Icons.star_rounded : Icons.star_border_rounded,
-                                fav ? 'Favourite' : 'Add to Favourites', () => _toggleFavourite(item)),
+                            _paneButton(fav ? Icons.star_rounded : Icons.star_border_rounded, 'Favourite',
+                                () => _toggleFavourite(item)),
                           ],
                         ),
                       ],
@@ -720,20 +720,28 @@ class _BrowseScreenState extends State<BrowseScreen> {
     );
   }
 
+  /// The three buttons share the row evenly, so none of them runs off the edge.
   Widget _paneButton(IconData icon, String label, VoidCallback onTap) {
-    return TvFocus(
-      radius: 9,
-      color: const Color(0x1AFFFFFF),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 17, color: C.accent),
-            const SizedBox(width: 6),
-            Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-          ],
+    return Expanded(
+      child: TvFocus(
+        radius: 9,
+        color: const Color(0x1AFFFFFF),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 17, color: C.accent),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -819,7 +827,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
       final double extent;
       if (_live) {
         columns = 1;
-        extent = 54;
+        extent = 48;
       } else {
         columns = math.max(2, (width / 128).floor());
         extent = ((width - (columns - 1) * 10) / columns) * 1.48;
