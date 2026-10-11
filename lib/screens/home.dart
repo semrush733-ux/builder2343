@@ -13,6 +13,7 @@ import 'browse.dart';
 import 'catchup.dart';
 import 'device.dart';
 import 'login.dart';
+import '../speedtest.dart';
 import 'playlists.dart';
 import 'settings.dart';
 import 'update_web.dart' if (dart.library.io) 'update.dart';
@@ -291,6 +292,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text(t('Settings'), style: const TextStyle(fontSize: 14)),
                       ],
                     ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TvFocus(
+                  onTap: () => showSpeedTest(context),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.speed_rounded, size: 20, color: C.dim),
                   ),
                 ),
                 const Spacer(),

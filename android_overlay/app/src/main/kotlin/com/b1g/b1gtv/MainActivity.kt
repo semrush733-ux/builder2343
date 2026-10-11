@@ -19,6 +19,7 @@ class MainActivity : FlutterActivity() {
     // ExoPlayer engine: draws into a Flutter texture under the app's own player controls.
     private var exo: ExoEngine? = null
     private val net by lazy { NetHelper(this) }
+    private val vpn by lazy { VpnHelper(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -133,6 +134,14 @@ class MainActivity : FlutterActivity() {
                 } else if (call.method == "wifiSettings") {
                     net.openSettings()
                     result.success(null)
+                } else if (call.method == "vpnCheck") {
+                    result.success(vpn.check(call.arguments as? String ?: ""))
+                } else if (call.method == "vpnState") {
+                    result.success(vpn.state())
+                } else if (call.method == "vpnUp") {
+                    vpn.up(call.arguments as? String ?: "", result)
+                } else if (call.method == "vpnDown") {
+                    vpn.down(result)
                 } else if (call.method == "canInstall") {
                     // From Android 8 the customer allows "install unknown apps" per app, once.
                     result.success(
@@ -161,5 +170,11 @@ class MainActivity : FlutterActivity() {
         exo?.disposeAll()
         exo = null
         super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == VpnHelper.PERMISSION_REQUEST) vpn.onPermission(resultCode == RESULT_OK)
     }
 }

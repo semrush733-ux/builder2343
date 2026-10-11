@@ -7,6 +7,8 @@ import '../config.dart';
 import '../engine.dart';
 import '../i18n.dart';
 import '../network.dart';
+import '../speedtest.dart';
+import '../vpn.dart';
 import '../parental.dart';
 import '../store.dart';
 import '../theme.dart';
@@ -14,10 +16,11 @@ import '../widgets.dart';
 import '../xtream.dart';
 import 'home.dart' show wallpaperAsset;
 
-enum _Section { network, vod, live, parental, wallpaper, categories, cache, language, info }
+enum _Section { network, vpn, vod, live, parental, wallpaper, categories, cache, language, info }
 
 const _titles = {
   _Section.network: 'Network',
+  _Section.vpn: 'VPN',
   _Section.vod: 'VOD Player',
   _Section.live: 'Live Player',
   _Section.parental: 'Parental Control',
@@ -30,6 +33,7 @@ const _titles = {
 
 const _icons = {
   _Section.network: Icons.wifi_rounded,
+  _Section.vpn: Icons.vpn_lock_rounded,
   _Section.vod: Icons.movie_filter_rounded,
   _Section.live: Icons.live_tv_rounded,
   _Section.parental: Icons.shield_rounded,
@@ -42,6 +46,7 @@ const _icons = {
 
 const _colors = {
   _Section.network: Color(0xFF35A7FF),
+  _Section.vpn: Color(0xFF2ECC71),
   _Section.vod: Color(0xFFFF9F1C),
   _Section.live: Color(0xFFFF5A5F),
   _Section.parental: Color(0xFF2ECC71),
@@ -182,6 +187,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     switch (_section) {
       case _Section.network:
         return const _NetworkPanel();
+      case _Section.vpn:
+        return const _VpnPanel();
       case _Section.vod:
         return _playerChoice(
           current: ExoEngine.available ? Store.engine : 'mpv',
@@ -980,6 +987,23 @@ class _NetworkPanelState extends State<_NetworkPanel> with WidgetsBindingObserve
               TvFocus(
                 radius: 10,
                 color: C.card,
+                onTap: () => showSpeedTest(context),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.speed_rounded, size: 17, color: C.accent),
+                      SizedBox(width: 8),
+                      Text('Speed test', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              TvFocus(
+                radius: 10,
+                color: C.card,
                 onTap: Net.openSettings,
                 child: const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
@@ -1087,6 +1111,291 @@ class _NetworkPanelState extends State<_NetworkPanel> with WidgetsBindingObserve
                     ],
                   ),
                 ),
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+
+/// Settings › VPN: the customer's own WireGuard VPN (from their VPN provider), added from the
+/// website, a link, or typed in; connect / disconnect for the whole TV.
+class _VpnPanel extends StatefulWidget {
+  const _VpnPanel();
+
+  @override
+  State<_VpnPanel> createState() => _VpnPanelState();
+}
+
+class _VpnPanelState extends State<_VpnPanel> {
+  List<VpnProfile> _list = const [];
+  String _busy = '';
+  String _note = '';
+  bool _noteBad = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Vpn.state.addListener(_changed);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    Vpn.state.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _load() async {
+    await Vpn.refresh();
+    final list = await Vpn.profiles();
+    if (Vpn.activeName.isEmpty) Vpn.activeName = await Vpn.lastUsed();
+    if (mounted) setState(() => _list = list);
+  }
+
+  void _say(String text, {bool bad = false}) {
+    if (mounted) {
+      setState(() {
+        _note = text;
+        _noteBad = bad;
+      });
+    }
+  }
+
+  Future<void> _addConfig(String name, String config) async {
+    final problem = await Vpn.check(config);
+    if (problem.isNotEmpty) {
+      _say('This is not a valid WireGuard configuration: $problem', bad: true);
+      return;
+    }
+    await Vpn.add(VpnProfile(name.trim().isEmpty ? 'My VPN' : name.trim(), config));
+    await _load();
+    _say('"${name.trim().isEmpty ? 'My VPN' : name.trim()}" was added. Select it to connect.');
+  }
+
+  Future<void> _fromSite() async {
+    setState(() => _busy = 'site');
+    try {
+      final v = await Backend.vpnFromSite();
+      if (v == null) {
+        _say('No VPN is saved on the website for this TV yet. Add it on the website: Upload Playlist › VPN.',
+            bad: true);
+      } else {
+        await _addConfig(v['name']!, v['config']!);
+      }
+    } catch (e) {
+      _say('The website could not be reached.', bad: true);
+    }
+    if (mounted) setState(() => _busy = '');
+  }
+
+  Future<String?> _ask(String title, String label, IconData icon) async {
+    final c = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: C.panel,
+        title: Text(title),
+        content: SizedBox(
+          width: 460,
+          child: TvField(
+            controller: c,
+            label: label,
+            icon: icon,
+            autofocus: true,
+            action: TextInputAction.done,
+            onSubmitted: (_) => Navigator.of(ctx).pop(true),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('OK')),
+        ],
+      ),
+    );
+    final text = c.text;
+    c.dispose();
+    return ok == true ? text : null;
+  }
+
+  Future<void> _fromLink() async {
+    final url = await _ask('VPN configuration link', 'Link to the .conf file', Icons.link_rounded);
+    if (url == null || url.trim().isEmpty) return;
+    setState(() => _busy = 'link');
+    try {
+      final text = await Vpn.download(url);
+      final parts = Uri.tryParse(url.trim())?.pathSegments.where((x) => x.isNotEmpty).toList() ?? const <String>[];
+      final name = parts.isEmpty ? 'My VPN' : parts.last;
+      await _addConfig(name.replaceAll(RegExp(r'\.conf$'), ''), text);
+    } catch (e) {
+      _say(e is FormatException ? e.message : 'The link could not be downloaded.', bad: true);
+    }
+    if (mounted) setState(() => _busy = '');
+  }
+
+  Future<void> _connect(VpnProfile p) async {
+    if (Vpn.state.value == 'up' && Vpn.activeName == p.name) {
+      setState(() => _busy = p.name);
+      final err = await Vpn.disconnect();
+      _say(err.isEmpty ? 'VPN switched off.' : err, bad: err.isNotEmpty);
+    } else {
+      setState(() => _busy = p.name);
+      if (Vpn.state.value == 'up') await Vpn.disconnect();
+      final err = await Vpn.connect(p);
+      _say(err.isEmpty ? 'Connected through "${p.name}". All apps on this TV now use the VPN.' : err,
+          bad: err.isNotEmpty);
+    }
+    if (mounted) setState(() => _busy = '');
+  }
+
+  Future<void> _delete(VpnProfile p) async {
+    if (Vpn.state.value == 'up' && Vpn.activeName == p.name) await Vpn.disconnect();
+    await Vpn.remove(p.name);
+    await _load();
+    _say('"${p.name}" was removed.');
+  }
+
+  Widget _action(IconData icon, String label, VoidCallback onTap, {bool busy = false}) => TvFocus(
+        radius: 10,
+        color: C.card,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              busy
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: C.accent))
+                  : Icon(icon, size: 17, color: C.accent),
+              const SizedBox(width: 8),
+              Text(label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final up = Vpn.state.value == 'up';
+    if (!Vpn.available) {
+      return const Text('The VPN works in the Android app.', style: TextStyle(color: C.dim));
+    }
+    return ListView(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: C.panel,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: up ? const Color(0x772ECC71) : const Color(0x33FFFFFF)),
+          ),
+          child: Row(
+            children: [
+              Icon(up ? Icons.vpn_lock_rounded : Icons.lock_open_rounded,
+                  size: 40, color: up ? const Color(0xFF2ECC71) : C.dim),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(up ? 'VPN ON' : 'VPN OFF',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1,
+                            color: up ? const Color(0xFF2ECC71) : C.dim)),
+                    Text(up ? Vpn.activeName : 'Not protected',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              ),
+              if (up) _action(Icons.power_settings_new_rounded, 'Switch off', () async {
+                    await Vpn.disconnect();
+                    _say('VPN switched off.');
+                  }),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Use the WireGuard VPN from your VPN provider (most providers offer a WireGuard ".conf" file). '
+          'Add it once, then select it here to connect. The VPN covers every app on this TV.',
+          style: TextStyle(fontSize: 13.5, color: C.dim, height: 1.5),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _action(Icons.language_rounded, 'Get from website', _fromSite, busy: _busy == 'site'),
+            _action(Icons.link_rounded, 'Add from link', _fromLink, busy: _busy == 'link'),
+          ],
+        ),
+        if (_note.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(_note, style: TextStyle(fontSize: 13.5, color: _noteBad ? C.danger : const Color(0xFF2ECC71))),
+        ],
+        const SizedBox(height: 18),
+        const Text('MY VPNS',
+            style: TextStyle(fontSize: 13, color: C.dim, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+        const SizedBox(height: 10),
+        if (_list.isEmpty)
+          const Text('No VPN added yet.', style: TextStyle(color: C.dim))
+        else
+          for (final p in _list)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TvFocus(
+                      radius: 10,
+                      color: C.panel,
+                      selected: up && Vpn.activeName == p.name,
+                      onTap: () => _connect(p),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        child: Row(
+                          children: [
+                            _busy == p.name
+                                ? const SizedBox(
+                                    width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: C.accent))
+                                : Icon(Icons.shield_rounded,
+                                    color: up && Vpn.activeName == p.name ? const Color(0xFF2ECC71) : C.dim),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(p.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                                  if (p.server.isNotEmpty)
+                                    Text(p.server, style: const TextStyle(fontSize: 12.5, color: C.dim)),
+                                ],
+                              ),
+                            ),
+                            Text(up && Vpn.activeName == p.name ? 'Connected · OK to switch off' : 'OK to connect',
+                                style: const TextStyle(fontSize: 12.5, color: C.dim)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  TvFocus(
+                    radius: 10,
+                    color: C.panel,
+                    onTap: () => _delete(p),
+                    child: const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Icon(Icons.delete_outline_rounded, color: C.dim, size: 20),
+                    ),
+                  ),
+                ],
               ),
             ),
       ],

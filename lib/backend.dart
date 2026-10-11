@@ -445,6 +445,19 @@ class Backend {
 
   /// Playlists managed on the website for this device.
   /// Throws [BackendException] with a readable message (403 = licence needed).
+  /// The VPN configuration saved for this TV on the website (Upload page › VPN), or null.
+  static Future<Map<String, String>?> vpnFromSite() async {
+    if (!registered && !await ensureRegistered()) {
+      throw BackendException('No connection to the server.');
+    }
+    final data = await _get('/device/playlists?device_id=$deviceId&pairing_code=$pairingCode');
+    final v = data is Map ? data['vpn'] : null;
+    if (v is! Map) return null;
+    final config = (v['config'] ?? '').toString();
+    if (config.trim().isEmpty) return null;
+    return {'name': (v['name'] ?? 'My VPN').toString(), 'config': config};
+  }
+
   static Future<List<BPlaylist>> playlists() async {
     if (!registered && !await ensureRegistered()) {
       throw BackendException('No connection to the server.');
