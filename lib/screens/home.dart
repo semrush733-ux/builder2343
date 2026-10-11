@@ -303,7 +303,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 22),
             Expanded(
-              child: Row(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 290),
+                  child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
@@ -347,6 +350,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ],
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 16),

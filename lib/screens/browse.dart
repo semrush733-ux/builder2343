@@ -2,7 +2,10 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 
+import '../config.dart';
 import '../input_mode.dart';
 import '../store.dart';
 import '../theme.dart';
@@ -76,6 +79,16 @@ class _BrowseScreenState extends State<BrowseScreen> {
   int _request = 0;
   Timer? _focusTimer;
 
+  // Live: the small preview on the right. OK on a channel starts it here,
+  // OK on the same channel again goes full screen (like the big IPTV apps).
+  Player? _pv;
+  VideoController? _pvVideo;
+  XItem? _pvItem;
+  bool _pvBuffering = false;
+  bool _pvFallbackTried = false;
+  final List<StreamSubscription> _pvSubs = [];
+  int _pvRequest = 0;
+
   bool get _live => widget.kind == XKind.live;
 
   @override
@@ -84,10 +97,83 @@ class _BrowseScreenState extends State<BrowseScreen> {
     _loadCategories();
   }
 
+  bool _disposed = false;
+
   @override
   void dispose() {
+    _disposed = true;
     _focusTimer?.cancel();
+    _stopPreview();
     super.dispose();
+  }
+
+  Future<void> _stopPreview() async {
+    _pvRequest++;
+    for (final s in _pvSubs) {
+      s.cancel();
+    }
+    _pvSubs.clear();
+    final player = _pv;
+    _pv = null;
+    _pvVideo = null;
+    _pvItem = null;
+    _pvBuffering = false;
+    if (mounted && !_disposed) setState(() {});
+    if (player != null) await player.dispose().catchError((Object _) {});
+  }
+
+  Future<void> _preview(XItem item, List<String> urls) async {
+    if (urls.isEmpty) return;
+    await _stopPreview();
+    if (!mounted) return;
+    final request = ++_pvRequest;
+    final player = Player(
+      configuration: PlayerConfiguration(
+        title: 'Cloud Player',
+        bufferSize: 8 * 1024 * 1024,
+        logLevel: MPVLogLevel.error,
+      ),
+    );
+    // The preview always renders through the normal picture path; the Direct
+    // mode (which takes over the whole screen surface) stays for full screen.
+    final video = VideoController(player);
+    final platform = player.platform;
+    if (platform is NativePlayer) {
+      // dynamic: setProperty only exists on Android/desktop (see player.dart).
+      final dynamic mpv = platform;
+      for (final p in const [
+        ['user-agent', kUserAgent],
+        ['network-timeout', '15'],
+        ['cache-pause-initial', 'no'],
+        ['audio-channels', 'stereo'],
+      ]) {
+        try {
+          await mpv.setProperty(p[0], p[1]);
+        } catch (_) {}
+      }
+    }
+    if (!mounted || request != _pvRequest) {
+      player.dispose().catchError((Object _) {});
+      return;
+    }
+    setState(() {
+      _pv = player;
+      _pvVideo = video;
+      _pvItem = item;
+      _pvBuffering = true;
+      _pvFallbackTried = false;
+    });
+    _pvSubs.add(player.stream.buffering.listen((b) {
+      if (mounted && request == _pvRequest && b != _pvBuffering) setState(() => _pvBuffering = b);
+    }));
+    _pvSubs.add(player.stream.error.listen((message) {
+      // Live channels have a second stream format; the preview tries it once.
+      if (request != _pvRequest || _pvFallbackTried || urls.length < 2) return;
+      _pvFallbackTried = true;
+      player.open(Media(urls[1])).catchError((Object _) {});
+    }));
+    log('preview open');
+    await player.open(Media(urls.first)).catchError((Object _) {});
   }
 
   Future<void> _loadCategories() async {
@@ -221,12 +307,20 @@ class _BrowseScreenState extends State<BrowseScreen> {
   Future<void> _openItem(List<XItem> items, int index) async {
     final api = widget.api;
     final item = items[index];
-    Store.addRecent(item);
     if (widget.kind == XKind.series && item.url.isEmpty) {
+      Store.addRecent(item);
       await Navigator.of(context)
           .push(MaterialPageRoute<void>(builder: (_) => SeriesScreen(api: api, series: item)));
     } else if (_live) {
       final format = Store.liveFormat;
+      // First OK on a channel: play it in the small preview. OK on the same
+      // channel again: full screen.
+      if (_pvItem?.id != item.id || _pv == null) {
+        _preview(item, api.liveUrlsFor(item, format));
+        return;
+      }
+      Store.addRecent(item);
+      await _stopPreview();
       final entries = [
         for (final i in items)
           PlayEntry(
@@ -239,9 +333,11 @@ class _BrowseScreenState extends State<BrowseScreen> {
             item: i,
           ),
       ];
+      if (!mounted) return;
       await Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => PlayerScreen(api: api, entries: entries, index: index, live: true)));
     } else {
+      Store.addRecent(item);
       // Movies open on their details page first; "Watch now" there starts the player.
       await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MovieScreen(api: api, movie: item)));
     }
@@ -311,13 +407,78 @@ class _BrowseScreenState extends State<BrowseScreen> {
                       ],
                     ),
                   ),
-                  Expanded(child: _content()),
+                  Expanded(
+                    child: _live
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: _content()),
+                              const SizedBox(width: 16),
+                              SizedBox(width: 330, child: _previewPane()),
+                            ],
+                          )
+                        : _content(),
+                  ),
                 ],
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _previewPane() {
+    final video = _pvVideo;
+    final item = _pvItem;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Container(
+              color: Colors.black,
+              child: video == null
+                  ? const Center(child: Icon(Icons.live_tv_rounded, color: C.dim, size: 40))
+                  : Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Video(
+                          key: ObjectKey(video),
+                          controller: video,
+                          controls: NoVideoControls,
+                          fill: Colors.black,
+                        ),
+                        if (_pvBuffering)
+                          const Center(
+                            child: SizedBox(
+                              width: 30,
+                              height: 30,
+                              child: CircularProgressIndicator(color: C.accent, strokeWidth: 3),
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          item?.name ?? 'Channel preview',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          item == null
+              ? 'Press OK on a channel to preview it here.'
+              : 'Press OK again for full screen.',
+          style: const TextStyle(fontSize: 12.5, color: C.dim, height: 1.4),
+        ),
+      ],
     );
   }
 
