@@ -411,7 +411,6 @@ List<XEpg> parseCatchup(dynamic data) {
   if (data is! Map) return out;
   final now = DateTime.now();
   for (final m in _asList(data['epg_listings'])) {
-    if (m is! Map) continue;
     if (toInt(m['has_archive']) != 1) continue;
     final start = toInt(m['start_timestamp']);
     final stop = toInt(m['stop_timestamp']);
