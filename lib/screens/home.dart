@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../backend.dart';
@@ -363,6 +365,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Expanded(
                     child: _BigTile(
                       autofocus: true,
+                      order: 0,
                       icon: Icons.live_tv_rounded,
                       title: 'Live TV',
                       subtitle: 'Channels and TV guide',
@@ -373,6 +376,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(width: 18),
                   Expanded(
                     child: _BigTile(
+                      order: 1,
                       icon: Icons.movie_rounded,
                       title: 'Movies',
                       subtitle: 'Films on demand',
@@ -383,6 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(width: 18),
                   Expanded(
                     child: _BigTile(
+                      order: 2,
                       icon: Icons.video_library_rounded,
                       title: 'Series',
                       subtitle: 'Seasons and episodes',
@@ -393,6 +398,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(width: 18),
                   Expanded(
                     child: _BigTile(
+                      order: 3,
                       icon: Icons.history_rounded,
                       title: 'Catch Up',
                       subtitle: 'Replay past TV',
@@ -483,8 +489,10 @@ class _BigTile extends StatelessWidget {
     required this.colors,
     required this.onTap,
     this.autofocus = false,
+    this.order = 0,
   });
 
+  final int order;
   final IconData icon;
   final String title;
   final String subtitle;
@@ -508,7 +516,7 @@ class _BigTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _FloatIcon(icon: icon),
+            _FloatIcon(icon: icon, order: order),
             const Spacer(),
             Text(title, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
@@ -523,44 +531,123 @@ class _BigTile extends StatelessWidget {
 /// The tile's icon in a rounded badge that floats gently up and down,
 /// so the home boxes feel alive without being distracting.
 class _FloatIcon extends StatefulWidget {
-  const _FloatIcon({required this.icon});
+  const _FloatIcon({required this.icon, this.order = 0});
   final IconData icon;
+
+  /// Position of the tile (0..3): which corner the icon flies in from, and how late.
+  final int order;
 
   @override
   State<_FloatIcon> createState() => _FloatIconState();
 }
 
-class _FloatIconState extends State<_FloatIcon> with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat(reverse: true);
+/// A 3D icon: it flies in from a corner of the screen spinning, then floats, sways in depth
+/// and turns a full circle every few seconds. Each tile is a little out of step with the others.
+class _FloatIconState extends State<_FloatIcon> with TickerProviderStateMixin {
+  static const _corners = [Offset(-150, -130), Offset(150, -130), Offset(-150, 130), Offset(150, 130)];
+
+  late final AnimationController _enter = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500));
+  late final AnimationController _loop = AnimationController(vsync: this, duration: const Duration(milliseconds: 6000));
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(Duration(milliseconds: 150 + widget.order * 220), () {
+      if (!mounted) return;
+      _enter.forward();
+      // Start the loop at a different phase per tile, so the four do not move in step.
+      _loop.value = (widget.order * 0.23) % 1.0;
+      _loop.repeat();
+    });
+  }
 
   @override
   void dispose() {
-    _c.dispose();
+    _enter.dispose();
+    _loop.dispose();
     super.dispose();
+  }
+
+  Widget _badge() {
+    // A few darker copies behind the icon give it thickness when it turns.
+    return SizedBox(
+      width: 84,
+      height: 84,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 78,
+            height: 78,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0x33FFFFFF), Color(0x0AFFFFFF)],
+              ),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0x22FFFFFF)),
+              boxShadow: const [
+                BoxShadow(color: Color(0x40FFC400), blurRadius: 28, offset: Offset(0, 14)),
+              ],
+            ),
+          ),
+          for (var d = 4; d >= 1; d--)
+            Transform.translate(
+              offset: Offset(d * 0.9, d * 1.2),
+              child: Icon(widget.icon, size: 48, color: Color.lerp(const Color(0xFF7A5A00), const Color(0xFFB88A00), d / 4)),
+            ),
+          ShaderMask(
+            blendMode: BlendMode.srcIn,
+            shaderCallback: (r) => const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFFFF1B0), C.accent, Color(0xFFFF9F1C)],
+            ).createShader(r),
+            child: Icon(widget.icon, size: 48),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: AnimatedBuilder(
-        animation: _c,
+        animation: Listenable.merge([_enter, _loop]),
         builder: (context, child) {
-          final t = Curves.easeInOut.transform(_c.value);
-          return Transform.translate(offset: Offset(0, -7 * t), child: child);
+          // Fly in: from the corner, small, spinning on two axes, settling with a small overshoot.
+          final e = Curves.easeOutBack.transform(_enter.value);
+          final fade = Curves.easeOut.transform((_enter.value * 1.6).clamp(0.0, 1.0));
+          final corner = _corners[widget.order % _corners.length];
+          final fly = Offset.lerp(corner, Offset.zero, e)!;
+          final enterSpinY = (1 - e) * 2 * math.pi;
+          final enterSpinX = (1 - e) * math.pi / 2;
+          final scale = 0.3 + 0.7 * e;
+
+          // Then: float up and down, sway in depth, and one full turn near the end of each cycle.
+          final t = _loop.value;
+          final wave = math.sin(t * 2 * math.pi);
+          final float = -8 * (0.5 + 0.5 * wave);
+          var turnY = 0.32 * math.sin(t * 4 * math.pi);
+          if (t > 0.78) {
+            turnY += Curves.easeInOutCubic.transform((t - 0.78) / 0.22) * 2 * math.pi;
+          }
+          final tiltX = 0.12 * math.cos(t * 2 * math.pi);
+
+          final m = Matrix4.identity()
+            ..setEntry(3, 2, 0.0016) // perspective
+            ..translate(fly.dx, fly.dy + float * _enter.value)
+            ..rotateY(enterSpinY + turnY * _enter.value)
+            ..rotateX(enterSpinX + tiltX * _enter.value)
+            ..scale(scale, scale, scale);
+          return Opacity(
+            opacity: fade,
+            child: Transform(alignment: Alignment.center, transform: m, child: child),
+          );
         },
-        child: Container(
-          width: 78,
-          height: 78,
-          decoration: BoxDecoration(
-            color: const Color(0x14FFFFFF),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: const [
-              BoxShadow(color: Color(0x2EFFC400), blurRadius: 26, offset: Offset(0, 12)),
-            ],
-          ),
-          child: Icon(widget.icon, size: 46, color: C.accent),
-        ),
+        child: _badge(),
       ),
     );
   }
