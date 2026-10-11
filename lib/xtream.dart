@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show compute;
 import 'package:http/http.dart' as http;
 
+import 'backend.dart' show Backend;
 import 'config.dart';
 
 /// Client for IPTV servers that speak the Xtream Codes API (player_api.php).
@@ -523,11 +524,11 @@ class XtreamApi implements Source {
   };
 
   Uri _uri(Map<String, String> extra) {
-    return Uri.parse('$server/player_api.php').replace(queryParameters: {
+    return Backend.webUri(Uri.parse('$server/player_api.php').replace(queryParameters: {
       'username': username,
       'password': password,
       ...extra,
-    });
+    }));
   }
 
   Future<Uint8List> _bytes(Map<String, String> extra, Duration timeout) async {

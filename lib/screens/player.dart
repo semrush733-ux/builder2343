@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../backend.dart' show Backend;
 import '../config.dart';
 import '../exo.dart';
 import '../input_mode.dart';
@@ -370,8 +372,14 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _retryTimer?.cancel();
     _accepting = false;
     final entry = _entry;
-    final url = entry.urls[_urlIndex % entry.urls.length];
-    final format = formatOfUrl(url);
+    var urls = entry.urls;
+    if (kIsWeb) {
+      // A browser cannot play an endless .ts stream; HLS (.m3u8) goes first, through the website.
+      urls = [...urls.where((u) => formatOfUrl(u) == 'm3u8'), ...urls.where((u) => formatOfUrl(u) != 'm3u8')];
+    }
+    final raw = urls[_urlIndex % urls.length];
+    final format = formatOfUrl(raw);
+    final url = Backend.webUrl(raw);
 
     var start = startAt ?? Duration.zero;
     if (startAt == null && !widget.live && entry.resumeKey != null) {

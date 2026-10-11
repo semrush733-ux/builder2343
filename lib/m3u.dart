@@ -5,6 +5,7 @@ import 'package:archive/archive.dart' show GZipDecoder;
 import 'package:flutter/foundation.dart' show compute;
 import 'package:http/http.dart' as http;
 
+import 'backend.dart' show Backend;
 import 'config.dart';
 import 'theme.dart' show log;
 import 'xtream.dart';
@@ -177,7 +178,7 @@ class M3uSource implements Source {
     }
     final client = http.Client();
     try {
-      final request = http.Request('GET', uri);
+      final request = http.Request('GET', Backend.webUri(uri));
       request.headers['User-Agent'] = kUserAgent;
       final response = await client.send(request).timeout(const Duration(seconds: 30));
       if (response.statusCode == 401 || response.statusCode == 403) {
@@ -269,7 +270,7 @@ class M3uSource implements Source {
       final client = http.Client();
       List<int> bytes;
       try {
-        final request = http.Request('GET', uri);
+        final request = http.Request('GET', Backend.webUri(uri));
         request.headers['User-Agent'] = kUserAgent;
         final response = await client.send(request).timeout(const Duration(seconds: 30));
         if (response.statusCode != 200) return const {};

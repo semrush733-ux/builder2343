@@ -148,6 +148,18 @@ class BUpdate {
 /// Talks to the B1G website: device registration, licence status,
 /// activation codes, remote playlists, the default server and app updates.
 class Backend {
+  /// Browser version only: IPTV servers are plain http and send no CORS headers, so a browser
+  /// on the https website cannot call them. The website fetches them instead (b1g/v1/relay).
+  /// Android / TV builds talk to the server directly and get the address back unchanged.
+  static String webUrl(String url) {
+    if (!kIsWeb || deviceId.isEmpty) return url;
+    if (!(url.startsWith('http://') || url.startsWith('https://'))) return url;
+    if (url.startsWith(kApiBase)) return url;
+    return '$kApiBase/relay?d=${Uri.encodeQueryComponent(deviceId)}&u=${Uri.encodeQueryComponent(url)}';
+  }
+
+  static Uri webUri(Uri uri) => kIsWeb ? Uri.parse(webUrl(uri.toString())) : uri;
+
   static SharedPreferences? _p;
   static Future<bool>? _registering;
   static const _device = MethodChannel('b1g/device');
