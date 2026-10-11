@@ -27,5 +27,6 @@ flutter:
   assets:
     - assets/logo.png
     - assets/symbol.png
+    - assets/intro.mp4
     - assets/home_bg.webp
     - assets/wallpapers/

@@ -6,6 +6,7 @@ import 'backend.dart';
 import 'config.dart';
 import 'input_mode.dart';
 import 'screens/device.dart';
+import 'screens/intro.dart';
 import 'start.dart';
 import 'store.dart';
 import 'theme.dart';
@@ -44,7 +45,8 @@ class B1GApp extends StatelessWidget {
         onPointerDown: (_) => InputMode.remote = false,
         child: AppGate(child: child ?? const SizedBox()),
       ),
-      home: Backend.allowed ? startScreen() : const ActivationScreen(),
+      // Start animation with its sound, then the app.
+      home: IntroGate(next: Backend.allowed ? startScreen() : const ActivationScreen()),
     );
   }
 }
