@@ -4,11 +4,10 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:media_kit_video/media_kit_video.dart';
 
 import '../backend.dart' show Backend;
 import '../config.dart';
-import '../exo.dart';
+import '../engine.dart';
 import '../input_mode.dart';
 import '../lang.dart';
 import '../quality.dart';
@@ -104,8 +103,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
   // A fresh engine is created for every stream that is opened and the old one is closed first:
   // an IPTV account usually allows a single connection, and a clean start is the most reliable.
-  Player? _player;
-  VideoController? _video;
+  PlaybackEngine? _engine;
+  // "exo" or "mpv" for this screen: starts with the customer's choice and switches once
+  // to the other engine by itself when a stream will not play.
+  String _engineName = 'mpv';
+  bool _engineSwitched = false;
   Future<void>? _closing;
   final List<StreamSubscription<dynamic>> _subs = [];
   Duration _wantStart = Duration.zero;
@@ -126,8 +128,6 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   String? _status = 'Loading…';
   String _lastError = '';
   bool _dead = false;
-  bool _inExo = false; // playback handed to the ExoPlayer engine
-  bool _exoTried = false; // the automatic hand-over happens once per player screen
   bool _suspended = false;
   bool _accepting = false; // false while switching streams: late events of the old one are ignored
   bool _ready = false;
@@ -182,6 +182,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   void initState() {
     super.initState();
     _index = widget.index < 0 || widget.index >= widget.entries.length ? 0 : widget.index;
+    _engineName = ExoEngine.available ? Store.engine : 'mpv';
     WidgetsBinding.instance.addObserver(this);
     _keepScreenOn(true);
     _watchdog = Timer.periodic(const Duration(seconds: 2), (_) => _checkHealth());
@@ -189,63 +190,60 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _scheduleEpg();
   }
 
-  Player _createPlayer() {
-    final player = Player(
-      configuration: PlayerConfiguration(
-        title: 'Cloud Player',
-        bufferSize: 48 * 1024 * 1024,
-        logLevel: kVerbose ? MPVLogLevel.info : MPVLogLevel.error,
-      ),
-    );
-    _player = player;
+  /// Starts a fresh engine of the kind chosen for this screen and listens to it.
+  Future<PlaybackEngine> _createEngine() async {
     _direct = Store.videoMode == 'direct';
     _pictureFailed = false;
-    _video = VideoController(
-      player,
-      configuration: VideoControllerConfiguration(
-        vo: _direct ? 'mediacodec_embed' : null,
-        hwdec: _direct ? 'mediacodec' : null,
-      ),
-    );
-    _subs.add(player.stream.position.listen(_onPosition));
-    _subs.add(player.stream.duration.listen((d) {
+    PlaybackEngine engine;
+    if (_engineName == 'exo' && ExoEngine.available) {
+      try {
+        engine = await ExoEngine.create(live: widget.live);
+      } catch (e) {
+        // ExoPlayer could not start on this device: MPV plays instead.
+        log('exo could not start: ${e.runtimeType}');
+        _engineName = 'mpv';
+        _engineSwitched = true;
+        engine = MpvEngine(live: widget.live, direct: _direct);
+      }
+    } else {
+      engine = MpvEngine(live: widget.live, direct: _direct);
+    }
+    _engine = engine;
+    _subs.add(engine.position.listen(_onPosition));
+    _subs.add(engine.duration.listen((d) {
       if (_accepting) _duration = d;
     }));
-    _subs.add(player.stream.buffering.listen((b) {
+    _subs.add(engine.buffering.listen((b) {
       if (b == _buffering) return;
       _buffering = b;
       if (mounted) setState(() {});
     }));
-    _subs.add(player.stream.completed.listen((done) {
+    _subs.add(engine.completed.listen((done) {
       if (done) _onCompleted();
     }));
-    _subs.add(player.stream.error.listen((message) {
-      final text = message.trim();
-      if (text.isNotEmpty) _noteError(text, true);
-    }));
-    _subs.add(player.stream.tracks.listen((tracks) {
+    _subs.add(engine.tracks.listen((tracks) {
       if (_accepting) _readTracks(tracks);
     }));
-    _subs.add(player.stream.log.listen((line) {
-      final text = line.text.trim();
-      if (text.isNotEmpty) _noteError('${line.prefix}: $text', line.level == 'error' || line.level == 'fatal');
+    _subs.add(engine.messages.listen((m) {
+      _noteError(m.text, m.error);
+      // ExoPlayer stops on an error (mpv carries on and reports hiccups): try again at once.
+      if (m.error && engine is ExoEngine && _accepting && identical(engine, _engine)) _failed();
     }));
-    return player;
+    return engine;
   }
 
   /// Closes the engine (and with it the connection to the server). Waits for a
   /// close that is still running, so two streams are never open at once.
   Future<void> _closePlayer() async {
-    final player = _player;
-    if (player != null) {
-      _player = null;
-      _video = null;
+    final engine = _engine;
+    if (engine != null) {
+      _engine = null;
       for (final s in _subs) {
         s.cancel();
       }
       _subs.clear();
       final previous = _closing;
-      final mine = player.dispose().catchError((Object _) {});
+      final mine = engine.dispose().catchError((Object _) {});
       // Keep waiting for an earlier close too, so two streams are never open at once.
       _closing = previous == null ? mine : Future.wait<void>([previous, mine]).then((_) {});
     }
@@ -256,69 +254,6 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         log('engine close timed out');
       });
     }
-  }
-
-  /// Engine settings chosen for IPTV: reconnect inside the network layer, a
-  /// few seconds of buffer, and only a short pause when the buffer runs dry.
-  Future<void> _configure(Player player) async {
-    final platform = player.platform;
-    if (platform is! NativePlayer) return;
-    // dynamic: setProperty only exists in the Android/desktop NativePlayer, so a
-    // static call would break the web compile; the guard above never lets web get here.
-    final dynamic mpv = platform;
-    Future<void> set(String name, String value) async {
-      try {
-        await mpv.setProperty(name, value);
-      } catch (_) {}
-    }
-
-    await Future.wait([
-      set('user-agent', kUserAgent),
-      set('network-timeout', '20'),
-      set('stream-lavf-o', 'reconnect=1,reconnect_streamed=1,reconnect_delay_max=4'),
-      set('cache', 'yes'),
-      // Start showing as soon as there is a picture instead of filling a buffer first...
-      set('cache-pause-initial', 'no'),
-      // ...and after a hiccup wait for only one second of video before carrying on.
-      set('cache-pause-wait', widget.live ? '1' : '2'),
-      set('demuxer-readahead-secs', widget.live ? '10' : '60'),
-      // How much of the stream may sit in memory: enough for a long buffer on
-      // movies, tighter on live so cheap 1 GB boxes never run out of memory.
-      set('demuxer-max-bytes', widget.live ? '64MiB' : '192MiB'),
-      set('demuxer-max-back-bytes', widget.live ? '16MiB' : '64MiB'),
-      // Movies: keep what was already watched in the buffer, so jumping back
-      // a few minutes is instant instead of re-downloading.
-      if (!widget.live) set('demuxer-seekable-cache', 'yes'),
-      // Decode straight into display memory - one copy less per frame.
-      set('vd-lavc-dr', 'yes'),
-      // Live: look at one second of the stream to learn what is in it (the default is up to five).
-      if (widget.live) set('demuxer-lavf-analyzeduration', '1'),
-      // Movies: jump to the nearest key picture, which is immediate on a network stream.
-      if (!widget.live) set('hr-seek', 'no'),
-      set('audio-channels', 'stereo'),
-      set('sub-auto', 'no'),
-      // Let the TV's own video chip decode every format it knows (older films are often MPEG-2,
-      // MPEG-4 / DivX or VC-1, which the engine would otherwise decode on the slow processor).
-      set('hwdec-codecs', 'all'),
-      // When a film still has to be decoded on the processor: use every core, take the quick
-      // paths, and drop a frame rather than let the picture fall behind the sound.
-      set('vd-lavc-threads', '0'),
-      set('vd-lavc-fast', 'yes'),
-      set('vd-lavc-skiploopfilter', 'nonkey'),
-      set('framedrop', 'decoder+vo'),
-      // Light picture processing: TV chips are far weaker than a computer's graphics card.
-      set('scale', 'bilinear'),
-      set('dscale', 'bilinear'),
-      set('cscale', 'bilinear'),
-      set('dither', 'no'),
-      set('deband', 'no'),
-      set('correct-downscaling', 'no'),
-      set('linear-downscaling', 'no'),
-      set('sigmoid-upscaling', 'no'),
-      set('hdr-compute-peak', 'no'),
-      set('interpolation', 'no'),
-      if (_direct) set('hwdec', 'mediacodec'),
-    ]);
   }
 
   @override
@@ -348,7 +283,6 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   // as the app goes to the background and reconnect when it comes back.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_inExo) return; // the ExoPlayer screen owns the stream now
     if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
       if (_suspended) return;
       _suspended = true;
@@ -411,21 +345,20 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       });
     }
     _wantStart = start;
-    log('open index=$_index format=$format try=$_fails');
+    log('open index=$_index format=$format try=$_fails engine=$_engineName');
     try {
       // The old engine is closed completely before the new one starts: most accounts allow a
       // single connection, and one engine at a time is what has proved reliable on TV boxes.
       await _closePlayer();
       if (generation != _generation || !mounted) return;
-      final player = _createPlayer();
+      final engine = await _createEngine();
+      if (generation != _generation || !mounted) {
+        if (identical(engine, _engine)) await _closePlayer();
+        return;
+      }
       setState(() {}); // show the new engine's picture surface
-      await _configure(player);
-      if (generation != _generation || !mounted) return;
-      await player.open(
-        Media(url, httpHeaders: const {'User-Agent': kUserAgent}, start: start > Duration.zero ? start : null),
-        play: true,
-      );
-      if (_speed != 1.0) await player.setRate(_speed);
+      await engine.open(url, start);
+      if (_speed != 1.0) await engine.setRate(_speed);
     } catch (e) {
       log('open failed: ${e.runtimeType}');
       if (generation != _generation || !mounted) return;
@@ -479,21 +412,21 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   void _markReady() {
     _ready = true;
     _playedThisUrl = true;
-    final player = _player;
+    final player = _engine;
     if (player == null) return;
-    if (_duration <= Duration.zero) _duration = player.state.duration;
-    _readTracks(player.state.tracks);
+    if (_duration <= Duration.zero) _duration = player.durationNow;
+    _readTracks(player.tracksNow);
     // Resume: if the engine did not start at the saved place, jump there now.
     if (!widget.live && _wantStart > Duration.zero && _position < _wantStart - const Duration(seconds: 5)) {
       log('resume by seeking to ${_wantStart.inSeconds}');
       player.seek(_wantStart);
     }
     final url = _entry.urls[_urlIndex % _entry.urls.length];
-    final w = player.state.width ?? 0;
-    final h = player.state.height ?? 0;
+    final w = player.width;
+    final h = player.height;
     _videoSize = w > 0 && h > 0 ? '$w x $h' : '';
     _videoHeight = h;
-    log('ready index=$_index format=${formatOfUrl(url)} video=${w}x$h mode=${_direct ? 'direct' : 'gpu'}');
+    log('ready index=$_index format=${formatOfUrl(url)} video=${w}x$h mode=${_direct ? 'direct' : 'gpu'} engine=$_engineName');
     _applyPreferredTracks();
     if (mounted) setState(() => _status = null);
     _showOverlay();
@@ -567,9 +500,19 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
     if (_fails > _maxFails) {
       log('gave up index=$_index');
-      // The main engine gave up: let ExoPlayer (the TV's own video chip) try once.
-      if (Exo.available && !_exoTried) {
-        _toExo();
+      // This engine gave up: let the other engine try once before showing the error.
+      if (ExoEngine.available && !_engineSwitched) {
+        _engineSwitched = true;
+        _engineName = _engineName == 'exo' ? 'mpv' : 'exo';
+        log('switching engine to $_engineName');
+        _fails = 0;
+        _urlIndex = 0;
+        _playedThisUrl = false;
+        setState(() => _status = 'Trying the other player…');
+        _retryTimer?.cancel();
+        _retryTimer = Timer(const Duration(seconds: 1), () {
+          if (mounted && !_suspended) _open(startAt: widget.live ? null : _lastPosition);
+        });
         return;
       }
       if (!_focus.hasPrimaryFocus) _focus.requestFocus();
@@ -598,14 +541,14 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       final errorAt = _errorAt;
       final refused = errorAt != null && now.difference(errorAt) > const Duration(milliseconds: 2500);
       // The engine stopped by itself (nothing loading, not paused by the user).
-      final player = _player;
+      final player = _engine;
       final idle = player != null &&
           waited > const Duration(seconds: 6) &&
-          !player.state.playing &&
-          !player.state.buffering;
+          !player.playing &&
+          !player.isBuffering;
       if (refused || idle || waited > const Duration(seconds: 25)) {
         log(refused ? 'open failed' : (idle ? 'open stopped' : 'open timed out'));
-        if (!refused && !idle && _direct) {
+        if (!refused && !idle && _direct && _engineName == 'mpv') {
           // The direct picture mode hung on this device: go back to the standard one.
           log('direct mode did not start, back to standard mode');
           Store.setVideoMode('gpu');
@@ -621,6 +564,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     // Sound but no picture: the standard picture mode could not start on this device.
     // Switch to the direct mode once (remembered for next time) and reopen.
     if (_pictureFailed &&
+        _engineName == 'mpv' &&
         !_direct &&
         !kNoAutoDirect &&
         !_autoDirectTried &&
@@ -677,7 +621,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       if (wantAudio.isNotEmpty) {
         for (final t in _audioTracks) {
           if ((t.language ?? '') == wantAudio) {
-            if (t.id != _audioId) _player?.setAudioTrack(t);
+            if (t.id != _audioId) _engine?.setAudioTrack(t);
             _audioId = t.id;
             break;
           }
@@ -695,61 +639,35 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       }
     }
     _subtitleId = chosen?.id ?? 'no';
-    _player?.setSubtitleTrack(chosen ?? SubtitleTrack.no());
+    _engine?.setSubtitleTrack(chosen ?? SubtitleTrack.no());
   }
 
   void _chooseAudio(AudioTrack track) {
     _audioId = track.id;
-    _player?.setAudioTrack(track);
+    _engine?.setAudioTrack(track);
     Store.setAudioLanguage(track.language ?? '');
     log('audio track=${track.language ?? track.id}');
   }
 
   void _chooseSubtitle(SubtitleTrack? track) {
     _subtitleId = track?.id ?? 'no';
-    _player?.setSubtitleTrack(track ?? SubtitleTrack.no());
+    _engine?.setSubtitleTrack(track ?? SubtitleTrack.no());
     Store.setSubtitleLanguage(track?.language ?? '');
     log('subtitle track=${track == null ? 'off' : (track.language ?? track.id)}');
   }
 
   void _chooseSpeed(double speed) {
     _speed = speed;
-    _player?.setRate(speed);
+    _engine?.setRate(speed);
     log('speed=$speed');
   }
 
   /// What the engine is doing right now, for the Quality panel (and for support).
   Future<List<String>> _streamFacts() async {
-    final platform = _player?.platform;
-    if (platform is! NativePlayer) return const [];
-    // dynamic for the same reason as in _configure: keeps the web compile working.
-    final dynamic mpv = platform;
-    Future<String> read(String name) async {
-      try {
-        return ((await mpv.getProperty(name)) as String).trim();
-      } catch (_) {
-        return '';
-      }
-    }
-
-    final values = await Future.wait([
-      read('video-format'),
-      read('hwdec-current'),
-      read('container-fps'),
-      read('frame-drop-count'),
-      read('decoder-frame-drop-count'),
-      read('audio-codec-name'),
-    ]);
-    final fps = double.tryParse(values[2]) ?? 0;
-    final hardware = values[1].isNotEmpty && values[1] != 'no';
-    final dropped = (int.tryParse(values[3]) ?? 0) + (int.tryParse(values[4]) ?? 0);
-    final facts = <String>[
-      if (values[0].isNotEmpty) 'Video: ${values[0].toUpperCase()}${fps > 0 ? ', ${fps.toStringAsFixed(fps == fps.roundToDouble() ? 0 : 2)} pictures a second' : ''}',
-      hardware ? 'Decoded by the video chip (${values[1]})' : 'Decoded by the processor (slower)',
-      if (values[5].isNotEmpty) 'Sound: ${values[5].toUpperCase()}',
-      'Pictures skipped so far: $dropped',
-    ];
-    log('facts video=${values[0]} hwdec=${values[1]} fps=${values[2]} dropped=$dropped mode=${_direct ? 'direct' : 'gpu'}');
+    final engine = _engine;
+    if (engine == null) return const [];
+    final facts = await engine.facts();
+    log('facts ${facts.join(' | ')}');
     return facts;
   }
 
@@ -798,7 +716,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                 autofocus: true,
                 onTap: () {
                   _videoId = 'auto';
-                  _player?.setVideoTrack(VideoTrack.auto());
+                  _engine?.setVideoTrack(VideoTrack.auto());
                   log('quality=auto');
                   refresh(() {});
                 },
@@ -809,7 +727,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                   selected: _videoId == variants[i].id,
                   onTap: () {
                     _videoId = variants[i].id;
-                    _player?.setVideoTrack(variants[i]);
+                    _engine?.setVideoTrack(variants[i]);
                     log('quality=${variants[i].h ?? variants[i].id}');
                     refresh(() {});
                   },
@@ -924,13 +842,24 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                 selected: _fit,
                 onTap: (i) => pick(() => _chooseFit(i)),
               ),
-              const _PanelHeading('Video mode'),
-              _PanelChips(
-                labels: _videoModeNames,
-                selected: _videoModes.indexOf(Store.videoMode),
-                onTap: (i) => pick(() => _chooseVideoMode(i)),
-              ),
-              const _PanelNote('Direct is lighter for TV sticks. Use Standard if a video shows no picture.'),
+              if (ExoEngine.available) ...[
+                const _PanelHeading('Player'),
+                _PanelChips(
+                  labels: const ['ExoPlayer', 'MPV'],
+                  selected: _engineName == 'exo' ? 0 : 1,
+                  onTap: (i) => pick(() => _chooseEngine(i == 0 ? 'exo' : 'mpv')),
+                ),
+                const _PanelNote('ExoPlayer uses the TV\'s own video chip. Try MPV if a channel will not play.'),
+              ],
+              if (_engineName == 'mpv') ...[
+                const _PanelHeading('Video mode'),
+                _PanelChips(
+                  labels: _videoModeNames,
+                  selected: _videoModes.indexOf(Store.videoMode),
+                  onTap: (i) => pick(() => _chooseVideoMode(i)),
+                ),
+                const _PanelNote('Direct is lighter for TV sticks. Use Standard if a video shows no picture.'),
+              ],
             ],
           );
         },
@@ -1059,10 +988,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (_userPaused) {
       _userPaused = false;
       _lastProgress = DateTime.now();
-      _player?.play();
+      _engine?.play();
     } else {
       _userPaused = true;
-      _player?.pause();
+      _engine?.pause();
     }
     log(_userPaused ? 'paused' : 'resumed');
     setState(() {});
@@ -1095,7 +1024,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (!mounted || !_ready) return;
     _lastProgress = DateTime.now();
     try {
-      await _player?.seek(to);
+      await _engine?.seek(to);
     } catch (_) {}
     if (!mounted) return;
     _position = to;
@@ -1145,48 +1074,17 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (mounted) Navigator.of(context).pop();
   }
 
-  /// Hands playback to the ExoPlayer engine and closes this screen when the customer comes back.
-  Future<void> _toExo() async {
-    if (!Exo.available || _inExo) return;
-    _exoTried = true;
-    _inExo = true;
-    _retryTimer?.cancel();
-    _saveResume();
-    _accepting = false;
-    _generation++;
-    final start = widget.live ? Duration.zero : _lastPosition;
-    if (mounted) setState(() => _status = 'Opening ExoPlayer…');
-    await _closePlayer(); // one connection per account: free it first
-    final r = await Exo.play(
-      titles: [for (final e in widget.entries) e.title],
-      urls: [for (final e in widget.entries) e.urls],
-      index: _index,
-      live: widget.live,
-      start: start,
-    );
-    if (!mounted) return;
-    if (r == null) {
-      // ExoPlayer could not be opened: stay here and say so.
-      _inExo = false;
-      setState(() {
-        _dead = true;
-        _status = widget.live ? 'This channel is not available right now.' : 'This video cannot be played right now.';
-      });
-      _showOverlay();
-      return;
-    }
-    if (!widget.live && r.index >= 0 && r.index < widget.entries.length) {
-      final key = widget.entries[r.index].resumeKey;
-      final pos = r.position.inSeconds;
-      if (key != null && pos > 0) {
-        final done = r.duration.inSeconds > 60 && pos > r.duration.inSeconds * 0.95;
-        Store.setResume(key, done ? 0 : pos);
-      }
-    }
-    _ready = false; // the resume above is the one to keep
-    _suspended = true; // nothing reconnects while the screen closes
-    _close();
+  /// The customer's engine choice: remembered, and the stream reopens at the same place.
+  void _chooseEngine(String name) {
+    if (!ExoEngine.available || name == _engineName) return;
+    _engineName = name;
+    _engineSwitched = false;
+    Store.setEngine(name);
+    log('engine=$name');
+    _reopenHere();
   }
+
+  void _cycleEngine() => _chooseEngine(_engineName == 'exo' ? 'mpv' : 'exo');
 
   bool _isOk(LogicalKeyboardKey k) =>
       k == LogicalKeyboardKey.select ||
@@ -1331,7 +1229,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Widget build(BuildContext context) {
     final busy = _status != null || (_buffering && !_userPaused);
     final shown = widget.entries[_zapTarget ?? _index];
-    final video = _video;
+    final engine = _engine;
     return PopScope(
       // Back first puts the control bar away, the next Back leaves the player.
       canPop: false,
@@ -1357,22 +1255,13 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
               children: [
                 // The picture is hidden until it really plays, so the last frame of the previous
                 // channel never shows under the new channel's name.
-                if (video != null)
+                if (engine != null)
                   Opacity(
                     opacity: _ready ? 1 : 0,
                     child: IgnorePointer(
                       child: ExcludeFocus(
-                        child: Video(
-                          key: ObjectKey(video),
-                          controller: video,
-                          controls: NoVideoControls,
-                          fit: _fits[_fit],
-                          fill: Colors.black,
-                          // Subtitles sit above the controls while those are on screen.
-                          subtitleViewConfiguration: SubtitleViewConfiguration(
-                            padding: EdgeInsets.fromLTRB(24, 0, 24, _overlay ? 150 : 26),
-                          ),
-                        ),
+                        // Subtitles sit above the controls while those are on screen.
+                        child: engine.view(fit: _fits[_fit], subtitlePad: _overlay ? 150 : 26),
                       ),
                     ),
                   )
@@ -1452,10 +1341,12 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _button(Icons.audiotrack_rounded, 'Audio language', _openOptions, node: widget.live && !many ? _mainButton : null),
       _button(Icons.closed_caption_rounded, 'Subtitles', _openOptions),
       _button(Icons.aspect_ratio_rounded, 'Picture: ${_fitNames[_fit]}', _cycleFit),
-      _button(Icons.memory_rounded,
-          'Video mode: ${_videoModeNames[_videoModes.indexOf(Store.videoMode)]}', _cycleVideoMode),
+      if (ExoEngine.available)
+        _button(Icons.smart_display_rounded, 'Player: ${_engineName == 'exo' ? 'ExoPlayer' : 'MPV'}', _cycleEngine),
+      if (_engineName == 'mpv')
+        _button(Icons.memory_rounded,
+            'Video mode: ${_videoModeNames[_videoModes.indexOf(Store.videoMode)]}', _cycleVideoMode),
       _button(Icons.high_quality_rounded, 'Quality', _openQuality),
-      if (Exo.available) _button(Icons.smart_display_rounded, 'Play with ExoPlayer', _toExo),
       if (!widget.live) _button(Icons.speed_rounded, 'Speed ${_speed}x', _openOptions),
       if (widget.live && item != null)
         _button(favourite ? Icons.star_rounded : Icons.star_border_rounded,

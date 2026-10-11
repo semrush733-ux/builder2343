@@ -192,6 +192,15 @@ class Store {
   }
   static void setVideoMode(String mode) => _p.setString('video_mode', mode);
 
+  /// Which player engine plays streams: "exo" (Google ExoPlayer, the default on Android) or
+  /// "mpv". The app's own controls are the same on both.
+  static String get engine {
+    final v = _p.getString('player_engine') ?? '';
+    if (v == 'exo' || v == 'mpv') return v;
+    return 'exo';
+  }
+  static void setEngine(String engine) => _p.setString('player_engine', engine);
+
   /// Subtitle language picked last time; empty = subtitles off.
   static String get subtitleLanguage => _p.getString('sub_lang') ?? '';
   static void setSubtitleLanguage(String code) => _p.setString('sub_lang', code);
