@@ -184,16 +184,53 @@ class _SpeedTestDialogState extends State<_SpeedTestDialog> {
     final frac = (math.log(1 + shown) / math.log(1 + 300)).clamp(0.0, 1.0);
     return AlertDialog(
       backgroundColor: C.panel,
-      title: const Row(
+      // Test again / Close sit next to the title, so small screens never cover them.
+      title: Row(
         children: [
-          Icon(Icons.speed_rounded, color: C.accent),
-          SizedBox(width: 10),
-          Text('Internet speed test'),
+          const Icon(Icons.speed_rounded, color: C.accent),
+          const SizedBox(width: 10),
+          const Expanded(child: Text('Internet speed test', maxLines: 1, overflow: TextOverflow.ellipsis)),
+          TvFocus(
+            radius: 9,
+            color: C.card,
+            onTap: _run,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.refresh_rounded, size: 16, color: C.accent),
+                  const SizedBox(width: 6),
+                  Text(_running ? 'Testing…' : 'Test again',
+                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TvFocus(
+            autofocus: true,
+            radius: 9,
+            color: C.card,
+            onTap: () => Navigator.of(context).pop(),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.close_rounded, size: 16, color: C.dim),
+                  SizedBox(width: 6),
+                  Text('Close', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
       content: SizedBox(
-        width: 460,
-        child: Column(
+        width: 520,
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
@@ -249,28 +286,8 @@ class _SpeedTestDialogState extends State<_SpeedTestDialog> {
               const Text('Testing… this takes about 15 seconds.', style: TextStyle(color: C.dim)),
           ],
         ),
+        ),
       ),
-      actions: [
-        TvFocus(
-          radius: 9,
-          color: C.card,
-          onTap: _run,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            child: Text(_running ? 'Testing…' : 'Test again', style: const TextStyle(fontWeight: FontWeight.w700)),
-          ),
-        ),
-        TvFocus(
-          autofocus: true,
-          radius: 9,
-          color: C.card,
-          onTap: () => Navigator.of(context).pop(),
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            child: Text('Close', style: TextStyle(fontWeight: FontWeight.w700)),
-          ),
-        ),
-      ],
     );
   }
 }
