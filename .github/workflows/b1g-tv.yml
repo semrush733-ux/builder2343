@@ -229,6 +229,15 @@ jobs:
         run: |
           flutter create --no-pub --platforms=web --org com.b1g --project-name b1gtv "$RUNNER_TEMP/webscaffold"
           cp -r "$RUNNER_TEMP/webscaffold/web" web
+          # Brand the web app: Cloud TV icons, title and manifest instead of the Flutter defaults.
+          cp web_brand/favicon.png web/favicon.png
+          cp web_brand/icons/Icon-192.png web/icons/Icon-192.png
+          cp web_brand/icons/Icon-512.png web/icons/Icon-512.png
+          cp web_brand/icons/Icon-maskable-192.png web/icons/Icon-maskable-192.png
+          cp web_brand/icons/Icon-maskable-512.png web/icons/Icon-maskable-512.png
+          sed -i 's|<title>b1gtv</title>|<title>Cloud TV</title>|' web/index.html
+          sed -i 's|content="b1gtv"|content="Cloud TV"|g' web/index.html
+          sed -i 's|"b1gtv"|"Cloud TV"|g; s|#0175C2|#0A0C10|g' web/manifest.json
 
       - name: Build the web app
         id: webbuild
