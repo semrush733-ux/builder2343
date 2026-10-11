@@ -7,6 +7,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../xtream.dart';
 import 'browse.dart';
+import 'catchup.dart';
 import 'device.dart';
 import 'login.dart';
 import 'update_web.dart' if (dart.library.io) 'update.dart';
@@ -62,6 +63,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _open(XKind kind) {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => BrowseScreen(api: widget.api, kind: kind)));
+  }
+
+  void _openCatchup() {
+    final api = widget.api;
+    if (api is XtreamApi) {
+      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CatchupScreen(api: api)));
+      return;
+    }
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: C.panel,
+        title: const Text('Catch Up'),
+        content: const Text(
+          'Catch Up works with Xtream accounts, where the server keeps recordings of past programmes. '
+          'An M3U playlist link does not carry recordings.',
+          style: TextStyle(height: 1.45),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK', style: TextStyle(color: C.accent))),
+        ],
+      ),
+    );
   }
 
   /// "Playlists" above the tiles: shows the lists on this device's account
@@ -310,6 +334,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       subtitle: 'Seasons and episodes',
                       colors: const [Color(0xFF2A1238), Color(0xFF120B17)],
                       onTap: () => _open(XKind.series),
+                    ),
+                  ),
+                  const SizedBox(width: 18),
+                  Expanded(
+                    child: _BigTile(
+                      icon: Icons.history_rounded,
+                      title: 'Catch Up',
+                      subtitle: 'Replay past TV',
+                      colors: const [Color(0xFF0F2E1C), Color(0xFF0A130D)],
+                      onTap: _openCatchup,
                     ),
                   ),
                 ],

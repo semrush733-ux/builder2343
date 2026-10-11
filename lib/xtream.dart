@@ -95,6 +95,7 @@ class XItem {
     this.num = 0,
     this.url = '',
     this.epgId = '',
+    this.archive = false,
   });
 
   final XKind kind;
@@ -105,6 +106,9 @@ class XItem {
   final String ext;
   final String rating;
   final int num;
+
+  /// True for live channels whose server keeps a recording (catch-up / TV archive).
+  final bool archive;
 
   /// Direct stream address. Only set for items that come from an M3U playlist.
   final String url;
@@ -126,6 +130,7 @@ class XItem {
       ext: kind == XKind.vod ? str(m['container_extension']) : '',
       rating: str(m['rating']),
       num: toInt(m['num']),
+      archive: kind == XKind.live && toInt(m['tv_archive']) == 1,
     );
   }
 
@@ -140,6 +145,7 @@ class XItem {
         'num': num,
         if (url.isNotEmpty) 'u': url,
         if (epgId.isNotEmpty) 'g': epgId,
+        if (archive) 'a': 1,
       };
 
   static XItem? fromJson(dynamic j) {
@@ -158,6 +164,7 @@ class XItem {
       num: toInt(j['num']),
       url: str(j['u']),
       epgId: str(j['g']),
+      archive: toInt(j['a']) == 1,
     );
   }
 }
@@ -397,6 +404,26 @@ List<XEpg> parseEpg(dynamic data) {
   return out;
 }
 
+/// Programmes of one channel that the server has recorded (catch-up).
+/// Newest first; only entries that have already been broadcast.
+List<XEpg> parseCatchup(dynamic data) {
+  final out = <XEpg>[];
+  if (data is! Map) return out;
+  final now = DateTime.now();
+  for (final m in _asList(data['epg_listings'])) {
+    if (m is! Map) continue;
+    if (toInt(m['has_archive']) != 1) continue;
+    final start = toInt(m['start_timestamp']);
+    final stop = toInt(m['stop_timestamp']);
+    if (start <= 0 || stop <= start) continue;
+    final s = DateTime.fromMillisecondsSinceEpoch(start * 1000);
+    if (s.isAfter(now)) continue;
+    out.add(XEpg(_b64(m['title']), s, DateTime.fromMillisecondsSinceEpoch(stop * 1000)));
+  }
+  out.sort((a, b) => b.start.compareTo(a.start));
+  return out;
+}
+
 XSeriesInfo parseSeriesInfo(dynamic data) {
   final seasons = <int, List<XEpisode>>{};
   var plot = '';
@@ -559,6 +586,26 @@ class XtreamApi implements Source {
     final data = await _json({'action': 'get_short_epg', 'stream_id': streamId, 'limit': '4'},
         timeout: const Duration(seconds: 12));
     return parseEpg(data);
+  }
+
+  /// The server's recorded programmes for one channel (catch-up).
+  Future<List<XEpg>> catchup(String streamId) async {
+    final data = await _json({'action': 'get_simple_data_table', 'stream_id': streamId},
+        timeout: const Duration(seconds: 20));
+    return parseCatchup(data);
+  }
+
+  /// Both address styles Xtream servers use for playing a recording;
+  /// the player tries them in order, like it does with live formats.
+  List<String> timeshiftUrls(String streamId, DateTime start, DateTime end) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    final s = '${start.year}-${two(start.month)}-${two(start.day)}:${two(start.hour)}-${two(start.minute)}';
+    final mins = end.difference(start).inMinutes.clamp(1, 24 * 60);
+    return [
+      '$server/streaming/timeshift.php?username=${Uri.encodeComponent(username)}'
+          '&password=${Uri.encodeComponent(password)}&stream=$streamId&start=$s&duration=$mins',
+      '$server/timeshift/$_auth/$mins/$s/$streamId.ts',
+    ];
   }
 
   String get _auth => '${Uri.encodeComponent(username)}/${Uri.encodeComponent(password)}';
