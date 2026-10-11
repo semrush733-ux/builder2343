@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import '../engine.dart';
+import '../i18n.dart';
 import '../parental.dart';
 import '../input_mode.dart';
 import '../store.dart';
@@ -22,11 +23,11 @@ const _recentId = '*recent';
 String kindTitle(XKind kind) {
   switch (kind) {
     case XKind.live:
-      return 'Live TV';
+      return t('Live TV');
     case XKind.vod:
-      return 'Movies';
+      return t('Movies');
     case XKind.series:
-      return 'Series';
+      return t('Series');
   }
 }
 
@@ -34,11 +35,11 @@ String kindTitle(XKind kind) {
 String allTitle(XKind kind) {
   switch (kind) {
     case XKind.live:
-      return 'All Live Channels';
+      return t('All Live Channels');
     case XKind.vod:
-      return 'All Movies';
+      return t('All Movies');
     case XKind.series:
-      return 'All Series';
+      return t('All Series');
   }
 }
 
@@ -624,10 +625,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
                         ),
                         const SizedBox(height: 10),
                         if (_focusEpgLoading)
-                          const Text('Loading the guide…', style: TextStyle(color: C.dim, fontSize: 13.5))
+                          Text(t('Loading the guide…'), style: const TextStyle(color: C.dim, fontSize: 13.5))
                         else if (upcoming.isEmpty)
-                          const Text('No programme information for this channel.',
-                              style: TextStyle(color: C.dim, fontSize: 13.5))
+                          Text(t('No programme information for this channel.'),
+                              style: const TextStyle(color: C.dim, fontSize: 13.5))
                         else ...[
                           if (current != null) ...[
                             Row(
@@ -687,16 +688,16 @@ class _BrowseScreenState extends State<BrowseScreen> {
                         const Spacer(),
                         Row(
                           children: [
-                            _paneButton(Icons.fullscreen_rounded, 'Full screen', () {
+                            _paneButton(Icons.fullscreen_rounded, t('Full screen'), () {
                               final items = _items;
                               if (items == null) return;
                               final i = items.indexWhere((x) => x.id == item.id);
                               if (i >= 0) _playFull(items, i);
                             }),
                             const SizedBox(width: 8),
-                            _paneButton(Icons.calendar_view_day_rounded, 'TV Guide', _openGuide),
+                            _paneButton(Icons.calendar_view_day_rounded, t('TV Guide'), _openGuide),
                             const SizedBox(width: 8),
-                            _paneButton(fav ? Icons.star_rounded : Icons.star_border_rounded, 'Favourite',
+                            _paneButton(fav ? Icons.star_rounded : Icons.star_border_rounded, t('Favourite'),
                                 () => _toggleFavourite(item)),
                           ],
                         ),
@@ -723,7 +724,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
             else
               const Icon(Icons.live_tv_rounded, color: C.dim, size: 46),
             const SizedBox(height: 10),
-            const Text('Press OK to watch here', style: TextStyle(color: C.dim, fontSize: 13.5)),
+            Text(t('Press OK to watch here'), style: const TextStyle(color: C.dim, fontSize: 13.5)),
           ],
         ),
       ),
@@ -770,7 +771,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
         if (index == 0) {
           return _CategoryRow(
             icon: Icons.search_rounded,
-            name: 'Search',
+            name: t('Search'),
             selected: _selected == _searchId,
             onTap: _search,
           );
@@ -778,19 +779,19 @@ class _BrowseScreenState extends State<BrowseScreen> {
         if (index == 1) {
           return _CategoryRow(
             icon: Icons.star_rounded,
-            name: 'Favourites',
+            name: t('Favourites'),
             selected: _selected == _favId,
-            onTap: () => _select(_favId, 'Favourites'),
-            onFocus: () => _focusCategory(_favId, 'Favourites'),
+            onTap: () => _select(_favId, t('Favourites')),
+            onFocus: () => _focusCategory(_favId, t('Favourites')),
           );
         }
         if (index == 2) {
           return _CategoryRow(
             icon: Icons.history_rounded,
-            name: 'Recent',
+            name: t('Recent'),
             selected: _selected == _recentId,
-            onTap: () => _select(_recentId, 'Recent'),
-            onFocus: () => _focusCategory(_recentId, 'Recent'),
+            onTap: () => _select(_recentId, t('Recent')),
+            onFocus: () => _focusCategory(_recentId, t('Recent')),
           );
         }
         if (index == 3) {

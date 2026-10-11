@@ -5,20 +5,24 @@ import 'package:flutter/material.dart';
 import '../backend.dart';
 import '../config.dart';
 import '../engine.dart';
+import '../i18n.dart';
 import '../parental.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../xtream.dart';
+import 'home.dart' show wallpaperAsset;
 
-enum _Section { vod, live, parental, categories, cache, info }
+enum _Section { vod, live, parental, wallpaper, categories, cache, language, info }
 
 const _titles = {
   _Section.vod: 'VOD Player',
   _Section.live: 'Live Player',
   _Section.parental: 'Parental Control',
+  _Section.wallpaper: 'Main Wallpaper',
   _Section.categories: 'Manage Categories',
   _Section.cache: 'Clear Cache',
+  _Section.language: 'Language',
   _Section.info: 'Application Info',
 };
 
@@ -26,6 +30,8 @@ const _icons = {
   _Section.vod: Icons.movie_filter_rounded,
   _Section.live: Icons.live_tv_rounded,
   _Section.parental: Icons.shield_rounded,
+  _Section.wallpaper: Icons.wallpaper_rounded,
+  _Section.language: Icons.translate_rounded,
   _Section.categories: Icons.checklist_rounded,
   _Section.cache: Icons.cleaning_services_rounded,
   _Section.info: Icons.info_rounded,
@@ -35,6 +41,8 @@ const _colors = {
   _Section.vod: Color(0xFFFF9F1C),
   _Section.live: Color(0xFFFF5A5F),
   _Section.parental: Color(0xFF2ECC71),
+  _Section.wallpaper: Color(0xFFFF4FD8),
+  _Section.language: Color(0xFF35D6C4),
   _Section.categories: Color(0xFF4AA3FF),
   _Section.cache: Color(0xFFB37BFF),
   _Section.info: Color(0xFFFFC400),
@@ -98,11 +106,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      _OnceIcon(icon: Icons.settings_rounded, color: C.accent, size: 28, order: 0),
-                      SizedBox(width: 12),
-                      Text('Settings', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+                      const _OnceIcon(icon: Icons.settings_rounded, color: C.accent, size: 28, order: 0),
+                      const SizedBox(width: 12),
+                      Text(t('Settings'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
                     ],
                   ),
                   const SizedBox(height: 22),
@@ -123,7 +131,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               _OnceIcon(icon: _icons[s]!, color: _colors[s]!, size: 24, order: s.index + 1),
                               const SizedBox(width: 14),
                               Expanded(
-                                child: Text(_titles[s]!,
+                                child: Text(t(_titles[s]!),
                                     style: TextStyle(
                                         fontSize: 15.5,
                                         fontWeight: s == _section ? FontWeight.w800 : FontWeight.w600)),
@@ -151,7 +159,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             size: 34,
                             order: 0),
                         const SizedBox(width: 14),
-                        Text(_titles[_section]!, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
+                        Text(t(_titles[_section]!), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
                       ],
                     ),
                     const SizedBox(height: 22),
@@ -184,8 +192,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       case _Section.parental:
         return _parental();
+      case _Section.wallpaper:
+        return _wallpapers();
       case _Section.categories:
         return _categories();
+      case _Section.language:
+        return _languages();
       case _Section.cache:
         return _cache();
       case _Section.info:
@@ -413,6 +425,119 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // --------------------------------------------------------------- wallpaper
+
+  Widget _wallpapers() {
+    final current = Store.wallpaper;
+    return GridView.builder(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4,
+        childAspectRatio: 16 / 9,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 14,
+      ),
+      itemCount: 21,
+      itemBuilder: (context, i) {
+        final on = current == i;
+        return TvFocus(
+          autofocus: on,
+          selected: on,
+          radius: 12,
+          color: Colors.black,
+          onTap: () {
+            Store.setWallpaper(i);
+            log('settings wallpaper=$i');
+            setState(() {});
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(9),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(wallpaperAsset(i), fit: BoxFit.cover, cacheWidth: 400, filterQuality: FilterQuality.medium),
+                if (i == 0)
+                  Positioned(
+                    left: 8,
+                    bottom: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: const Color(0xCC000000), borderRadius: BorderRadius.circular(5)),
+                      child: Text(t('Default'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                    ),
+                  ),
+                if (on)
+                  const Positioned(
+                    right: 8,
+                    top: 8,
+                    child: CircleAvatar(
+                      radius: 13,
+                      backgroundColor: C.accent,
+                      child: Icon(Icons.check_rounded, size: 18, color: Colors.black),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------- language
+
+  Widget _languages() {
+    final chosen = Store.uiLanguage;
+    final entries = <(String, String, String)>[('auto', t('Automatic (TV language)'), ''), ...kLanguages];
+    return GridView.builder(
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 300,
+        mainAxisExtent: 54,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: entries.length,
+      itemBuilder: (context, i) {
+        final (code, english, own) = entries[i];
+        final on = chosen == code;
+        return TvFocus(
+          autofocus: on,
+          selected: on,
+          radius: 10,
+          color: C.panel,
+          onTap: () {
+            Store.setUiLanguage(code);
+            log('settings language=$code');
+            setState(() {});
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                Icon(on ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                    size: 18, color: on ? C.accent : C.dim),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(own.isEmpty ? english : own,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      if (own.isNotEmpty && own != english)
+                        Text(english, style: const TextStyle(fontSize: 11.5, color: C.dim)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   // ------------------------------------------------------------------- cache
 
   Future<void> _clearCache() async {
@@ -455,7 +580,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: C.accent))
                     : const Icon(Icons.cleaning_services_rounded, color: Color(0xFFB37BFF)),
                 const SizedBox(width: 12),
-                const Text('Clear cache now', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                Text(t('Clear cache now'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
               ],
             ),
           ),

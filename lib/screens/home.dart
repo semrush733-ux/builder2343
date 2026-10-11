@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../i18n.dart';
 import '../backend.dart';
 import '../m3u.dart';
 import '../store.dart';
@@ -203,9 +204,9 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           // Faded entertainment picture far behind everything...
           Opacity(
-            opacity: 0.42,
+            opacity: Store.wallpaper == 0 ? 0.42 : 0.9,
             child: Image.asset(
-              'assets/home_bg.webp',
+              wallpaperAsset(Store.wallpaper),
               fit: BoxFit.cover,
               alignment: Alignment.center,
               filterQuality: FilterQuality.low,
@@ -260,30 +261,34 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 16),
                 TvFocus(
                   onTap: _choosePlaylist,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.playlist_play_rounded, size: 18, color: C.dim),
-                        SizedBox(width: 8),
-                        Text('Playlists', style: TextStyle(fontSize: 14)),
+                        const Icon(Icons.playlist_play_rounded, size: 18, color: C.dim),
+                        const SizedBox(width: 8),
+                        Text(t('Playlists'), style: const TextStyle(fontSize: 14)),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 TvFocus(
+                  // Language or wallpaper may have changed: redraw when the customer comes back.
                   onTap: () => Navigator.of(context)
-                      .push(MaterialPageRoute<void>(builder: (_) => SettingsScreen(api: widget.api))),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      .push(MaterialPageRoute<void>(builder: (_) => SettingsScreen(api: widget.api)))
+                      .then((_) {
+                    if (mounted) setState(() {});
+                  }),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.settings_rounded, size: 18, color: C.dim),
-                        SizedBox(width: 8),
-                        Text('Settings', style: TextStyle(fontSize: 14)),
+                        const Icon(Icons.settings_rounded, size: 18, color: C.dim),
+                        const SizedBox(width: 8),
+                        Text(t('Settings'), style: const TextStyle(fontSize: 14)),
                       ],
                     ),
                   ),
@@ -320,8 +325,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       autofocus: true,
                       order: 0,
                       icon: Icons.live_tv_rounded,
-                      title: 'Live TV',
-                      subtitle: 'Channels and TV guide',
+                      title: t('Live TV'),
+                      subtitle: t('Channels and TV guide'),
                       colors: const [Color(0xFF3A2C00), Color(0xFF16130A)],
                       onTap: () => _open(XKind.live),
                     ),
@@ -331,8 +336,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: _BigTile(
                       order: 1,
                       icon: Icons.movie_rounded,
-                      title: 'Movies',
-                      subtitle: 'Films on demand',
+                      title: t('Movies'),
+                      subtitle: t('Films on demand'),
                       colors: const [Color(0xFF0E2A3A), Color(0xFF0B1319)],
                       onTap: () => _open(XKind.vod),
                     ),
@@ -342,8 +347,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: _BigTile(
                       order: 2,
                       icon: Icons.video_library_rounded,
-                      title: 'Series',
-                      subtitle: 'Seasons and episodes',
+                      title: t('Series'),
+                      subtitle: t('Seasons and episodes'),
                       colors: const [Color(0xFF2A1238), Color(0xFF120B17)],
                       onTap: () => _open(XKind.series),
                     ),
@@ -353,8 +358,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: _BigTile(
                       order: 3,
                       icon: Icons.history_rounded,
-                      title: 'Catch Up',
-                      subtitle: 'Replay past TV',
+                      title: t('Catch Up'),
+                      subtitle: t('Replay past TV'),
                       colors: const [Color(0xFF0F2E1C), Color(0xFF0A130D)],
                       onTap: _openCatchup,
                     ),
@@ -380,13 +385,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         const Icon(Icons.tv_rounded, size: 15, color: C.accent),
                         const SizedBox(width: 8),
-                        const Text('Device ID  ', style: TextStyle(fontSize: 12.5, color: C.dim)),
+                        Text('${t('Device ID')}  ', style: const TextStyle(fontSize: 12.5, color: C.dim)),
                         Text(Backend.deviceId,
                             style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
                         if (Backend.pairingCode.isNotEmpty) ...[
                           Container(
                               width: 1, height: 14, margin: const EdgeInsets.symmetric(horizontal: 12), color: C.dim),
-                          const Text('Device Key  ', style: TextStyle(fontSize: 12.5, color: C.dim)),
+                          Text('${t('Device Key')}  ', style: const TextStyle(fontSize: 12.5, color: C.dim)),
                           Text(Backend.pairingCode,
                               style: const TextStyle(
                                   fontSize: 13.5, fontWeight: FontWeight.w800, color: C.accent, letterSpacing: 0.5)),
@@ -401,15 +406,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: C.accent,
                     focusBorder: Colors.white,
                     onTap: _showUpdate,
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.system_update_rounded, size: 17, color: Colors.black),
-                          SizedBox(width: 8),
-                          Text('Update',
-                              style: TextStyle(fontSize: 14, color: Colors.black, fontWeight: FontWeight.w800)),
+                          const Icon(Icons.system_update_rounded, size: 17, color: Colors.black),
+                          const SizedBox(width: 8),
+                          Text(t('Update'),
+                              style: const TextStyle(fontSize: 14, color: Colors.black, fontWeight: FontWeight.w800)),
                         ],
                       ),
                     ),
@@ -426,7 +431,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const Icon(Icons.qr_code_2_rounded, size: 17, color: C.dim),
                         const SizedBox(width: 8),
                         Text(
-                          Backend.statusLine.isEmpty ? 'My device' : 'My device  ·  ${Backend.statusLine}',
+                          Backend.statusLine.isEmpty ? t('My device') : '${t('My device')}  ·  ${Backend.statusLine}',
                           style: const TextStyle(fontSize: 14),
                         ),
                       ],
@@ -436,14 +441,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 6),
                 TvFocus(
                   onTap: _logout,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.logout_rounded, size: 17, color: C.dim),
-                        SizedBox(width: 8),
-                        Text('Sign out', style: TextStyle(fontSize: 14)),
+                        const Icon(Icons.logout_rounded, size: 17, color: C.dim),
+                        const SizedBox(width: 8),
+                        Text(t('Sign out'), style: const TextStyle(fontSize: 14)),
                       ],
                     ),
                   ),
@@ -638,3 +643,7 @@ class _FloatIconState extends State<_FloatIcon> with TickerProviderStateMixin {
     );
   }
 }
+
+/// The picture for a wallpaper number (0 = the standard home background).
+String wallpaperAsset(int n) =>
+    n <= 0 || n > 20 ? 'assets/home_bg.webp' : 'assets/wallpapers/wp${n.toString().padLeft(2, '0')}.webp';

@@ -8,6 +8,7 @@ import 'package:media_kit/media_kit.dart';
 import '../backend.dart' show Backend;
 import '../config.dart';
 import '../engine.dart';
+import '../i18n.dart';
 import '../input_mode.dart';
 import '../lang.dart';
 import '../quality.dart';
@@ -1389,17 +1390,17 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
     final List<Widget> centre = widget.live
         ? [
-            if (many) _button(Icons.list_rounded, 'Channel list', _openChannels, node: _mainButton, size: 52),
+            if (many) _button(Icons.list_rounded, t('Channel list'), _openChannels, node: _mainButton, size: 52),
             if (many) _button(Icons.skip_previous_rounded, 'Previous channel', () => _zap(-1)),
             if (many) _button(Icons.skip_next_rounded, 'Next channel', () => _zap(1)),
-            _button(Icons.calendar_view_day_rounded, 'TV Guide', _openGuide),
+            _button(Icons.calendar_view_day_rounded, t('TV Guide'), _openGuide),
           ]
         : [
             if (many) _button(Icons.skip_previous_rounded, 'Previous episode', () => _step(-1)),
             _button(Icons.fast_rewind_rounded, 'Back 10 seconds (hold for more)', () => _seek(-1)),
             _button(
               _userPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-              _userPaused ? 'Play' : 'Pause',
+              _userPaused ? t('Play') : t('Pause'),
               _togglePause,
               node: _mainButton,
               size: 60,
@@ -1408,16 +1409,16 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
             if (many) _button(Icons.skip_next_rounded, 'Next episode', () => _step(1)),
           ];
     final List<Widget> side = [
-      _button(Icons.audiotrack_rounded, 'Audio language', _openOptions, node: widget.live && !many ? _mainButton : null),
-      _button(Icons.closed_caption_rounded, 'Subtitles', _openOptions),
+      _button(Icons.audiotrack_rounded, t('Audio language'), _openOptions, node: widget.live && !many ? _mainButton : null),
+      _button(Icons.closed_caption_rounded, t('Subtitles'), _openOptions),
       _button(Icons.aspect_ratio_rounded, 'Picture: ${_fitNames[_fit]}', _cycleFit),
-      _button(Icons.high_quality_rounded, 'Quality', _openQuality),
+      _button(Icons.high_quality_rounded, t('Quality'), _openQuality),
       if (!widget.live) _button(Icons.speed_rounded, 'Speed ${_speed}x', _openOptions),
       if (widget.live && item != null)
         _button(favourite ? Icons.star_rounded : Icons.star_border_rounded,
             favourite ? 'Remove from Favourites' : 'Add to Favourites', _toggleFavourite,
             active: favourite),
-      _button(Icons.undo_rounded, 'Back', _close),
+      _button(Icons.undo_rounded, t('Back'), _close),
     ];
 
     return Column(

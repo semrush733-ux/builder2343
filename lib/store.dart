@@ -209,6 +209,14 @@ class Store {
   }
   static void setLiveEngine(String engine) => _p.setString('live_engine', engine);
 
+  /// App language: "auto" (the TV's own language when the app has it, else English) or a code.
+  static String get uiLanguage => _p.getString('ui_language') ?? 'auto';
+  static void setUiLanguage(String code) => _p.setString('ui_language', code);
+
+  /// Home screen wallpaper: 0 = the standard one, 1..20 = the pictures in assets/wallpapers.
+  static int get wallpaper => _p.getInt('wallpaper') ?? 0;
+  static void setWallpaper(int n) => _p.setInt('wallpaper', n);
+
   // ---- parental control and category management (per account) ----
 
   /// The PIN that unlocks locked categories; empty = parental control off.
