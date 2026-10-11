@@ -195,11 +195,11 @@ class Store {
   /// Which player engine plays streams: "exo" (Google ExoPlayer, the default on Android) or
   /// "mpv". The app's own controls are the same on both.
   static String get engine {
-    final v = _p.getString('player_engine') ?? '';
+    final v = _p.getString('player_engine2') ?? '';
     if (v == 'exo' || v == 'mpv') return v;
     return 'exo';
   }
-  static void setEngine(String engine) => _p.setString('player_engine', engine);
+  static void setEngine(String engine) => _p.setString('player_engine2', engine);
 
   /// Subtitle language picked last time; empty = subtitles off.
   static String get subtitleLanguage => _p.getString('sub_lang') ?? '';
