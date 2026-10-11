@@ -15,6 +15,7 @@ import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../xtream.dart';
+import 'guide.dart';
 
 /// One thing the player can show. [urls] are tried in order (live channels
 /// have a second stream format as a fallback).
@@ -132,6 +133,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   String _lastError = '';
   bool _dead = false;
   bool _suspended = false;
+  bool _childOpen = false; // a catch-up recording plays on its own screen above this one
   bool _accepting = false; // false while switching streams: late events of the old one are ignored
   bool _ready = false;
   bool _playedThisUrl = false;
@@ -287,6 +289,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   // as the app goes to the background and reconnect when it comes back.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_childOpen) return;
     if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
       if (_suspended) return;
       _suspended = true;
@@ -873,6 +876,51 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (mounted) _showOverlay();
   }
 
+  /// The full TV Guide. Picking a channel tunes to it; picking a past programme with a
+  /// recording plays it (catch-up) and comes back to live TV afterwards.
+  Future<void> _openGuide() async {
+    if (_panelOpen || !widget.live) return;
+    _panelOpen = true;
+    _hideTimer?.cancel();
+    log('panel=guide');
+    final picked = await Navigator.of(context).push<GuideResult>(MaterialPageRoute(
+      builder: (_) => GuideScreen(api: widget.api, entries: widget.entries, index: _zapTarget ?? _index),
+    ));
+    _panelOpen = false;
+    if (!mounted) return;
+    final channel = picked?.channel;
+    final archive = picked?.archive;
+    if (channel != null && channel != _index) {
+      _tuneTo(channel);
+    } else if (archive != null) {
+      await _playArchive(archive);
+    } else {
+      _showOverlay();
+    }
+  }
+
+  /// Plays a recording on its own screen. The live stream is closed first (most accounts
+  /// allow one connection) and opened again when the customer comes back.
+  Future<void> _playArchive(PlayEntry entry) async {
+    _suspended = true;
+    _accepting = false;
+    _generation++;
+    _retryTimer?.cancel();
+    await _closePlayer();
+    if (!mounted) return;
+    log('guide catch-up');
+    _childOpen = true;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => PlayerScreen(api: widget.api, entries: [entry], index: 0, live: false),
+    ));
+    _childOpen = false;
+    if (!mounted) return;
+    _keepScreenOn(true);
+    _suspended = false;
+    _fails = 0;
+    _open();
+  }
+
   Future<void> _openChannels() async {
     if (_panelOpen || !widget.live || widget.entries.length < 2) return;
     _panelOpen = true;
@@ -1111,6 +1159,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (!up) {
       if (k == LogicalKeyboardKey.contextMenu) {
         if (down) _openOptions();
+        return KeyEventResult.handled;
+      }
+      // The remote's Guide / EPG key.
+      if (widget.live && (k == LogicalKeyboardKey.guide || k == LogicalKeyboardKey.info)) {
+        if (down) _openGuide();
         return KeyEventResult.handled;
       }
       if (widget.live) {
@@ -1358,6 +1411,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
             if (many) _button(Icons.list_rounded, 'Channel list', _openChannels, node: _mainButton, size: 52),
             if (many) _button(Icons.skip_previous_rounded, 'Previous channel', () => _zap(-1)),
             if (many) _button(Icons.skip_next_rounded, 'Next channel', () => _zap(1)),
+            _button(Icons.calendar_view_day_rounded, 'TV Guide', _openGuide),
           ]
         : [
             if (many) _button(Icons.skip_previous_rounded, 'Previous episode', () => _step(-1)),

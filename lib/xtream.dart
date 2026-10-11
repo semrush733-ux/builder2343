@@ -292,10 +292,16 @@ XMovieInfo parseMovieInfo(dynamic data) {
 }
 
 class XEpg {
-  const XEpg(this.title, this.start, this.end);
+  const XEpg(this.title, this.start, this.end, {this.description = '', this.archive = false});
   final String title;
   final DateTime start;
   final DateTime end;
+
+  /// What the programme is about (empty when the guide has no text).
+  final String description;
+
+  /// The server keeps a recording (catch-up can play it).
+  final bool archive;
 }
 
 class XAccount {
@@ -405,6 +411,33 @@ List<XEpg> parseEpg(dynamic data) {
   return out;
 }
 
+/// The whole guide the server has for one channel (past, now and coming),
+/// oldest first, with descriptions and the catch-up flag.
+List<XEpg> parseFullEpg(dynamic data) {
+  final out = <XEpg>[];
+  if (data is! Map) return out;
+  for (final m in _asList(data['epg_listings'])) {
+    final start = toInt(m['start_timestamp']);
+    final stop = toInt(m['stop_timestamp']);
+    if (start <= 0 || stop <= start) continue;
+    out.add(XEpg(
+      _b64(m['title']),
+      DateTime.fromMillisecondsSinceEpoch(start * 1000),
+      DateTime.fromMillisecondsSinceEpoch(stop * 1000),
+      description: _b64(m['description']),
+      archive: toInt(m['has_archive']) == 1,
+    ));
+  }
+  out.sort((a, b) => a.start.compareTo(b.start));
+  // Some servers list the same slot twice: keep the first of overlapping duplicates.
+  final clean = <XEpg>[];
+  for (final e in out) {
+    if (clean.isNotEmpty && !e.start.isAfter(clean.last.start)) continue;
+    clean.add(e);
+  }
+  return clean;
+}
+
 /// Programmes of one channel that the server has recorded (catch-up).
 /// Newest first; only entries that have already been broadcast.
 List<XEpg> parseCatchup(dynamic data) {
@@ -496,6 +529,9 @@ abstract class Source {
 
   Future<List<XEpg>> shortEpg(String streamId);
 
+  /// Everything the guide has for one channel (TV Guide screen), oldest first.
+  Future<List<XEpg>> fullEpg(String epgId);
+
   /// Stream addresses of a live channel, the one to try first at the front.
   List<String> liveUrlsFor(XItem item, String preferredFormat);
 
@@ -586,6 +622,13 @@ class XtreamApi implements Source {
     final data = await _json({'action': 'get_short_epg', 'stream_id': streamId, 'limit': '4'},
         timeout: const Duration(seconds: 12));
     return parseEpg(data);
+  }
+
+  @override
+  Future<List<XEpg>> fullEpg(String epgId) async {
+    final data = await _json({'action': 'get_simple_data_table', 'stream_id': epgId},
+        timeout: const Duration(seconds: 20));
+    return parseFullEpg(data);
   }
 
   /// The server's recorded programmes for one channel (catch-up).

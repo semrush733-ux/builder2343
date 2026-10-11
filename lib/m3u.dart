@@ -246,6 +246,14 @@ class M3uSource implements Source {
     return list.where((e) => e.end.isAfter(now)).take(4).toList();
   }
 
+  /// Everything the XMLTV guide has for the channel (TV Guide screen).
+  @override
+  Future<List<XEpg>> fullEpg(String epgId) async {
+    if (epgId.isEmpty) return const [];
+    final guide = await _guide();
+    return guide[epgId] ?? guide[epgId.toLowerCase()] ?? const <XEpg>[];
+  }
+
   /// Downloads and parses the XMLTV guide once per app start. Best effort:
   /// any problem simply means "no guide", never an error on screen.
   Future<Map<String, List<XEpg>>> _guide() {
@@ -337,6 +345,7 @@ Map<String, List<XEpg>> parseXmltv(String xml) {
       r'<programme[^>]*?start="([^"]+)"[^>]*?(?:stop="([^"]+)")?[^>]*?channel="([^"]+)"[^>]*>(.*?)</programme>',
       dotAll: true);
   final titleTag = RegExp(r'<title[^>]*>(.*?)</title>', dotAll: true);
+  final descTag = RegExp(r'<desc[^>]*>(.*?)</desc>', dotAll: true);
 
   final now = DateTime.now();
   final from = now.subtract(const Duration(hours: 3));
@@ -354,8 +363,9 @@ Map<String, List<XEpg>> parseXmltv(String xml) {
     final title = _xmlText(titleTag.firstMatch(body)?.group(1) ?? '');
     if (title.isEmpty) continue;
     final list = out.putIfAbsent(channel, () => <XEpg>[]);
-    if (list.length >= 60) continue;
-    list.add(XEpg(title, start, end));
+    if (list.length >= 80) continue;
+    final desc = _xmlText(descTag.firstMatch(body)?.group(1) ?? '');
+    list.add(XEpg(title, start, end, description: desc.length > 400 ? '${desc.substring(0, 400)}…' : desc));
   }
   for (final list in out.values) {
     list.sort((a, b) => a.start.compareTo(b.start));
