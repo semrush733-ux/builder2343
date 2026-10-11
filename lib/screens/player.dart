@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../config.dart';
+import '../exo.dart';
 import '../input_mode.dart';
 import '../lang.dart';
 import '../quality.dart';
@@ -123,6 +124,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   String? _status = 'Loading…';
   String _lastError = '';
   bool _dead = false;
+  bool _inExo = false; // playback handed to the ExoPlayer engine
+  bool _exoTried = false; // the automatic hand-over happens once per player screen
   bool _suspended = false;
   bool _accepting = false; // false while switching streams: late events of the old one are ignored
   bool _ready = false;
@@ -343,6 +346,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   // as the app goes to the background and reconnect when it comes back.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_inExo) return; // the ExoPlayer screen owns the stream now
     if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
       if (_suspended) return;
       _suspended = true;
@@ -555,6 +559,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
     if (_fails > _maxFails) {
       log('gave up index=$_index');
+      // The main engine gave up: let ExoPlayer (the TV's own video chip) try once.
+      if (Exo.available && !_exoTried) {
+        _toExo();
+        return;
+      }
       if (!_focus.hasPrimaryFocus) _focus.requestFocus();
       setState(() {
         _dead = true;
@@ -1128,6 +1137,49 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (mounted) Navigator.of(context).pop();
   }
 
+  /// Hands playback to the ExoPlayer engine and closes this screen when the customer comes back.
+  Future<void> _toExo() async {
+    if (!Exo.available || _inExo) return;
+    _exoTried = true;
+    _inExo = true;
+    _retryTimer?.cancel();
+    _saveResume();
+    _accepting = false;
+    _generation++;
+    final start = widget.live ? Duration.zero : _lastPosition;
+    if (mounted) setState(() => _status = 'Opening ExoPlayer…');
+    await _closePlayer(); // one connection per account: free it first
+    final r = await Exo.play(
+      titles: [for (final e in widget.entries) e.title],
+      urls: [for (final e in widget.entries) e.urls],
+      index: _index,
+      live: widget.live,
+      start: start,
+    );
+    if (!mounted) return;
+    if (r == null) {
+      // ExoPlayer could not be opened: stay here and say so.
+      _inExo = false;
+      setState(() {
+        _dead = true;
+        _status = widget.live ? 'This channel is not available right now.' : 'This video cannot be played right now.';
+      });
+      _showOverlay();
+      return;
+    }
+    if (!widget.live && r.index >= 0 && r.index < widget.entries.length) {
+      final key = widget.entries[r.index].resumeKey;
+      final pos = r.position.inSeconds;
+      if (key != null && pos > 0) {
+        final done = r.duration.inSeconds > 60 && pos > r.duration.inSeconds * 0.95;
+        Store.setResume(key, done ? 0 : pos);
+      }
+    }
+    _ready = false; // the resume above is the one to keep
+    _suspended = true; // nothing reconnects while the screen closes
+    _close();
+  }
+
   bool _isOk(LogicalKeyboardKey k) =>
       k == LogicalKeyboardKey.select ||
       k == LogicalKeyboardKey.enter ||
@@ -1395,6 +1447,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _button(Icons.memory_rounded,
           'Video mode: ${_videoModeNames[_videoModes.indexOf(Store.videoMode)]}', _cycleVideoMode),
       _button(Icons.high_quality_rounded, 'Quality', _openQuality),
+      if (Exo.available) _button(Icons.smart_display_rounded, 'Play with ExoPlayer', _toExo),
       if (!widget.live) _button(Icons.speed_rounded, 'Speed ${_speed}x', _openOptions),
       if (widget.live && item != null)
         _button(favourite ? Icons.star_rounded : Icons.star_border_rounded,

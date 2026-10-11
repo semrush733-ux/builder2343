@@ -35,6 +35,14 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- Second player engine (ExoPlayer), opened by Flutter for a channel or film. -->
+        <activity
+            android:name=".ExoActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation|smallestScreenSize|screenLayout|uiMode"
+            android:hardwareAccelerated="true" />
         <!-- Lets the installer read the downloaded update from the app's cache folder. -->
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -16,6 +16,9 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private val exoRequest = 4711
+    private var exoResult: MethodChannel.Result? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // The app draws its own focus highlight; Android's outline around the whole screen is not wanted.
@@ -114,6 +117,28 @@ class MainActivity : FlutterActivity() {
                     } catch (e: Exception) {
                         result.success(false)
                     }
+                } else if (call.method == "playExo") {
+                    // Hands playback to the ExoPlayer engine; answers when the customer comes back.
+                    try {
+                        @Suppress("UNCHECKED_CAST")
+                        val a = call.arguments as Map<String, Any?>
+                        val titles = ArrayList((a["titles"] as? List<*>)?.map { it?.toString() ?: "" } ?: emptyList())
+                        val urls = ArrayList((a["urls"] as? List<*>)?.map { it?.toString() ?: "" } ?: emptyList())
+                        val intent = Intent(this, ExoActivity::class.java)
+                            .putStringArrayListExtra(ExoActivity.EXTRA_TITLES, titles)
+                            .putStringArrayListExtra(ExoActivity.EXTRA_URLS, urls)
+                            .putExtra(ExoActivity.EXTRA_INDEX, (a["index"] as? Number)?.toInt() ?: 0)
+                            .putExtra(ExoActivity.EXTRA_LIVE, a["live"] as? Boolean ?: true)
+                            .putExtra(ExoActivity.EXTRA_START_MS, (a["startMs"] as? Number)?.toLong() ?: 0L)
+                            .putExtra(ExoActivity.EXTRA_UA, a["ua"] as? String)
+                        exoResult?.success(null)
+                        exoResult = result
+                        @Suppress("DEPRECATION")
+                        startActivityForResult(intent, exoRequest)
+                    } catch (e: Exception) {
+                        exoResult = null
+                        result.success(null)
+                    }
                 } else if (call.method == "canInstall") {
                     // From Android 8 the customer allows "install unknown apps" per app, once.
                     result.success(
@@ -136,5 +161,22 @@ class MainActivity : FlutterActivity() {
                     result.notImplemented()
                 }
             }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != exoRequest) return
+        val r = exoResult ?: return
+        exoResult = null
+        if (data == null) {
+            r.success(null)
+            return
+        }
+        r.success(mapOf(
+            "index" to data.getIntExtra(ExoActivity.RESULT_INDEX, 0),
+            "positionMs" to data.getLongExtra(ExoActivity.RESULT_POSITION_MS, 0L),
+            "durationMs" to data.getLongExtra(ExoActivity.RESULT_DURATION_MS, 0L)
+        ))
     }
 }
