@@ -46,6 +46,14 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
     super.initState();
     UpdateDialog.showing = true;
     WidgetsBinding.instance.addObserver(this);
+    // TV remotes: pull the D-pad focus INTO this window, otherwise the remote
+    // keeps moving the screen behind it and "Update now" can never be reached.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _mainNode.requestFocus();
+    });
+    Future.delayed(const Duration(milliseconds: 450), () {
+      if (mounted && !_mainNode.hasFocus) _mainNode.requestFocus();
+    });
   }
 
   @override
@@ -246,7 +254,9 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
     }
     return PopScope(
       canPop: !u.force && _stage != _Stage.downloading,
-      child: Dialog(
+      child: FocusScope(
+        autofocus: true,
+        child: Dialog(
         backgroundColor: C.panel,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -281,6 +291,7 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
               ],
             ),
           ),
+        ),
         ),
       ),
     );
