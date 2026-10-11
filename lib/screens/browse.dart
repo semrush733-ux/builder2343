@@ -2,15 +2,13 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:media_kit/media_kit.dart';
-import 'package:media_kit_video/media_kit_video.dart';
-
-import '../config.dart';
+import '../engine.dart';
 import '../input_mode.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../xtream.dart';
+import 'guide.dart';
 import 'movie.dart';
 import 'player.dart';
 import 'series.dart';
@@ -81,13 +79,22 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   // Live: the small preview on the right. OK on a channel starts it here,
   // OK on the same channel again goes full screen (like the big IPTV apps).
-  Player? _pv;
-  VideoController? _pvVideo;
+  PlaybackEngine? _pv;
   XItem? _pvItem;
   bool _pvBuffering = false;
   bool _pvFallbackTried = false;
   final List<StreamSubscription> _pvSubs = [];
   int _pvRequest = 0;
+
+  // Live: the guide box under the preview follows the channel the remote is on.
+  XItem? _focusItem;
+  int _focusNumber = 0;
+  List<XEpg> _focusEpg = const [];
+  bool _focusEpgLoading = false;
+  final Map<String, List<XEpg>> _epgCache = {};
+  Timer? _epgTimer;
+  int _epgRequest = 0;
+  Timer? _clock;
 
   bool get _live => widget.kind == XKind.live;
 
@@ -95,6 +102,12 @@ class _BrowseScreenState extends State<BrowseScreen> {
   void initState() {
     super.initState();
     _loadCategories();
+    if (_live) {
+      // Keeps "now" and the progress bar of the guide box current.
+      _clock = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   bool _disposed = false;
@@ -103,6 +116,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
   void dispose() {
     _disposed = true;
     _focusTimer?.cancel();
+    _epgTimer?.cancel();
+    _clock?.cancel();
     _stopPreview();
     super.dispose();
   }
@@ -113,67 +128,129 @@ class _BrowseScreenState extends State<BrowseScreen> {
       s.cancel();
     }
     _pvSubs.clear();
-    final player = _pv;
+    final engine = _pv;
     _pv = null;
-    _pvVideo = null;
     _pvItem = null;
     _pvBuffering = false;
     if (mounted && !_disposed) setState(() {});
-    if (player != null) await player.dispose().catchError((Object _) {});
+    if (engine != null) await engine.dispose().catchError((Object _) {});
   }
 
+  /// Plays a channel in the preview box, on the same engine as full screen
+  /// (ExoPlayer on Android, MPV elsewhere or when the customer chose it).
   Future<void> _preview(XItem item, List<String> urls) async {
     if (urls.isEmpty) return;
     await _stopPreview();
     if (!mounted) return;
     final request = ++_pvRequest;
-    final player = Player(
-      configuration: PlayerConfiguration(
-        title: 'Cloud Player',
-        bufferSize: 8 * 1024 * 1024,
-        logLevel: MPVLogLevel.error,
-      ),
-    );
-    // The preview always renders through the normal picture path; the Direct
-    // mode (which takes over the whole screen surface) stays for full screen.
-    final video = VideoController(player);
-    final platform = player.platform;
-    if (platform is NativePlayer) {
-      // dynamic: setProperty only exists on Android/desktop (see player.dart).
-      final dynamic mpv = platform;
-      for (final p in const [
-        ['user-agent', kUserAgent],
-        ['network-timeout', '15'],
-        ['cache-pause-initial', 'no'],
-        ['audio-channels', 'stereo'],
-      ]) {
-        try {
-          await mpv.setProperty(p[0], p[1]);
-        } catch (_) {}
-      }
+    PlaybackEngine engine;
+    try {
+      engine = ExoEngine.available && Store.engine == 'exo'
+          ? await ExoEngine.create(live: true)
+          : MpvEngine(live: true, direct: false);
+    } catch (_) {
+      engine = MpvEngine(live: true, direct: false);
     }
     if (!mounted || request != _pvRequest) {
-      player.dispose().catchError((Object _) {});
+      engine.dispose().catchError((Object _) {});
       return;
     }
     setState(() {
-      _pv = player;
-      _pvVideo = video;
+      _pv = engine;
       _pvItem = item;
       _pvBuffering = true;
       _pvFallbackTried = false;
     });
-    _pvSubs.add(player.stream.buffering.listen((b) {
+    _pvSubs.add(engine.buffering.listen((b) {
       if (mounted && request == _pvRequest && b != _pvBuffering) setState(() => _pvBuffering = b);
     }));
-    _pvSubs.add(player.stream.error.listen((message) {
-      // Live channels have a second stream format; the preview tries it once.
-      if (request != _pvRequest || _pvFallbackTried || urls.length < 2) return;
-      _pvFallbackTried = true;
-      player.open(Media(urls[1])).catchError((Object _) {});
+    _pvSubs.add(engine.position.listen((_) {
+      if (mounted && request == _pvRequest && _pvBuffering) setState(() => _pvBuffering = false);
     }));
-    log('preview open');
-    await player.open(Media(urls.first)).catchError((Object _) {});
+    _pvSubs.add(engine.messages.listen((m) {
+      // Live channels have a second stream format; the preview tries it once.
+      if (!m.error || request != _pvRequest || _pvFallbackTried || urls.length < 2) return;
+      _pvFallbackTried = true;
+      engine.open(urls[1], Duration.zero).catchError((Object _) {});
+    }));
+    log('preview open engine=${engine.name}');
+    await engine.open(urls.first, Duration.zero).catchError((Object _) {});
+  }
+
+  /// The remote moved onto a channel: show its guide under the preview once it settles there.
+  void _focusChannel(XItem item, int number) {
+    if (_focusItem?.id == item.id) return;
+    final id = item.url.isEmpty ? item.id : item.epgId;
+    final cached = _epgCache[id];
+    setState(() {
+      _focusItem = item;
+      _focusNumber = number;
+      _focusEpg = cached ?? const [];
+      _focusEpgLoading = cached == null && id.isNotEmpty;
+    });
+    _epgTimer?.cancel();
+    if (cached != null || id.isEmpty) return;
+    final request = ++_epgRequest;
+    _epgTimer = Timer(const Duration(milliseconds: 350), () async {
+      List<XEpg> list = const [];
+      try {
+        list = await widget.api.fullEpg(id);
+      } catch (_) {}
+      if (_epgCache.length > 300) _epgCache.clear();
+      _epgCache[id] = list;
+      if (!mounted || request != _epgRequest) return;
+      setState(() {
+        _focusEpg = list;
+        _focusEpgLoading = false;
+      });
+    });
+  }
+
+  List<PlayEntry> _entriesFor(List<XItem> items) {
+    final format = Store.liveFormat;
+    return [
+      for (final i in items)
+        PlayEntry(
+          title: i.name,
+          urls: widget.api.liveUrlsFor(i, format),
+          // Xtream channels use their stream id; playlist channels use the
+          // tvg-id from the M3U (shown when an XMLTV guide is set).
+          epgId: i.url.isEmpty ? i.id : (i.epgId.isEmpty ? null : i.epgId),
+          logo: i.icon,
+          item: i,
+        ),
+    ];
+  }
+
+  Future<void> _playFull(List<XItem> items, int index) async {
+    Store.addRecent(items[index]);
+    await _stopPreview();
+    if (!mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => PlayerScreen(api: widget.api, entries: _entriesFor(items), index: index, live: true)));
+  }
+
+  /// TV Guide for the channels of this category, starting on the selected one.
+  Future<void> _openGuide() async {
+    final items = _items;
+    if (items == null || items.isEmpty) return;
+    final current = _focusItem ?? _pvItem;
+    var index = current == null ? 0 : items.indexWhere((i) => i.id == current.id);
+    if (index < 0) index = 0;
+    await _stopPreview();
+    if (!mounted) return;
+    final entries = _entriesFor(items);
+    final picked = await Navigator.of(context).push<GuideResult>(
+        MaterialPageRoute(builder: (_) => GuideScreen(api: widget.api, entries: entries, index: index)));
+    if (!mounted || picked == null) return;
+    final channel = picked.channel;
+    final archive = picked.archive;
+    if (channel != null) {
+      await _playFull(items, channel);
+    } else if (archive != null) {
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => PlayerScreen(api: widget.api, entries: [archive], index: 0, live: false)));
+    }
   }
 
   Future<void> _loadCategories() async {
@@ -312,30 +389,13 @@ class _BrowseScreenState extends State<BrowseScreen> {
       await Navigator.of(context)
           .push(MaterialPageRoute<void>(builder: (_) => SeriesScreen(api: api, series: item)));
     } else if (_live) {
-      final format = Store.liveFormat;
-      // First OK on a channel: play it in the small preview. OK on the same
-      // channel again: full screen.
+      // First OK on a channel: play it in the preview. OK on the same channel again: full screen.
       if (_pvItem?.id != item.id || _pv == null) {
-        _preview(item, api.liveUrlsFor(item, format));
+        _focusChannel(item, index + 1);
+        _preview(item, api.liveUrlsFor(item, Store.liveFormat));
         return;
       }
-      Store.addRecent(item);
-      await _stopPreview();
-      final entries = [
-        for (final i in items)
-          PlayEntry(
-            title: i.name,
-            urls: api.liveUrlsFor(i, format),
-            // Xtream channels use their stream id; playlist channels use the
-            // tvg-id from the M3U (shown when an XMLTV guide is set).
-            epgId: i.url.isEmpty ? i.id : (i.epgId.isEmpty ? null : i.epgId),
-            logo: i.icon,
-            item: i,
-          ),
-      ];
-      if (!mounted) return;
-      await Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => PlayerScreen(api: api, entries: entries, index: index, live: true)));
+      await _playFull(items, index);
     } else {
       Store.addRecent(item);
       // Movies open on their details page first; "Watch now" there starts the player.
@@ -410,11 +470,11 @@ class _BrowseScreenState extends State<BrowseScreen> {
                   Expanded(
                     child: _live
                         ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Expanded(child: _content()),
+                              SizedBox(width: 340, child: _content()),
                               const SizedBox(width: 16),
-                              SizedBox(width: 330, child: _previewPane()),
+                              Expanded(child: Padding(padding: const EdgeInsets.only(bottom: 14), child: _previewPane())),
                             ],
                           )
                         : _content(),
@@ -428,57 +488,254 @@ class _BrowseScreenState extends State<BrowseScreen> {
     );
   }
 
+  static String _hm(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  /// Live: the preview picture on top, the channel's guide under it, and quick buttons.
   Widget _previewPane() {
-    final video = _pvVideo;
-    final item = _pvItem;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
+    final engine = _pv;
+    final playing = _pvItem;
+    final item = _focusItem ?? playing;
+    final now = DateTime.now();
+    final upcoming = _focusEpg.where((e) => e.end.isAfter(now)).take(5).toList();
+    final current = upcoming.isNotEmpty && !upcoming.first.start.isAfter(now) ? upcoming.first : null;
+    final later = current == null ? upcoming : upcoming.skip(1).toList();
+    final double progress = current == null
+        ? 0.0
+        : (now.difference(current.start).inSeconds / math.max(1, current.end.difference(current.start).inSeconds))
+            .clamp(0.0, 1.0)
+            .toDouble();
+    final fav = item != null && Store.isFavourite(item);
+
+    return LayoutBuilder(builder: (context, box) {
+      final videoH = math.min(box.maxWidth * 9 / 16, box.maxHeight * 0.52);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ---- picture
+          Center(
             child: Container(
-              color: Colors.black,
-              child: video == null
-                  ? const Center(child: Icon(Icons.live_tv_rounded, color: C.dim, size: 40))
-                  : Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Video(
-                          key: ObjectKey(video),
-                          controller: video,
-                          controls: NoVideoControls,
-                          fill: Colors.black,
-                        ),
-                        if (_pvBuffering)
-                          const Center(
-                            child: SizedBox(
-                              width: 30,
-                              height: 30,
-                              child: CircularProgressIndicator(color: C.accent, strokeWidth: 3),
-                            ),
+              width: videoH * 16 / 9,
+              height: videoH,
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0x22FFFFFF)),
+                boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 10))],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (engine != null)
+                    IgnorePointer(child: ExcludeFocus(child: engine.view(fit: BoxFit.contain, subtitlePad: 12)))
+                  else
+                    _previewIdle(item),
+                  if (engine != null && _pvBuffering)
+                    const Center(
+                      child: SizedBox(
+                          width: 34, height: 34, child: CircularProgressIndicator(color: C.accent, strokeWidth: 3)),
+                    ),
+                  if (engine != null && playing != null)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(14, 26, 14, 10),
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, Color(0xCC000000)],
                           ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration:
+                                  BoxDecoration(color: C.danger, borderRadius: BorderRadius.circular(4)),
+                              child: const Text('LIVE',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(playing.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                            ),
+                            const Text('OK = full screen', style: TextStyle(fontSize: 12, color: Color(0xFFD5DAE3))),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // ---- guide box
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF1C2130), Color(0xFF151923), Color(0xFF2A1E08)],
+                ),
+                border: Border.all(color: const Color(0x1FFFC400)),
+              ),
+              child: item == null
+                  ? const Center(
+                      child: Text('Move to a channel to see what is on.\nOK plays it here, OK again goes full screen.',
+                          textAlign: TextAlign.center, style: TextStyle(color: C.dim, fontSize: 14, height: 1.5)),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            SizedBox(width: 38, height: 30, child: NetImage(item.icon, cacheWidth: 96)),
+                            const SizedBox(width: 10),
+                            if (_focusNumber > 0)
+                              Text('$_focusNumber  ',
+                                  style: const TextStyle(fontSize: 15, color: C.accent, fontWeight: FontWeight.w800)),
+                            Expanded(
+                              child: Text(item.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                            ),
+                            Text(_hm(now), style: const TextStyle(fontSize: 14, color: C.dim, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        if (_focusEpgLoading)
+                          const Text('Loading the guide…', style: TextStyle(color: C.dim, fontSize: 13.5))
+                        else if (upcoming.isEmpty)
+                          const Text('No programme information for this channel.',
+                              style: TextStyle(color: C.dim, fontSize: 13.5))
+                        else ...[
+                          if (current != null) ...[
+                            Row(
+                              children: [
+                                Text('${_hm(current.start)} – ${_hm(current.end)}',
+                                    style: const TextStyle(
+                                        fontSize: 13.5, color: C.accent, fontWeight: FontWeight.w800)),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(current.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 15.5, color: C.accent, fontWeight: FontWeight.w800)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(3),
+                              child: LinearProgressIndicator(
+                                value: progress,
+                                minHeight: 4,
+                                color: C.accent,
+                                backgroundColor: const Color(0x26FFFFFF),
+                              ),
+                            ),
+                            if (current.description.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(current.description,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 12.5, height: 1.35, color: Color(0xFFB9C0CC))),
+                            ],
+                            const SizedBox(height: 8),
+                          ],
+                          for (final e in later.take(4))
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 5),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: 104,
+                                    child: Text('${_hm(e.start)} – ${_hm(e.end)}',
+                                        style: const TextStyle(fontSize: 13, color: Color(0xFFD5DAE3))),
+                                  ),
+                                  Expanded(
+                                    child: Text(e.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                        const Spacer(),
+                        Row(
+                          children: [
+                            _paneButton(Icons.fullscreen_rounded, 'Full screen', () {
+                              final items = _items;
+                              if (items == null) return;
+                              final i = items.indexWhere((x) => x.id == item.id);
+                              if (i >= 0) _playFull(items, i);
+                            }),
+                            const SizedBox(width: 8),
+                            _paneButton(Icons.calendar_view_day_rounded, 'TV Guide', _openGuide),
+                            const SizedBox(width: 8),
+                            _paneButton(fav ? Icons.star_rounded : Icons.star_border_rounded,
+                                fav ? 'Favourite' : 'Add to Favourites', () => _toggleFavourite(item)),
+                          ],
+                        ),
                       ],
                     ),
             ),
           ),
+        ],
+      );
+    });
+  }
+
+  Widget _previewIdle(XItem? item) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: RadialGradient(colors: [Color(0xFF1E2433), Colors.black], radius: 0.9),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (item != null && item.icon.startsWith('http'))
+              SizedBox(width: 120, height: 72, child: NetImage(item.icon, cacheWidth: 240))
+            else
+              const Icon(Icons.live_tv_rounded, color: C.dim, size: 46),
+            const SizedBox(height: 10),
+            const Text('Press OK to watch here', style: TextStyle(color: C.dim, fontSize: 13.5)),
+          ],
         ),
-        const SizedBox(height: 12),
-        Text(
-          item?.name ?? 'Channel preview',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800),
+      ),
+    );
+  }
+
+  Widget _paneButton(IconData icon, String label, VoidCallback onTap) {
+    return TvFocus(
+      radius: 9,
+      color: const Color(0x1AFFFFFF),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 17, color: C.accent),
+            const SizedBox(width: 6),
+            Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+          ],
         ),
-        const SizedBox(height: 5),
-        Text(
-          item == null
-              ? 'Press OK on a channel to preview it here.'
-              : 'Press OK again for full screen.',
-          style: const TextStyle(fontSize: 12.5, color: C.dim, height: 1.4),
-        ),
-      ],
+      ),
     );
   }
 
@@ -561,8 +818,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
       final int columns;
       final double extent;
       if (_live) {
-        columns = math.max(1, (width / 222).floor());
-        extent = 58;
+        columns = 1;
+        extent = 54;
       } else {
         columns = math.max(2, (width / 128).floor());
         extent = ((width - (columns - 1) * 10) / columns) * 1.48;
@@ -583,7 +840,15 @@ class _BrowseScreenState extends State<BrowseScreen> {
           void open() => _openItem(items, index);
           void hold() => _toggleFavourite(item);
           return _live
-              ? _ChannelTile(item: item, number: index + 1, favourite: fav, onTap: open, onLongPress: hold)
+              ? _ChannelTile(
+                  item: item,
+                  number: index + 1,
+                  favourite: fav,
+                  playing: _pvItem?.id == item.id,
+                  onTap: open,
+                  onLongPress: hold,
+                  onFocus: () => _focusChannel(item, index + 1),
+                )
               : _PosterTile(item: item, favourite: fav, onTap: open, onLongPress: hold);
         },
       );
@@ -654,23 +919,34 @@ class _ChannelTile extends StatelessWidget {
     required this.favourite,
     required this.onTap,
     required this.onLongPress,
+    this.onFocus,
+    this.playing = false,
   });
 
   final XItem item;
   final int number;
   final bool favourite;
+  final bool playing;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final VoidCallback? onFocus;
 
   @override
   Widget build(BuildContext context) {
     return TvFocus(
       onTap: onTap,
       onLongPress: onLongPress,
+      onFocus: onFocus,
+      selected: playing,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 9),
         child: Row(
           children: [
+            SizedBox(
+              width: 34,
+              child: Text('$number',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: playing ? C.accent : C.dim)),
+            ),
             SizedBox(width: 40, height: 40, child: NetImage(item.icon, cacheWidth: 96)),
             const SizedBox(width: 10),
             Expanded(
