@@ -18,6 +18,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     // ExoPlayer engine: draws into a Flutter texture under the app's own player controls.
     private var exo: ExoEngine? = null
+    private val net by lazy { NetHelper(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -118,6 +119,20 @@ class MainActivity : FlutterActivity() {
                     } catch (e: Exception) {
                         result.success(false)
                     }
+                } else if (call.method == "netInfo") {
+                    result.success(try { net.info() } catch (e: Exception) { mapOf("type" to "none") })
+                } else if (call.method == "wifiScan") {
+                    result.success(try { net.scan() } catch (e: Exception) { mapOf("permission" to true, "list" to emptyList<Any>()) })
+                } else if (call.method == "wifiPermission") {
+                    net.requestLocation()
+                    result.success(null)
+                } else if (call.method == "wifiJoin") {
+                    @Suppress("UNCHECKED_CAST")
+                    val a = call.arguments as Map<String, Any?>
+                    result.success(net.join(a["ssid"] as? String ?: "", a["password"] as? String ?: "", a["secured"] as? Boolean ?: true))
+                } else if (call.method == "wifiSettings") {
+                    net.openSettings()
+                    result.success(null)
                 } else if (call.method == "canInstall") {
                     // From Android 8 the customer allows "install unknown apps" per app, once.
                     result.success(

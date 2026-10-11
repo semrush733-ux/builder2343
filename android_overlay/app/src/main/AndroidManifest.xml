@@ -3,6 +3,14 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- "Update now": the app downloads its own new version and hands it to Android's installer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Settings › Network: show the Wi-Fi connection, scan for networks and join one. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
 
     <!-- Android TV / Fire TV: no touch screen needed, shown in the TV launcher. -->
     <uses-feature android:name="android.software.leanback" android:required="false" />

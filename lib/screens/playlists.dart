@@ -91,13 +91,29 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     }
   }
 
-  /// A locked playlist opens only with its 4-digit PIN (set on the website).
-  Future<void> _pick(BPlaylist p) async {
-    if (p.locked && !await _askPin(p)) return;
-    if (mounted) Navigator.of(context).pop(p);
+  // Locked playlists (4-digit PIN set on the website) are hidden until their PIN is typed;
+  // they then stay visible until the app is closed.
+  static final Set<int> _revealed = {};
+
+  static String _hash(String pin) => sha256.convert(utf8.encode('b1g-pin:${pin.trim()}')).toString();
+
+  bool _visible(BPlaylist p) => !p.locked || _revealed.contains(p.id);
+
+  void _pick(BPlaylist p) => Navigator.of(context).pop(p);
+
+  /// "Show locked playlists": the PIN shows every playlist locked with it.
+  Future<void> _reveal() async {
+    final lists = _lists ?? const <BPlaylist>[];
+    final hashes = {for (final p in lists) if (p.locked) p.pinHash};
+    final ok = await _askPin('Locked playlists', (hash) => hashes.contains(hash), (hash) {
+      for (final p in lists) {
+        if (p.locked && p.pinHash == hash) _revealed.add(p.id);
+      }
+    });
+    if (ok && mounted) setState(() {});
   }
 
-  Future<bool> _askPin(BPlaylist p) async {
+  Future<bool> _askPin(String title, bool Function(String hash) accepts, void Function(String hash) onOk) async {
     final controller = TextEditingController();
     var error = '';
     final ok = await showDialog<bool>(
@@ -105,8 +121,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, refresh) {
           void check(String value) {
-            final hash = sha256.convert(utf8.encode('b1g-pin:${value.trim()}')).toString();
-            if (hash == p.pinHash) {
+            final hash = _hash(value);
+            if (accepts(hash)) {
+              onOk(hash);
               Navigator.of(ctx).pop(true);
             } else {
               controller.clear();
@@ -120,7 +137,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               children: [
                 const Icon(Icons.lock_rounded, color: C.accent),
                 const SizedBox(width: 10),
-                Expanded(child: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis)),
               ],
             ),
             content: SizedBox(
@@ -194,11 +211,44 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                                     textAlign: TextAlign.center,
                                     style: TextStyle(color: C.dim, fontSize: 15, height: 1.5)),
                               )
-                            : ListView.separated(
-                                itemCount: lists.length,
-                                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                                itemBuilder: (context, i) => _row(lists[i], i == 0),
-                              ),
+                            : Builder(builder: (context) {
+                                final shown = lists.where(_visible).toList();
+                                final hidden = lists.length - shown.length;
+                                return ListView(
+                                  children: [
+                                    for (var i = 0; i < shown.length; i++)
+                                      Padding(
+                                        padding: const EdgeInsets.only(bottom: 10),
+                                        child: _row(shown[i], i == 0),
+                                      ),
+                                    if (hidden > 0)
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: TvFocus(
+                                          autofocus: shown.isEmpty,
+                                          radius: 10,
+                                          color: C.panel,
+                                          onTap: _reveal,
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.lock_rounded, size: 18, color: C.accent),
+                                                const SizedBox(width: 10),
+                                                Text(
+                                                    hidden == 1
+                                                        ? 'Show locked playlist (PIN)'
+                                                        : 'Show $hidden locked playlists (PIN)',
+                                                    style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700)),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              }),
               ),
             ],
           ),

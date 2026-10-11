@@ -6,6 +6,7 @@ import '../backend.dart';
 import '../config.dart';
 import '../engine.dart';
 import '../i18n.dart';
+import '../network.dart';
 import '../parental.dart';
 import '../store.dart';
 import '../theme.dart';
@@ -13,9 +14,10 @@ import '../widgets.dart';
 import '../xtream.dart';
 import 'home.dart' show wallpaperAsset;
 
-enum _Section { vod, live, parental, wallpaper, categories, cache, language, info }
+enum _Section { network, vod, live, parental, wallpaper, categories, cache, language, info }
 
 const _titles = {
+  _Section.network: 'Network',
   _Section.vod: 'VOD Player',
   _Section.live: 'Live Player',
   _Section.parental: 'Parental Control',
@@ -27,6 +29,7 @@ const _titles = {
 };
 
 const _icons = {
+  _Section.network: Icons.wifi_rounded,
   _Section.vod: Icons.movie_filter_rounded,
   _Section.live: Icons.live_tv_rounded,
   _Section.parental: Icons.shield_rounded,
@@ -38,6 +41,7 @@ const _icons = {
 };
 
 const _colors = {
+  _Section.network: Color(0xFF35A7FF),
   _Section.vod: Color(0xFFFF9F1C),
   _Section.live: Color(0xFFFF5A5F),
   _Section.parental: Color(0xFF2ECC71),
@@ -59,7 +63,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  _Section _section = _Section.vod;
+  _Section _section = _Section.network;
   XKind _kind = XKind.live;
   final Map<XKind, List<XCategory>> _cats = {};
   final Map<XKind, String> _catsError = {};
@@ -118,7 +122,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: TvFocus(
-                        autofocus: s == _Section.vod,
+                        autofocus: s == _Section.network,
                         selected: s == _section,
                         radius: 11,
                         color: C.panel,
@@ -176,6 +180,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _body() {
     switch (_section) {
+      case _Section.network:
+        return const _NetworkPanel();
       case _Section.vod:
         return _playerChoice(
           current: ExoEngine.available ? Store.engine : 'mpv',
@@ -785,6 +791,305 @@ class _OnceIconState extends State<_OnceIcon> with SingleTickerProviderStateMixi
         );
       },
       child: Icon(widget.icon, color: widget.color, size: widget.size),
+    );
+  }
+}
+
+
+/// Settings › Network: the connection in use, the Wi-Fi networks around the TV, and joining one.
+class _NetworkPanel extends StatefulWidget {
+  const _NetworkPanel();
+
+  @override
+  State<_NetworkPanel> createState() => _NetworkPanelState();
+}
+
+class _NetworkPanelState extends State<_NetworkPanel> with WidgetsBindingObserver {
+  NetInfo _info = const NetInfo();
+  List<WifiNet>? _nets = const [];
+  bool _scanning = false;
+  bool _askedPermission = false;
+  String _note = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refresh(scan: true);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Back from the permission question or the TV's Wi-Fi page: look again.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh(scan: true);
+  }
+
+  Future<void> _refresh({bool scan = false}) async {
+    final info = await Net.info();
+    if (!mounted) return;
+    setState(() => _info = info);
+    if (scan) await _scan();
+  }
+
+  Future<void> _scan() async {
+    if (_scanning) return;
+    setState(() => _scanning = true);
+    var nets = await Net.scan();
+    if (nets != null && nets.isEmpty) {
+      // A fresh scan takes a moment on most TVs: ask once more shortly after.
+      await Future<void>.delayed(const Duration(seconds: 3));
+      nets = await Net.scan();
+    }
+    if (!mounted) return;
+    setState(() {
+      _nets = nets;
+      _scanning = false;
+    });
+    if (nets == null && !_askedPermission) {
+      _askedPermission = true;
+      await Net.askPermission();
+    }
+  }
+
+  Future<void> _join(WifiNet n) async {
+    if (!_info.canJoin) {
+      setState(() => _note = 'This TV only lets its own Wi-Fi page join networks. Opening it now…');
+      await Net.openSettings();
+      return;
+    }
+    var password = '';
+    if (n.secured) {
+      final controller = TextEditingController();
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: C.panel,
+          title: Text(n.ssid),
+          content: SizedBox(
+            width: 380,
+            child: TvField(
+              controller: controller,
+              label: 'Wi-Fi password',
+              icon: Icons.key_rounded,
+              obscure: true,
+              autofocus: true,
+              action: TextInputAction.done,
+              onSubmitted: (_) => Navigator.of(ctx).pop(true),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Connect')),
+          ],
+        ),
+      );
+      password = controller.text;
+      controller.dispose();
+      if (ok != true || !mounted) return;
+    }
+    setState(() => _note = 'Connecting to ${n.ssid}…');
+    final r = await Net.join(n.ssid, password, n.secured);
+    if (!mounted) return;
+    if (r == 'failed') {
+      setState(() => _note = 'Could not connect to ${n.ssid}. Check the password and try again.');
+      return;
+    }
+    if (r == 'settings') return;
+    // Give the TV a few seconds to connect, then show the result.
+    for (var i = 0; i < 6; i++) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      final info = await Net.info();
+      if (!mounted) return;
+      setState(() => _info = info);
+      if (info.type == 'wifi' && info.ssid == n.ssid) {
+        setState(() => _note = 'Connected to ${n.ssid}.');
+        return;
+      }
+    }
+    setState(() => _note = 'Still connecting… If it does not connect, check the password.');
+  }
+
+  Widget _bars(int level, {double size = 20, Color? color}) {
+    const icons = [
+      Icons.signal_wifi_0_bar_rounded,
+      Icons.network_wifi_1_bar_rounded,
+      Icons.network_wifi_2_bar_rounded,
+      Icons.network_wifi_3_bar_rounded,
+      Icons.signal_wifi_4_bar_rounded,
+    ];
+    return Icon(icons[level.clamp(0, 4)], size: size, color: color ?? (level >= 3 ? const Color(0xFF2ECC71) : C.accent));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final i = _info;
+    final connected = i.type != 'none';
+    final title = switch (i.type) {
+      'wifi' => i.ssid.isEmpty ? 'Wi-Fi' : i.ssid,
+      'ethernet' => 'Cable (Ethernet)',
+      'mobile' => 'Mobile data',
+      'none' => 'Not connected',
+      _ => 'Connected',
+    };
+    final details = <String>[
+      if (i.type == 'wifi' && i.linkMbps > 0) '${i.linkMbps} Mbit/s',
+      if (i.type == 'wifi' && i.frequency > 0) i.frequency > 4900 ? '5 GHz' : '2.4 GHz',
+      if (i.ip.isNotEmpty) 'IP ${i.ip}',
+    ];
+    final nets = _nets;
+    return ListView(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: C.panel,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: connected ? const Color(0x552ECC71) : const Color(0x55FF6B6B)),
+          ),
+          child: Row(
+            children: [
+              if (i.type == 'wifi')
+                _bars(i.level, size: 40)
+              else
+                Icon(i.type == 'ethernet' ? Icons.settings_ethernet_rounded : (connected ? Icons.public_rounded : Icons.wifi_off_rounded),
+                    size: 40, color: connected ? const Color(0xFF2ECC71) : C.danger),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(connected ? 'CONNECTED' : 'OFFLINE',
+                        style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1,
+                            color: connected ? const Color(0xFF2ECC71) : C.danger)),
+                    const SizedBox(height: 2),
+                    Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                    if (details.isNotEmpty)
+                      Text(details.join('   ·   '), style: const TextStyle(fontSize: 13.5, color: C.dim)),
+                  ],
+                ),
+              ),
+              TvFocus(
+                radius: 10,
+                color: C.card,
+                onTap: Net.openSettings,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.settings_rounded, size: 17, color: C.dim),
+                      SizedBox(width: 8),
+                      Text('TV Wi-Fi settings', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            const Text('NEARBY WI-FI NETWORKS',
+                style: TextStyle(fontSize: 13, color: C.dim, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+            const SizedBox(width: 14),
+            if (_scanning)
+              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: C.accent)),
+            const Spacer(),
+            TvFocus(
+              radius: 18,
+              color: C.panel,
+              onTap: () => _refresh(scan: true),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.refresh_rounded, size: 17, color: C.accent),
+                    SizedBox(width: 6),
+                    Text('Scan again', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_note.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text(_note, style: const TextStyle(fontSize: 13.5, color: C.accent)),
+        ],
+        const SizedBox(height: 12),
+        if (!Net.available)
+          const Text('Network settings are available in the Android app.', style: TextStyle(color: C.dim))
+        else if (nets == null)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'To list Wi-Fi networks, Android needs the "location" permission for this app '
+                '(it is only used for the Wi-Fi list).',
+                style: TextStyle(fontSize: 13.5, color: C.dim, height: 1.5),
+              ),
+              const SizedBox(height: 10),
+              TvFocus(
+                radius: 10,
+                color: C.card,
+                onTap: Net.askPermission,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Text('Allow', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ],
+          )
+        else if (nets.isEmpty && !_scanning)
+          Text(i.wifiOn ? 'No Wi-Fi networks found yet. Press "Scan again".' : 'Wi-Fi is switched off on this TV.',
+              style: const TextStyle(color: C.dim))
+        else
+          for (final n in nets)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: TvFocus(
+                radius: 10,
+                color: C.panel,
+                selected: i.type == 'wifi' && i.ssid == n.ssid,
+                onTap: () => _join(n),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  child: Row(
+                    children: [
+                      _bars(n.level),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Text(n.ssid,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      ),
+                      if (i.type == 'wifi' && i.ssid == n.ssid)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 12),
+                          child: Text('Connected',
+                              style: TextStyle(fontSize: 12.5, color: Color(0xFF2ECC71), fontWeight: FontWeight.w800)),
+                        ),
+                      Text(n.band, style: const TextStyle(fontSize: 12, color: C.dim)),
+                      const SizedBox(width: 10),
+                      Icon(n.secured ? Icons.lock_rounded : Icons.lock_open_rounded, size: 16, color: C.dim),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+      ],
     );
   }
 }
