@@ -47,10 +47,21 @@ class Logo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Brand wordmark: "Cloud TV".
+    // Brand: the logo symbol (fitted, never cropped or stretched) and the "Cloud Player" wordmark.
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        SizedBox(
+          width: size * 1.15,
+          height: size * 1.15,
+          child: Image.asset(
+            'assets/symbol.png',
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.medium,
+            errorBuilder: (_, __, ___) => const SizedBox(),
+          ),
+        ),
+        SizedBox(width: size * 0.3),
         Text(
           'Cloud',
           style: TextStyle(
