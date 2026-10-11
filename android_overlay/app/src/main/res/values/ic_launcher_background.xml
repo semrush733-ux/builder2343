@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Same grey as the bars Fire TV draws beside square app icons, so the tile reads as one piece. -->
-    <color name="ic_launcher_background">#8A8A8A</color>
+    <!-- Transparent: the launcher's own tile colour (Fire TV grey, phone wallpaper...) shows around the logo. -->
+    <color name="ic_launcher_background">#00000000</color>
     <!-- Start screen background stays the app's dark colour. -->
     <color name="splash_background">#0E1118</color>
 </resources>
