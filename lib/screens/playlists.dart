@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:flutter/material.dart';
 
 import '../backend.dart';
@@ -88,15 +91,72 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     }
   }
 
-  String _address(BPlaylist p) {
-    final parsed = parseServerInput(p.url);
-    if (p.isXtream) return '${parsed.server}   ·   ${p.username}';
-    // Never show a password that sits inside an M3U link.
-    final u = Uri.tryParse(p.url);
-    if (u == null) return p.url;
-    final q = Map<String, String>.of(u.queryParameters);
-    if (q.containsKey('password')) q['password'] = '••••';
-    return u.replace(queryParameters: q.isEmpty ? null : q).toString();
+  /// A locked playlist opens only with its 4-digit PIN (set on the website).
+  Future<void> _pick(BPlaylist p) async {
+    if (p.locked && !await _askPin(p)) return;
+    if (mounted) Navigator.of(context).pop(p);
+  }
+
+  Future<bool> _askPin(BPlaylist p) async {
+    final controller = TextEditingController();
+    var error = '';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, refresh) {
+          void check(String value) {
+            final hash = sha256.convert(utf8.encode('b1g-pin:${value.trim()}')).toString();
+            if (hash == p.pinHash) {
+              Navigator.of(ctx).pop(true);
+            } else {
+              controller.clear();
+              refresh(() => error = 'Wrong PIN, please try again.');
+            }
+          }
+
+          return AlertDialog(
+            backgroundColor: C.panel,
+            title: Row(
+              children: [
+                const Icon(Icons.lock_rounded, color: C.accent),
+                const SizedBox(width: 10),
+                Expanded(child: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
+              ],
+            ),
+            content: SizedBox(
+              width: 340,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TvField(
+                    controller: controller,
+                    label: 'Playlist PIN (4 digits)',
+                    icon: Icons.pin_rounded,
+                    obscure: true,
+                    autofocus: true,
+                    keyboardType: TextInputType.number,
+                    action: TextInputAction.done,
+                    onSubmitted: check,
+                  ),
+                  if (error.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Text(error, style: const TextStyle(color: C.danger, fontSize: 13.5)),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+              TextButton(onPressed: () => check(controller.text), child: const Text('OK')),
+            ],
+          );
+        },
+      ),
+    );
+    controller.dispose();
+    return ok == true;
   }
 
   @override
@@ -170,7 +230,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       radius: 12,
       color: C.panel,
       selected: now,
-      onTap: () => Navigator.of(context).pop(p),
+      onTap: () => _pick(p),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         child: Row(
@@ -183,6 +243,11 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 children: [
                   Row(
                     children: [
+                      if (p.locked)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 8),
+                          child: Icon(Icons.lock_rounded, size: 18, color: C.accent),
+                        ),
                       Flexible(
                         child: Text(p.name,
                             maxLines: 1,
@@ -203,9 +268,6 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(_address(p),
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: C.dim)),
                 ],
               ),
             ),

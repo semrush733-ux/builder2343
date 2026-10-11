@@ -49,6 +49,7 @@ class BPlaylist {
     this.username = '',
     this.password = '',
     this.epgUrl = '',
+    this.pinHash = '',
   });
 
   final int id;
@@ -58,6 +59,11 @@ class BPlaylist {
   final String username;
   final String password;
   final String epgUrl;
+
+  /// Set when the playlist is locked on the website with a 4-digit PIN (sha256 of "b1g-pin:" + PIN).
+  final String pinHash;
+
+  bool get locked => pinHash.isNotEmpty;
 
   bool get isXtream => type == 'xtream';
 
@@ -73,6 +79,7 @@ class BPlaylist {
       username: (j['username'] ?? '').toString(),
       password: (j['password'] ?? '').toString(),
       epgUrl: (j['epg_url'] ?? '').toString(),
+      pinHash: (j['pin_hash'] ?? '').toString(),
     );
   }
 }
