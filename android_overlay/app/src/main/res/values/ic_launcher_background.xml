@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#0E1118</color>
+    <!-- Same grey as the bars Fire TV draws beside square app icons, so the tile reads as one piece. -->
+    <color name="ic_launcher_background">#8A8A8A</color>
+    <!-- Start screen background stays the app's dark colour. -->
+    <color name="splash_background">#0E1118</color>
 </resources>
