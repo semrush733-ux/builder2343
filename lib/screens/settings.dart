@@ -624,7 +624,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String expiry;
     switch (Backend.licStatus) {
       case 'active':
-        if (Backend.licType == 'lifetime') {
+        if (Backend.licType == 'free') {
+          expiry = 'Free – never expires';
+        } else if (Backend.licType == 'lifetime') {
           expiry = 'Lifetime (never expires)';
         } else {
           final d = (Backend.licChecked ?? DateTime.now()).add(Duration(days: math.max(0, Backend.licDaysLeft)));

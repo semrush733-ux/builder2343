@@ -265,6 +265,7 @@ class Backend {
       case 'trial':
         return licDaysLeft > 0 ? 'Trial · $licDaysLeft days left' : 'Trial';
       case 'active':
+        if (licType == 'free') return 'Free';
         return licType == 'lifetime'
             ? 'Activated · Lifetime'
             : (licDaysLeft > 0 ? 'Activated · $licDaysLeft days left' : 'Activated');

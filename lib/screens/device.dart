@@ -115,6 +115,11 @@ class _ActivationScreenState extends State<ActivationScreen> {
     ActivationScreen.showing = true;
     log('screen=activation status=${Backend.licStatus}');
     // The customer may activate on the website (QR code): notice it without a restart.
+    // Check once right away too: the app may have become free since the last check.
+    Future<void>.delayed(const Duration(seconds: 1), () async {
+      await Backend.refreshStatus();
+      if (mounted && !_busy && Backend.allowed) _unlock();
+    });
     _poll = Timer.periodic(const Duration(seconds: 20), (_) async {
       if (_busy) return;
       await Backend.refreshStatus();
