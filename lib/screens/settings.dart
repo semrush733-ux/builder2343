@@ -621,29 +621,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // -------------------------------------------------------------------- info
 
   Widget _info() {
-    String expiry;
-    switch (Backend.licStatus) {
-      case 'active':
-        if (Backend.licType == 'free') {
-          expiry = 'Free – never expires';
-        } else if (Backend.licType == 'lifetime') {
-          expiry = 'Lifetime (never expires)';
-        } else {
-          final d = (Backend.licChecked ?? DateTime.now()).add(Duration(days: math.max(0, Backend.licDaysLeft)));
-          expiry = '${d.day.toString().padLeft(2, '0')}-${d.month.toString().padLeft(2, '0')}-${d.year}'
-              '  (${Backend.licDaysLeft} days left)';
-        }
-      case 'trial':
-        final d = (Backend.licChecked ?? DateTime.now()).add(Duration(days: math.max(0, Backend.licDaysLeft)));
-        expiry = 'Free trial until ${d.day.toString().padLeft(2, '0')}-${d.month.toString().padLeft(2, '0')}-${d.year}'
-            '  (${Backend.licDaysLeft} days left)';
-      case 'expired':
-        expiry = 'Expired';
-      case 'suspended':
-        expiry = 'Suspended';
-      default:
-        expiry = 'Unknown (no answer from the website yet)';
-    }
+    final expiry = Backend.licStatus == 'suspended' ? 'Suspended' : 'Free – never expires';
     final rows = <List<String>>[
       ['Application', kAppName],
       ['Version', Backend.appVersionName.isEmpty ? '—' : Backend.appVersionName],

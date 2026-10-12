@@ -256,27 +256,10 @@ class Backend {
 
   static String get activationUrl => '$kSiteBase/activation/?device_id=$deviceId';
 
-  /// May the app run? Expired/suspended lock the app; everything else —
-  /// including "no answer from the server yet" — keeps it open.
-  static bool get allowed => licStatus != 'expired' && licStatus != 'suspended';
+  /// Cloud Player is completely free: only a device suspended on the website is locked.
+  static bool get allowed => licStatus != 'suspended';
 
-  static String get statusLine {
-    switch (licStatus) {
-      case 'trial':
-        return licDaysLeft > 0 ? 'Trial · $licDaysLeft days left' : 'Trial';
-      case 'active':
-        if (licType == 'free') return 'Free';
-        return licType == 'lifetime'
-            ? 'Activated · Lifetime'
-            : (licDaysLeft > 0 ? 'Activated · $licDaysLeft days left' : 'Activated');
-      case 'expired':
-        return 'Licence expired';
-      case 'suspended':
-        return 'Device suspended';
-      default:
-        return '';
-    }
-  }
+  static String get statusLine => licStatus == 'suspended' ? 'Device suspended' : 'Free';
 
   // ---- HTTP helpers ----
 
