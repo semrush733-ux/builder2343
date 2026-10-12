@@ -14,10 +14,13 @@ import 'tmdb.dart' show Tmdb;
 
 /// Address of the B1G website backend (WordPress plugin "B1G App Platform").
 /// Override at build time with --dart-define=B1G_API_BASE=https://yoursite.com/wp-json/b1g/v1
-const String kApiBase = String.fromEnvironment(
+const String kDefaultApiBase = String.fromEnvironment(
   'B1G_API_BASE',
-  defaultValue: 'https://iptvuk.my.bestiptvuk-4k.com/wp-json/b1g/v1',
+  defaultValue: 'https://playercloud.app/wp-json/b1g/v1',
 );
+
+/// The address in use: the built-in one, or a newer one the website told the app to move to.
+String get kApiBase => Backend.apiBase;
 
 /// The website address itself (used for the QR / activation links).
 String get kSiteBase {
@@ -168,6 +171,12 @@ class Backend {
   static Uri webUri(Uri uri) => kIsWeb ? Uri.parse(webUrl(uri.toString())) : uri;
 
   static SharedPreferences? _p;
+
+  /// Website API address; starts as the built-in one and follows a website move.
+  static String apiBase = kDefaultApiBase;
+
+  static bool _validBase(String v) =>
+      v.startsWith('https://') && v.contains('/wp-json/') && Uri.tryParse(v)?.host.isNotEmpty == true;
   static Future<bool>? _registering;
   static const _device = MethodChannel('b1g/device');
 
@@ -201,6 +210,10 @@ class Backend {
 
   static Future<void> init() async {
     _p = await SharedPreferences.getInstance();
+    // A moved website is only followed for a build made for the same default address.
+    final moved = _p!.getString('b1g_api_base') ?? '';
+    final movedFrom = _p!.getString('b1g_api_base_from') ?? '';
+    if (_validBase(moved) && movedFrom == kDefaultApiBase) apiBase = moved;
     deviceId = _p!.getString('b1g_device_id') ?? '';
     pairingCode = _p!.getString('b1g_pairing') ?? '';
     // Device IDs are "CLT-..." now; the website renamed the old "B1G-..." ones too.
@@ -324,6 +337,13 @@ class Backend {
           await _p?.setString('b1g_server_url', url);
           await _p?.setString('b1g_server_name', name);
         }
+      }
+      final moveTo = (c is Map ? c['api_base'] : null)?.toString().trim() ?? '';
+      if (_validBase(moveTo) && moveTo != apiBase) {
+        log('backend moved to a new website address');
+        apiBase = moveTo;
+        await _p?.setString('b1g_api_base', moveTo);
+        await _p?.setString('b1g_api_base_from', kDefaultApiBase);
       }
       final epoch = int.tryParse((c is Map ? c['cache_epoch'] : null)?.toString() ?? '') ?? 0;
       if (epoch > 0 && epoch != (_p?.getInt('b1g_cache_epoch') ?? 0)) {
