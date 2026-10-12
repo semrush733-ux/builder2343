@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../backend.dart';
 import '../engine.dart';
 import '../i18n.dart';
 import '../parental.dart';
@@ -140,7 +141,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   /// Plays a channel in the preview box, on the same engine as full screen
   /// (ExoPlayer on Android, MPV elsewhere or when the customer chose it).
-  Future<void> _preview(XItem item, List<String> urls) async {
+  Future<void> _preview(XItem item, List<String> streamUrls) async {
+    // In a browser the preview needs the HLS address through the website relay, like full screen.
+    final urls = Backend.playable(streamUrls);
     if (urls.isEmpty) return;
     await _stopPreview();
     if (!mounted) return;

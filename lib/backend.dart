@@ -170,6 +170,35 @@ class Backend {
 
   static Uri webUri(Uri uri) => kIsWeb ? Uri.parse(webUrl(uri.toString())) : uri;
 
+  /// Stream addresses as the player should try them. On Android / TV: unchanged.
+  /// In a browser an endless MPEG-TS live stream cannot play, so live channels use their HLS
+  /// (.m3u8) address instead, and everything goes through the website relay (the IPTV server
+  /// is plain http without CORS, which an https page may not load).
+  static List<String> playable(List<String> urls) {
+    if (!kIsWeb) return urls;
+    final out = <String>[];
+    void add(String u) {
+      if (!out.contains(u)) out.add(u);
+    }
+
+    for (final u in urls) {
+      final path = (Uri.tryParse(u)?.path ?? '').toLowerCase();
+      if (path.endsWith('.m3u8')) add(u);
+    }
+    for (final u in urls) {
+      final uri = Uri.tryParse(u);
+      final path = (uri?.path ?? '').toLowerCase();
+      if (path.endsWith('.m3u8')) continue;
+      if (path.endsWith('.ts') && (path.contains('/live/') || !path.contains('/'))) {
+        // Xtream serves every live channel as HLS too: same address, other ending.
+        add(u.replaceFirst(RegExp(r'\.ts(?=$|\?)', caseSensitive: false), '.m3u8'));
+      } else {
+        add(u);
+      }
+    }
+    return [for (final u in out) webUrl(u)];
+  }
+
   static SharedPreferences? _p;
 
   /// Website API address; starts as the built-in one and follows a website move.

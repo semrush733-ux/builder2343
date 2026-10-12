@@ -312,14 +312,13 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _retryTimer?.cancel();
     _accepting = false;
     final entry = _entry;
-    var urls = entry.urls;
-    if (kIsWeb) {
-      // A browser cannot play an endless .ts stream; HLS (.m3u8) goes first, through the website.
-      urls = [...urls.where((u) => formatOfUrl(u) == 'm3u8'), ...urls.where((u) => formatOfUrl(u) != 'm3u8')];
-    }
-    final raw = urls[_urlIndex % urls.length];
-    final format = formatOfUrl(raw);
-    final url = Backend.webUrl(raw);
+    final urls = entry.urls;
+    // In a browser: HLS addresses through the website relay (see Backend.playable).
+    final playable = Backend.playable(urls);
+    final pick = _urlIndex % playable.length;
+    final raw = kIsWeb ? urls[pick % urls.length] : urls[pick];
+    final format = kIsWeb ? 'm3u8' : formatOfUrl(raw);
+    final url = playable[pick];
 
     var start = startAt ?? Duration.zero;
     if (startAt == null && !widget.live && entry.resumeKey != null) {
@@ -400,7 +399,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (now.difference(_openedAt) > const Duration(seconds: 8)) {
       // Playing for a while: this stream works, forget earlier failures.
       _fails = 0;
-      if (widget.live) {
+      if (widget.live && !kIsWeb) {
         final url = _entry.urls[_urlIndex % _entry.urls.length];
         Store.setLiveFormat(formatOfUrl(url) == 'm3u8' ? 'm3u8' : 'ts');
       }

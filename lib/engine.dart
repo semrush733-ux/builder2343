@@ -166,7 +166,10 @@ class MpvEngine extends PlaybackEngine {
   Future<void> open(String url, Duration start) async {
     await _configure();
     await player.open(
-      Media(url, httpHeaders: const {'User-Agent': kUserAgent}, start: start > Duration.zero ? start : null),
+      // Browsers refuse a custom User-Agent, so the web build sends no headers.
+      Media(url,
+          httpHeaders: kIsWeb ? null : const {'User-Agent': kUserAgent},
+          start: start > Duration.zero ? start : null),
       play: true,
     );
   }
