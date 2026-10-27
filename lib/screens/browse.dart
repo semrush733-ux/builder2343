@@ -85,6 +85,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
   PlaybackEngine? _pv;
   XItem? _pvItem;
   bool _pvBuffering = false;
+  bool _pvOpening = false; // full screen is opening: the preview box shows a spinner meanwhile
   bool _pvFallbackTried = false;
   final List<StreamSubscription> _pvSubs = [];
   int _pvRequest = 0;
@@ -229,10 +230,18 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   Future<void> _playFull(List<XItem> items, int index) async {
     Store.addRecent(items[index]);
-    await _stopPreview();
+    setState(() => _pvOpening = true);
+    // The preview engine is closed with a time limit, so a stuck one never holds the screen.
+    await _stopPreview().timeout(const Duration(seconds: 3), onTimeout: () {});
     if (!mounted) return;
-    await Navigator.of(context).push(MaterialPageRoute<void>(
+    final route = Navigator.of(context).push(MaterialPageRoute<void>(
         builder: (_) => PlayerScreen(api: widget.api, entries: _entriesFor(items), index: index, live: true)));
+    // The full-screen player shows its own circle from its first frame.
+    Future<void>.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) setState(() => _pvOpening = false);
+    });
+    await route;
+    if (mounted && _pvOpening) setState(() => _pvOpening = false);
   }
 
   /// TV Guide for the channels of this category, starting on the selected one.
@@ -345,21 +354,54 @@ class _BrowseScreenState extends State<BrowseScreen> {
   Future<void> _search() async {
     _focusTimer?.cancel();
     final q = await _askSearch(context, _query);
-    if (q == null || q.isEmpty || !mounted) return;
+    if (q == null || !mounted) return;
+    if (q.isEmpty) {
+      // An emptied box clears the search and goes back to the whole list.
+      if (_selected == _searchId) {
+        _query = '';
+        _selected = '';
+        _select(_allId, allTitle(widget.kind));
+      }
+      return;
+    }
+    await _runSearch(q);
+  }
+
+  /// The remote rests on the Search row: the results stay (no category takes their place).
+  void _keepSearch() {
+    _focusTimer?.cancel();
+  }
+
+  /// Letters and digits only, lower case, one space between words: "BBC: One HD" -> "bbc one hd".
+  static String _plain(String s) =>
+      s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9\u00c0-\u024f\u0600-\u06ff\u0900-\u097f]+'), ' ').trim();
+
+  Future<void> _runSearch(String q) async {
     final request = ++_request;
     setState(() {
       _query = q;
       _selected = _searchId;
-      _selectedName = 'Search: $q';
+      _selectedName = '${t('Search')}: $q';
       _items = null;
       _itemsError = null;
     });
     try {
       final all = await _loadAll();
       if (!mounted || request != _request) return;
-      final needle = q.toLowerCase();
-      final found =
-          all.where((i) => Store.allowed(i) && i.name.toLowerCase().contains(needle)).take(400).toList();
+      // Every word of the query must be in the name, in any order; punctuation and
+      // spacing do not matter, and names that start with the query come first.
+      final words = _plain(q).split(' ').where((w) => w.isNotEmpty).toList();
+      final needle = words.join(' ');
+      final starts = <XItem>[];
+      final rest = <XItem>[];
+      for (final i in all) {
+        if (!Store.allowed(i)) continue;
+        final name = _plain(i.name);
+        if (name.isEmpty || !words.every(name.contains)) continue;
+        (name.startsWith(needle) ? starts : rest).add(i);
+        if (starts.length + rest.length >= 600) break;
+      }
+      final found = [...starts, ...rest];
       setState(() => _items = found);
       log('browse ${widget.kind.name} search=${found.length}');
     } catch (e) {
@@ -372,7 +414,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
     final id = _selected;
     final name = _selectedName;
     if (id == _searchId) {
-      _search();
+      // Try again runs the same search; the box opens only when there is none yet.
+      _query.isEmpty ? _search() : _runSearch(_query);
       return;
     }
     _selected = '';
@@ -544,7 +587,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                     IgnorePointer(child: ExcludeFocus(child: engine.view(fit: BoxFit.contain, subtitlePad: 12)))
                   else
                     _previewIdle(item),
-                  if (engine != null && _pvBuffering)
+                  if ((engine != null && _pvBuffering) || _pvOpening)
                     const Center(
                       child: SizedBox(
                           width: 34, height: 34, child: CircularProgressIndicator(color: C.accent, strokeWidth: 3)),
@@ -771,33 +814,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
       itemCount: cats.length + 4,
       itemExtent: 42,
       itemBuilder: (context, index) {
+        // "All" is the first row, so the whole list of the server opens straight away.
         if (index == 0) {
-          return _CategoryRow(
-            icon: Icons.search_rounded,
-            name: t('Search'),
-            selected: _selected == _searchId,
-            onTap: _search,
-          );
-        }
-        if (index == 1) {
-          return _CategoryRow(
-            icon: Icons.star_rounded,
-            name: t('Favourites'),
-            selected: _selected == _favId,
-            onTap: () => _select(_favId, t('Favourites')),
-            onFocus: () => _focusCategory(_favId, t('Favourites')),
-          );
-        }
-        if (index == 2) {
-          return _CategoryRow(
-            icon: Icons.history_rounded,
-            name: t('Recent'),
-            selected: _selected == _recentId,
-            onTap: () => _select(_recentId, t('Recent')),
-            onFocus: () => _focusCategory(_recentId, t('Recent')),
-          );
-        }
-        if (index == 3) {
           final total = _all?.length;
           final title = allTitle(widget.kind);
           return _CategoryRow(
@@ -807,6 +825,33 @@ class _BrowseScreenState extends State<BrowseScreen> {
             autofocus: true,
             onTap: () => _select(_allId, title),
             onFocus: () => _focusCategory(_allId, title),
+          );
+        }
+        if (index == 1) {
+          return _CategoryRow(
+            icon: Icons.search_rounded,
+            name: t('Search'),
+            selected: _selected == _searchId,
+            onTap: _search,
+            onFocus: _keepSearch,
+          );
+        }
+        if (index == 2) {
+          return _CategoryRow(
+            icon: Icons.star_rounded,
+            name: t('Favourites'),
+            selected: _selected == _favId,
+            onTap: () => _select(_favId, t('Favourites')),
+            onFocus: () => _focusCategory(_favId, t('Favourites')),
+          );
+        }
+        if (index == 3) {
+          return _CategoryRow(
+            icon: Icons.history_rounded,
+            name: t('Recent'),
+            selected: _selected == _recentId,
+            onTap: () => _select(_recentId, t('Recent')),
+            onFocus: () => _focusCategory(_recentId, t('Recent')),
           );
         }
         final cat = cats[index - 4];
@@ -1044,18 +1089,18 @@ class _PosterTile extends StatelessWidget {
   }
 }
 
-Future<String?> _askSearch(BuildContext context, String initial) {
+Future<String?> _askSearch(BuildContext context, String initial) async {
   final controller = TextEditingController(text: initial);
-  return showDialog<String>(
+  final result = await showDialog<String>(
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: C.panel,
-      title: const Text('Search'),
+      title: Text(t('Search')),
       content: SizedBox(
         width: 380,
         child: TvField(
           controller: controller,
-          label: 'Name',
+          label: t('Name'),
           icon: Icons.search_rounded,
           autofocus: true,
           action: TextInputAction.search,
@@ -1063,9 +1108,11 @@ Future<String?> _askSearch(BuildContext context, String initial) {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-        TextButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('Search')),
+        TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(t('Cancel'))),
+        TextButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: Text(t('Search'))),
       ],
     ),
   );
+  controller.dispose();
+  return result;
 }

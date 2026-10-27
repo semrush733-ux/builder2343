@@ -481,6 +481,39 @@ class _LoadingState extends State<Loading> with SingleTickerProviderStateMixin {
   }
 }
 
+/// A spinning ring over the video while a stream connects or pauses to buffer.
+class Spinner extends StatelessWidget {
+  const Spinner({super.key, this.label, this.size = 64});
+  final String? label;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: size,
+            height: size,
+            child: const CircularProgressIndicator(
+              strokeWidth: 4,
+              strokeCap: StrokeCap.round,
+              color: C.accent,
+              backgroundColor: Color(0x33FFFFFF),
+            ),
+          ),
+          if (label != null) ...[
+            const SizedBox(height: 14),
+            Text(label!,
+                style: const TextStyle(color: C.dim, fontSize: 14, shadows: [Shadow(color: Colors.black, blurRadius: 6)])),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 /// Message with a "Try again" button, used when a list cannot be loaded.
 class ErrorBox extends StatelessWidget {
   const ErrorBox({super.key, required this.message, required this.onRetry, this.autofocus = false});

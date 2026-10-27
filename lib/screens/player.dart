@@ -1336,14 +1336,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                   )
                 else
                   const SizedBox.expand(),
-                if (busy && !_dead)
-                  Loading(
-                    // One count per stream: it carries on through a reconnect and starts again
-                    // for the next channel or a pause to buffer.
-                    key: ValueKey('loading-$_index-$_ready'),
-                    label: _status,
-                    expected: Duration(milliseconds: widget.live ? 3000 : 4000),
-                  ),
+                // A spinning circle while the stream connects or pauses to buffer.
+                if (busy && !_dead) Spinner(label: _status),
                 if (_dead) Center(child: _DeadMessage(text: _status ?? '', detail: _lastError)),
                 IgnorePointer(
                   ignoring: !_overlay,
