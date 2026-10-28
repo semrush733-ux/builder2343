@@ -497,7 +497,7 @@ class SoftDots extends StatefulWidget {
 
 class _SoftDotsState extends State<SoftDots> with SingleTickerProviderStateMixin {
   late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat();
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 1900))..repeat();
 
   @override
   void dispose() {
@@ -543,16 +543,18 @@ class _DotsPainter extends CustomPainter {
     final gap = size.width / 3.5;
     final cy = size.height * 0.62;
     for (var i = 0; i < 3; i++) {
-      // Each dot runs the same wave, a third of a cycle after the one before it.
-      final t = (a.value - i * 0.2) % 1.0;
-      final wave = t < 0.5 ? math.sin(t * math.pi) : 0.0; // up and down, then rest
-      final lift = wave * r * 1.6;
-      final glow = 0.35 + 0.65 * wave;
+      // One continuous wave with no stops or jumps: each dot follows the one before it by a
+      // third of a cycle, so the three rise and settle like a gentle ripple.
+      final phase = (a.value - i * 0.18) * 2 * math.pi;
+      final wave = 0.5 - 0.5 * math.cos(phase); // 0 -> 1 -> 0, smooth at both ends
+      final eased = wave * wave * (3 - 2 * wave); // softer at the top and bottom
+      final lift = eased * r * 1.3;
+      final glow = 0.4 + 0.6 * eased;
       final cx = size.width / 2 + (i - 1) * gap;
       final c = Offset(cx, cy - lift);
-      canvas.drawCircle(c, r * (1.6 + 0.6 * wave), Paint()..color = C.accent.withValues(alpha: 0.18 * glow)
+      canvas.drawCircle(c, r * (1.6 + 0.5 * eased), Paint()..color = C.accent.withValues(alpha: 0.16 * glow)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, r));
-      canvas.drawCircle(c, r * (0.8 + 0.25 * wave), Paint()..color = Color.lerp(C.dim, Colors.white, wave)!.withValues(alpha: glow));
+      canvas.drawCircle(c, r * (0.8 + 0.2 * eased), Paint()..color = Color.lerp(C.dim, Colors.white, eased)!.withValues(alpha: glow));
     }
   }
 
