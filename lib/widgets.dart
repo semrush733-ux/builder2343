@@ -481,37 +481,83 @@ class _LoadingState extends State<Loading> with SingleTickerProviderStateMixin {
   }
 }
 
-/// A spinning ring over the video while a stream connects or pauses to buffer.
-class Spinner extends StatelessWidget {
-  const Spinner({super.key, this.label, this.size = 64});
+/// Three soft dots that rise and glow one after the other: shown while a stream connects,
+/// pauses to buffer, or a list loads. Quiet enough not to look like an error, and on screen
+/// from the first frame.
+class SoftDots extends StatefulWidget {
+  const SoftDots({super.key, this.label, this.size = 12});
   final String? label;
+
+  /// Diameter of one dot.
   final double size;
 
   @override
+  State<SoftDots> createState() => _SoftDotsState();
+}
+
+class _SoftDotsState extends State<SoftDots> with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: size,
-            height: size,
-            child: const CircularProgressIndicator(
-              strokeWidth: 4,
-              strokeCap: StrokeCap.round,
-              color: C.accent,
-              backgroundColor: Color(0x33FFFFFF),
+    final d = widget.size;
+    return IgnorePointer(
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RepaintBoundary(
+              child: SizedBox(
+                width: d * 7,
+                height: d * 3,
+                child: CustomPaint(painter: _DotsPainter(_c)),
+              ),
             ),
-          ),
-          if (label != null) ...[
-            const SizedBox(height: 14),
-            Text(label!,
-                style: const TextStyle(color: C.dim, fontSize: 14, shadows: [Shadow(color: Colors.black, blurRadius: 6)])),
+            if (widget.label != null && widget.label!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(widget.label!,
+                  style: const TextStyle(color: C.dim, fontSize: 14, shadows: [Shadow(color: Colors.black, blurRadius: 6)])),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
+}
+
+/// Painted straight from the animation (no widget rebuilds).
+class _DotsPainter extends CustomPainter {
+  _DotsPainter(this.a) : super(repaint: a);
+  final Animation<double> a;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = size.height / 6;
+    final gap = size.width / 3.5;
+    final cy = size.height * 0.62;
+    for (var i = 0; i < 3; i++) {
+      // Each dot runs the same wave, a third of a cycle after the one before it.
+      final t = (a.value - i * 0.2) % 1.0;
+      final wave = t < 0.5 ? math.sin(t * math.pi) : 0.0; // up and down, then rest
+      final lift = wave * r * 1.6;
+      final glow = 0.35 + 0.65 * wave;
+      final cx = size.width / 2 + (i - 1) * gap;
+      final c = Offset(cx, cy - lift);
+      canvas.drawCircle(c, r * (1.6 + 0.6 * wave), Paint()..color = C.accent.withValues(alpha: 0.18 * glow)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, r));
+      canvas.drawCircle(c, r * (0.8 + 0.25 * wave), Paint()..color = Color.lerp(C.dim, Colors.white, wave)!.withValues(alpha: glow));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DotsPainter old) => false;
 }
 
 /// Message with a "Try again" button, used when a list cannot be loaded.

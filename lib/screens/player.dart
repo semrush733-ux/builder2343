@@ -1337,7 +1337,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                 else
                   const SizedBox.expand(),
                 // A spinning circle while the stream connects or pauses to buffer.
-                if (busy && !_dead) Spinner(label: _status),
+                if (busy && !_dead) SoftDots(label: _status, size: 14),
                 if (_dead) Center(child: _DeadMessage(text: _status ?? '', detail: _lastError)),
                 IgnorePointer(
                   ignoring: !_overlay,

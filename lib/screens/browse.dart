@@ -277,8 +277,15 @@ class _BrowseScreenState extends State<BrowseScreen> {
       if (!mounted) return;
       setState(() => _cats = cats);
       log('browse ${widget.kind.name} categories=${cats.length}');
-      // Everything in one list first; the single categories stay below it.
-      _select(_allId, allTitle(widget.kind));
+      // The server's first category opens straight away; "All" stays one row above it.
+      final first = cats
+          .where((c) => !Store.isHidden(widget.kind, c.id) && (!Store.isLocked(widget.kind, c.id) || Store.parentalUnlocked))
+          .toList();
+      if (first.isEmpty) {
+        _select(_allId, allTitle(widget.kind));
+      } else {
+        _select(first.first.id, first.first.name);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _catsError = friendlyError(e));
@@ -587,11 +594,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                     IgnorePointer(child: ExcludeFocus(child: engine.view(fit: BoxFit.contain, subtitlePad: 12)))
                   else
                     _previewIdle(item),
-                  if ((engine != null && _pvBuffering) || _pvOpening)
-                    const Center(
-                      child: SizedBox(
-                          width: 34, height: 34, child: CircularProgressIndicator(color: C.accent, strokeWidth: 3)),
-                    ),
+                  if ((engine != null && _pvBuffering) || _pvOpening) const SoftDots(size: 9),
                   if (engine != null && playing != null)
                     Positioned(
                       left: 0,
@@ -807,7 +810,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
   Widget _categories() {
     if (_catsError != null) return ErrorBox(message: _catsError!, onRetry: _loadCategories, autofocus: true);
     final all = _cats;
-    if (all == null) return const Loading();
+    if (all == null) return const SoftDots(size: 9);
     final cats = all.where((c) => !Store.isHidden(widget.kind, c.id)).toList();
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 16),
@@ -822,7 +825,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
             icon: Icons.apps_rounded,
             name: total == null ? title : '$title  ($total)',
             selected: _selected == _allId,
-            autofocus: true,
+            autofocus: _selected == _allId,
             onTap: () => _select(_allId, title),
             onFocus: () => _focusCategory(_allId, title),
           );
@@ -860,6 +863,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
           icon: locked ? Icons.lock_rounded : null,
           name: cat.name,
           selected: _selected == cat.id,
+          autofocus: _selected == cat.id,
           onTap: () => _select(cat.id, cat.name),
           onFocus: () => _focusCategory(cat.id, cat.name),
         );
@@ -871,7 +875,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     if (_itemsError != null) return ErrorBox(message: _itemsError!, onRetry: _retryItems);
     final items = _items;
     if (items == null) {
-      return _cats == null && _catsError != null ? const SizedBox() : const Loading();
+      return _cats == null && _catsError != null ? const SizedBox() : const SoftDots(size: 10);
     }
     if (items.isEmpty) {
       final text = _selected == _favId
