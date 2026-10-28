@@ -1,0 +1,21 @@
+mock IPTV server on port 8787, media in /home/runner/work/builder2343/builder2343/ci/media
+POST /wp-json/b1g/v1/device/register fields=hwid,platform
+15:40:43 "POST /wp-json/b1g/v1/device/register HTTP/1.1" 200 -
+15:40:44 "GET /wp-json/b1g/v1/device/status?device_id=B1G-TEST01&pairing_code=123456 HTTP/1.1" 200 -
+15:40:44 "GET /wp-json/b1g/v1/app/config?platform=android-tv&version_code=1&device_id=B1G-TEST01 HTTP/1.1" 200 -
+15:40:44 "GET /wp-json/b1g/v1/device/playlists?device_id=B1G-TEST01&pairing_code=123456 HTTP/1.1" 200 -
+15:40:49 "GET /player_api.php?username=demo&password=demo HTTP/1.1" 200 -
+15:40:52 "GET /player_api.php?username=demo&password=demo&action=get_live_categories HTTP/1.1" 200 -
+15:40:53 "GET /player_api.php?username=demo&password=demo&action=get_live_streams&category_id=1 HTTP/1.1" 200 -
+15:40:53 "GET /logo.png HTTP/1.1" 200 -
+15:40:56 "GET /logo.png HTTP/1.1" 200 -
+15:40:56 "GET /player_api.php?username=demo&password=demo&action=get_simple_data_table&stream_id=5 HTTP/1.1" 200 -
+15:40:57 "GET /player_api.php?username=demo&password=demo&action=get_simple_data_table&stream_id=3 HTTP/1.1" 200 -
+15:40:58 "GET /live/demo/demo/3.ts HTTP/1.1" 404 -
+15:40:59 "GET /live/demo/demo/3.ts HTTP/1.1" 404 -
+15:41:00 "GET /live/demo/demo/3.ts HTTP/1.1" 404 -
+15:41:02 "GET /live/demo/demo/3.ts HTTP/1.1" 404 -
+15:41:02 "GET /live/demo/demo/3.m3u8 HTTP/1.1" 404 -
+15:41:02 "GET /live/demo/demo/3.m3u8 HTTP/1.1" 404 -
+15:41:03 "GET /live/demo/demo/3.m3u8 HTTP/1.1" 404 -
+15:41:05 "GET /live/demo/demo/3.m3u8 HTTP/1.1" 404 -
