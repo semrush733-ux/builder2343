@@ -120,6 +120,8 @@ void main() {
     await t.pumpWidget(_app(k3, HomeScreen(api: _FakeSource())));
     await t.pump(const Duration(milliseconds: 1200));
     await _shot(t, k3, '6-home');
+    await t.pump(const Duration(milliseconds: 1700));
+    await _shot(t, k3, '7-home-later');
     await t.pumpWidget(const SizedBox());
   });
 }

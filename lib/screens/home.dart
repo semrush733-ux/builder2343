@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../backend.dart';
@@ -14,6 +16,7 @@ import 'catchup.dart';
 import 'login.dart';
 import 'playlists.dart';
 import 'settings.dart';
+import 'tile_art.dart';
 
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -260,6 +263,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: _Tile(
                     autofocus: true,
                     hero: true,
+                    art: TileArtKind.live,
+                    order: 0,
                     icon: Icons.live_tv_rounded,
                     title: t('Live TV'),
                     subtitle: t('Channels and TV guide'),
@@ -276,6 +281,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Expanded(
                         child: _Tile(
+                          art: TileArtKind.movies,
+                          order: 1,
                           icon: Icons.movie_rounded,
                           title: t('Movies'),
                           subtitle: t('Films on demand'),
@@ -287,6 +294,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 16),
                       Expanded(
                         child: _Tile(
+                          art: TileArtKind.series,
+                          order: 2,
                           icon: Icons.video_library_rounded,
                           title: t('Series'),
                           subtitle: t('Seasons and episodes'),
@@ -328,7 +337,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// A big home tile: gradient card, a glowing icon, soft scale-up when the remote or finger is on it.
+/// A big home tile: gradient card with its own moving picture (signal rings, floating posters,
+/// rippling episode cards). It slides in when the screen opens, and when the remote or finger is on
+/// it the tile rises, glows in its colour and a band of light sweeps across.
 class _Tile extends StatefulWidget {
   const _Tile({
     required this.icon,
@@ -337,6 +348,8 @@ class _Tile extends StatefulWidget {
     required this.colors,
     required this.glow,
     required this.onTap,
+    required this.art,
+    this.order = 0,
     this.autofocus = false,
     this.hero = false,
   });
@@ -347,6 +360,8 @@ class _Tile extends StatefulWidget {
   final List<Color> colors;
   final Color glow;
   final VoidCallback onTap;
+  final TileArtKind art;
+  final int order;
   final bool autofocus;
   final bool hero;
 
@@ -354,64 +369,137 @@ class _Tile extends StatefulWidget {
   State<_Tile> createState() => _TileState();
 }
 
-class _TileState extends State<_Tile> {
+class _TileState extends State<_Tile> with TickerProviderStateMixin {
   bool _focused = false;
+
+  // Loops forever: drives the moving picture.
+  late final AnimationController _loop = AnimationController(vsync: this, duration: const Duration(seconds: 6))..repeat();
+  // Plays once when the screen opens (staggered by tile order).
+  late final AnimationController _enter = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+  // Plays each time the tile gets focus: the sweep of light.
+  late final AnimationController _shine = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(Duration(milliseconds: 120 + widget.order * 140), () {
+      if (mounted) _enter.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _loop.dispose();
+    _enter.dispose();
+    _shine.dispose();
+    super.dispose();
+  }
+
+  void _onFocus(bool f) {
+    setState(() => _focused = f);
+    if (f) _shine.forward(from: 0);
+  }
 
   @override
   Widget build(BuildContext context) {
     final hero = widget.hero;
-    return Focus(
-      canRequestFocus: false,
-      skipTraversal: true,
-      onFocusChange: (f) => setState(() => _focused = f),
-      child: AnimatedScale(
-        scale: _focused ? 1.025 : 1.0,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        child: TvFocus(
-          autofocus: widget.autofocus,
-          radius: 24,
-          color: widget.colors.last,
-          focusBorder: widget.glow,
-          onTap: widget.onTap,
-          child: Container(
-            clipBehavior: Clip.antiAlias,
+    return AnimatedBuilder(
+      animation: _enter,
+      builder: (context, child) {
+        final e = Curves.easeOutCubic.transform(_enter.value);
+        return Opacity(
+          opacity: e,
+          child: Transform.translate(offset: Offset(0, 46 * (1 - e)), child: child),
+        );
+      },
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onFocusChange: _onFocus,
+        child: AnimatedScale(
+          scale: _focused ? 1.035 : 1.0,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutBack,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 240),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
-              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: widget.colors),
-            ),
-            child: Stack(
-              children: [
-                // A big faint icon bleeding off the corner gives each tile its own shape.
-                Positioned(
-                  right: hero ? -30 : -18,
-                  bottom: hero ? -34 : -22,
-                  child: Icon(widget.icon, size: hero ? 230 : 130, color: const Color(0x14FFFFFF)),
-                ),
-                Padding(
-                  padding: EdgeInsets.all(hero ? 30 : 22),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: hero ? 70 : 52,
-                        height: hero ? 70 : 52,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0x22FFFFFF),
-                          boxShadow: [BoxShadow(color: widget.glow.withValues(alpha: _focused ? 0.55 : 0.28), blurRadius: 28)],
-                        ),
-                        child: Icon(widget.icon, size: hero ? 36 : 26, color: Colors.white),
-                      ),
-                      const Spacer(),
-                      Text(widget.title,
-                          style: TextStyle(fontSize: hero ? 40 : 26, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-                      const SizedBox(height: 3),
-                      Text(widget.subtitle, style: TextStyle(fontSize: hero ? 15.5 : 13.5, color: const Color(0xCCFFFFFF))),
-                    ],
-                  ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: widget.glow.withValues(alpha: _focused ? 0.45 : 0.12),
+                  blurRadius: _focused ? 46 : 22,
+                  spreadRadius: _focused ? -4 : -10,
+                  offset: const Offset(0, 14),
                 ),
               ],
+            ),
+            child: TvFocus(
+              autofocus: widget.autofocus,
+              radius: 24,
+              color: widget.colors.last,
+              focusBorder: widget.glow,
+              onTap: widget.onTap,
+              child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: widget.colors),
+                ),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: RepaintBoundary(
+                        child: AnimatedBuilder(
+                          animation: _loop,
+                          builder: (_, __) => TileArt(kind: widget.art, t: _loop.value, focused: _focused, glow: widget.glow),
+                        ),
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: AnimatedBuilder(
+                          animation: _shine,
+                          builder: (_, __) => CustomPaint(painter: ShinePainter(_shine.value)),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(hero ? 30 : 22),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AnimatedBuilder(
+                            animation: _loop,
+                            builder: (_, child) {
+                              final pulse = 0.5 + 0.5 * math.sin(_loop.value * 2 * math.pi);
+                              return Container(
+                                width: hero ? 70 : 52,
+                                height: hero ? 70 : 52,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0x22FFFFFF),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.10 + 0.12 * pulse)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                        color: widget.glow.withValues(alpha: (_focused ? 0.5 : 0.25) + 0.15 * pulse), blurRadius: 24 + 8 * pulse),
+                                  ],
+                                ),
+                                child: child,
+                              );
+                            },
+                            child: Icon(widget.icon, size: hero ? 36 : 26, color: Colors.white),
+                          ),
+                          const Spacer(),
+                          Text(widget.title,
+                              style: TextStyle(fontSize: hero ? 40 : 26, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                          const SizedBox(height: 3),
+                          Text(widget.subtitle, style: TextStyle(fontSize: hero ? 15.5 : 13.5, color: const Color(0xCCFFFFFF))),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
