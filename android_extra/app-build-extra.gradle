@@ -1,0 +1,25 @@
+
+// ---- B1G: pack only the processor types this build is for (keeps the APK small) ----
+def b1gAbis = System.getenv('B1G_ABIS')
+if (b1gAbis) {
+    android {
+        defaultConfig {
+            ndk {
+                abiFilters.clear()
+                abiFilters.addAll(b1gAbis.split(',').collect { it.trim() })
+            }
+        }
+    }
+}
+
+// ---- B1G: FileProvider (hands the downloaded update to Android's installer) ----
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
+}
+
+// ---- 2060 Tele Player: own application id (installs next to other apps) ----
+android {
+    defaultConfig {
+        applicationId "com.tele2060.player"
+    }
+}

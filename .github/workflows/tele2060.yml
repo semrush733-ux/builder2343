@@ -1,0 +1,171 @@
+name: 2060 Tele Player
+
+# Builds the 2060 Tele Player Android app (phones, tablets, Android TV, Fire TV) in the cloud.
+#
+# Result: release "tele-latest" of this repository with Tele2060-Player.apk
+#
+# Signing: with the secrets ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and
+# ANDROID_KEY_PASSWORD the APK is signed with your own key. Without them it is signed with a
+# throw-away key: it installs, but a later build cannot update it (uninstall first).
+
+on:
+  push:
+    branches: [tele-2060]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+concurrency:
+  group: tele-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  BUILD_NUMBER: ${{ github.run_number }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # The android/ folder is generated from Flutter's own template, then the files in
+      # android_overlay/ (manifest, activity, icons, banner) are copied over it.
+      - name: Create the Android project
+        run: |
+          flutter --version
+          echo "FLUTTER_VERSION=$(flutter --version | head -1 | awk '{print $2}')" >> "$GITHUB_ENV"
+          flutter create --no-pub --platforms=android --org com.b1g --project-name b1gtv "$RUNNER_TEMP/scaffold"
+          cp -r "$RUNNER_TEMP/scaffold/android" android
+          cp -r android_overlay/. android/
+          if [ -f android/app/build.gradle.kts ]; then
+            cat android_extra/app-build-extra.gradle.kts >> android/app/build.gradle.kts
+          else
+            cat android_extra/app-build-extra.gradle >> android/app/build.gradle
+          fi
+          mkdir -p out/logs
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Check the code
+        run: |
+          set -o pipefail
+          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee out/logs/analyze.log
+
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          flutter test 2>&1 | tee out/logs/test.log
+
+      - name: Build Tele2060-Player.apk
+        env:
+          B1G_ABIS: armeabi-v7a,arm64-v8a
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: |
+          set -o pipefail
+          echo "TMDB_KEY_SET=$([ -n "$TMDB_API_KEY" ] && echo true || echo false)" >> "$GITHUB_ENV"
+          flutter build apk --release --target-platform android-arm,android-arm64 \
+            --build-name "1.0.$BUILD_NUMBER" --build-number "$BUILD_NUMBER" \
+            --dart-define=B1G_TMDB_KEY="$TMDB_API_KEY" \
+            2>&1 | tee out/logs/build.log
+          cp build/app/outputs/flutter-apk/app-release.apk out/Tele2060-Player.apk
+
+      - name: Sign with your own key
+        if: env.HAS_SIGNING == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          "$BT/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEY_PASSWORD \
+            --out "$RUNNER_TEMP/signed.apk" out/Tele2060-Player.apk
+          mv "$RUNNER_TEMP/signed.apk" out/Tele2060-Player.apk
+          rm -f "$RUNNER_TEMP/release.jks"
+
+      - name: Verify the APK and write the build report
+        if: always()
+        run: |
+          mkdir -p out
+          R=out/REPORT.md
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          {
+            echo "## 2060 Tele Player build #$BUILD_NUMBER"
+            echo ""
+            echo "Commit: \`$GITHUB_SHA\`  -  Flutter $FLUTTER_VERSION"
+            echo ""
+            echo '```'
+            echo "signed with your own key: $HAS_SIGNING"
+            if [ -f out/Tele2060-Player.apk ]; then
+              echo "Tele2060-Player.apk  $(stat -c%s out/Tele2060-Player.apk) bytes  sha256 $(sha256sum out/Tele2060-Player.apk | cut -d' ' -f1)"
+              "$BT/aapt2" dump badging out/Tele2060-Player.apk | grep -E "^package:|^sdkVersion|^targetSdkVersion|^application-label:|launchable-activity|^native-code|^leanback" || true
+            else
+              echo "Tele2060-Player.apk was NOT built"
+            fi
+            echo '```'
+            echo "### Code check"
+            echo '```'
+            tail -60 out/logs/analyze.log 2>/dev/null || true
+            echo '```'
+            echo "### Unit tests"
+            echo '```'
+            tail -3 out/logs/test.log 2>/dev/null || true
+            echo '```'
+            echo "### Errors"
+            echo '```'
+            grep -hE "^e: |error:|Error:|FAILED|What went wrong|error -" out/logs/*.log 2>/dev/null | sort -u | head -80 || true
+            echo "(end)"
+            echo '```'
+            if grep -qs "What went wrong" out/logs/build*.log; then
+              echo "### Build failure details"
+              echo '```'
+              grep -h -A 45 "What went wrong" out/logs/build*.log 2>/dev/null | cut -c1-320 | head -110 || true
+              echo '```'
+            fi
+          } > "$R"
+          cat "$R"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tele2060
+          path: out/
+          if-no-files-found: warn
+
+      # A failed build still publishes its report (so the errors can be read), but never replaces a good APK.
+      - name: Publish to the "tele-latest" release
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FILES=""
+          if [ -f out/Tele2060-Player.apk ]; then FILES="out/Tele2060-Player.apk"; fi
+          TITLE="2060 Tele Player - build #$BUILD_NUMBER"
+          if [ -z "$FILES" ]; then TITLE="2060 Tele Player - build #$BUILD_NUMBER FAILED (APK below is from an earlier build)"; fi
+          publish() {
+            if gh release view tele-latest >/dev/null 2>&1; then
+              if [ -n "$FILES" ]; then gh release upload tele-latest $FILES --clobber || return 1; fi
+              gh release edit tele-latest --title "$TITLE" --notes-file out/REPORT.md --prerelease
+            else
+              gh release create tele-latest $FILES --target "$GITHUB_SHA" --title "$TITLE" --notes-file out/REPORT.md --prerelease
+            fi
+          }
+          publish || { sleep 20; publish; } || { sleep 60; publish; }
