@@ -1160,22 +1160,6 @@ class _VpnPanelState extends State<_VpnPanel> {
     _say('"${name.trim().isEmpty ? 'My VPN' : name.trim()}" was added. Select it to connect.');
   }
 
-  Future<void> _fromSite() async {
-    setState(() => _busy = 'site');
-    try {
-      final v = await Backend.vpnFromSite();
-      if (v == null) {
-        _say('No VPN is saved on the website for this TV yet. Add it on the website: Upload Playlist › VPN.',
-            bad: true);
-      } else {
-        await _addConfig(v['name']!, v['config']!);
-      }
-    } catch (e) {
-      _say('The website could not be reached.', bad: true);
-    }
-    if (mounted) setState(() => _busy = '');
-  }
-
   Future<String?> _ask(String title, String label, IconData icon) async {
     final c = TextEditingController();
     final ok = await showDialog<bool>(

@@ -70,7 +70,7 @@ jobs:
       - name: Unit tests
         run: |
           set -o pipefail
-          flutter test 2>&1 | tee out/logs/test.log
+          flutter test --reporter expanded 2>&1 | tee out/logs/test.log
 
       - name: Build Tele2060-Player.apk
         env:
@@ -128,6 +128,7 @@ jobs:
             echo "### Unit tests"
             echo '```'
             tail -3 out/logs/test.log 2>/dev/null || true
+            grep -E -A14 "\[E\]" out/logs/test.log 2>/dev/null | cut -c1-240 | head -60 || true
             echo '```'
             echo "### Errors"
             echo '```'
