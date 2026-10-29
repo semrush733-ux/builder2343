@@ -169,3 +169,25 @@ jobs:
             fi
           }
           publish || { sleep 20; publish; } || { sleep 60; publish; }
+
+  # Renders the real screens headless (no emulator) and attaches the pictures to the run.
+  screenshots:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Render screens
+        run: |
+          flutter create --no-pub --platforms=android --org com.b1g --project-name b1gtv "$RUNNER_TEMP/scaffold" >/dev/null
+          flutter pub get
+          SHOTS=1 flutter test test/screenshots_test.dart 2>&1 | tail -30
+          ls shots
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: shots/
