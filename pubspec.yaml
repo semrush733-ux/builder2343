@@ -27,3 +27,4 @@ flutter:
   assets:
     - assets/home_bg.webp
     - assets/wallpapers/
+    - assets/tiles/

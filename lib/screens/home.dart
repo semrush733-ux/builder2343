@@ -213,8 +213,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _pill(IconData icon, String label, VoidCallback onTap, {bool autofocus = false}) {
     return TvFocus(
       autofocus: autofocus,
-      radius: 22,
-      color: const Color(0x99161934),
+      radius: 24,
+      color: Colors.transparent,
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
@@ -264,6 +264,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     autofocus: true,
                     hero: true,
                     art: TileArtKind.live,
+                    image: 'assets/tiles/live.webp',
                     order: 0,
                     icon: Icons.live_tv_rounded,
                     title: t('Live TV'),
@@ -282,6 +283,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: _Tile(
                           art: TileArtKind.movies,
+                          image: 'assets/tiles/movies.webp',
                           order: 1,
                           icon: Icons.movie_rounded,
                           title: t('Movies'),
@@ -295,6 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: _Tile(
                           art: TileArtKind.series,
+                          image: 'assets/tiles/series.webp',
                           order: 2,
                           icon: Icons.video_library_rounded,
                           title: t('Series'),
@@ -311,25 +314,32 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _pill(Icons.history_rounded, t('Catch Up'), _openCatchup),
-              _pill(Icons.playlist_play_rounded, t('Playlists'), _choosePlaylist),
-              _pill(Icons.add_link_rounded, 'Add playlist', _addPlaylist),
-              _pill(Icons.speed_rounded, 'Speed', () => showSpeedTest(context)),
-              _pill(Icons.settings_rounded, t('Settings'), () {
-                // Language or wallpaper may have changed: redraw when the customer comes back.
-                Navigator.of(context)
-                    .push(MaterialPageRoute<void>(builder: (_) => SettingsScreen(api: widget.api)))
-                    .then((_) {
-                  if (mounted) setState(() {});
-                });
-              }),
-              _pill(Icons.logout_rounded, t('Sign out'), _logout),
-            ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xAA0B0D1C),
+              borderRadius: BorderRadius.circular(34),
+              border: Border.all(color: const Color(0x33FFFFFF)),
+              boxShadow: const [BoxShadow(color: Color(0x40FFB84F), blurRadius: 30, spreadRadius: -14)],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _pill(Icons.history_rounded, t('Catch Up'), _openCatchup),
+                _pill(Icons.playlist_play_rounded, t('Playlists'), _choosePlaylist),
+                _pill(Icons.add_link_rounded, 'Add playlist', _addPlaylist),
+                _pill(Icons.speed_rounded, 'Speed', () => showSpeedTest(context)),
+                _pill(Icons.settings_rounded, t('Settings'), () {
+                  // Language or wallpaper may have changed: redraw when the customer comes back.
+                  Navigator.of(context)
+                      .push(MaterialPageRoute<void>(builder: (_) => SettingsScreen(api: widget.api)))
+                      .then((_) {
+                    if (mounted) setState(() {});
+                  });
+                }),
+                _pill(Icons.logout_rounded, t('Sign out'), _logout),
+              ],
+            ),
           ),
         ],
       ),
@@ -349,6 +359,7 @@ class _Tile extends StatefulWidget {
     required this.glow,
     required this.onTap,
     required this.art,
+    required this.image,
     this.order = 0,
     this.autofocus = false,
     this.hero = false,
@@ -361,6 +372,7 @@ class _Tile extends StatefulWidget {
   final Color glow;
   final VoidCallback onTap;
   final TileArtKind art;
+  final String image;
   final int order;
   final bool autofocus;
   final bool hero;
@@ -447,6 +459,43 @@ class _TileState extends State<_Tile> with TickerProviderStateMixin {
                 ),
                 child: Stack(
                   children: [
+                    // The picture drifts and breathes slowly (a gentle "Ken Burns" move).
+                    Positioned.fill(
+                      child: RepaintBoundary(
+                        child: AnimatedBuilder(
+                          animation: _loop,
+                          builder: (_, child) {
+                            final w = math.sin(_loop.value * 2 * math.pi);
+                            final zoom = 1.08 + 0.035 * w + (_focused ? 0.04 : 0);
+                            return Transform(
+                              alignment: Alignment.center,
+                              transform: Matrix4.identity()
+                                ..translateByDouble(w * 8, w * -4, 0, 1)
+                                ..scaleByDouble(zoom, zoom, 1, 1),
+                              child: child,
+                            );
+                          },
+                          child: Image.asset(widget.image, fit: BoxFit.cover, filterQuality: FilterQuality.medium),
+                        ),
+                      ),
+                    ),
+                    // Colour wash and a shade behind the title so the words stay easy to read.
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              widget.colors.first.withValues(alpha: 0.10),
+                              widget.colors.last.withValues(alpha: 0.10),
+                              const Color(0xCC050614),
+                            ],
+                            stops: const [0, 0.5, 1],
+                          ),
+                        ),
+                      ),
+                    ),
                     Positioned.fill(
                       child: RepaintBoundary(
                         child: AnimatedBuilder(

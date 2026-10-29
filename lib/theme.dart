@@ -207,6 +207,28 @@ class _AuroraPainter extends CustomPainter {
       );
     }
 
+    // Thin flowing light lines (gold and violet) across the screen.
+    for (var k = 0; k < 3; k++) {
+      final path = Path();
+      for (var i = 0; i <= 48; i++) {
+        final x = s.width * i / 48;
+        final y = s.height * (0.78 + 0.07 * k) +
+            math.sin(i / 48 * 2 * math.pi * (1.0 + 0.4 * k) + t * 2 * math.pi + k) * s.height * (0.05 + 0.015 * k);
+        if (i == 0) {
+          path.moveTo(x, y);
+        } else {
+          path.lineTo(x, y);
+        }
+      }
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.4
+          ..color = (k == 0 ? const Color(0xFFFFB84F) : C.violet).withValues(alpha: 0.20 * this.k),
+      );
+    }
+
     blob(C.violet, 0.15, 0.20, 0.85, 0, 0.0);
     blob(C.accent, 0.88, 0.85, 0.75, 0, 0.35);
     blob(C.pink, 0.78, 0.10, 0.55, 0, 0.7);
