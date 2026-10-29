@@ -375,6 +375,7 @@ class _TileState extends State<_Tile> {
           focusBorder: widget.glow,
           onTap: widget.onTap,
           child: Container(
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(22),
               gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: widget.colors),
