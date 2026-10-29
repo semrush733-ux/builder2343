@@ -192,3 +192,14 @@ jobs:
         with:
           name: screenshots
           path: shots/
+      - name: Publish the pictures to the branch tele-shots
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          D="$RUNNER_TEMP/shots-branch"; rm -rf "$D"; mkdir -p "$D"
+          cp shots/*.png "$D"/
+          cd "$D"
+          git init -q && git checkout -q -b tele-shots && git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -q -m "screens"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" tele-shots
