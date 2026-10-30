@@ -8,8 +8,16 @@ if 'screenOrientation' not in text:
     text, n = re.subn(r'<activity(\s)', r'<activity android:screenOrientation="portrait"\1', text, count=1)
     if n != 1:
         sys.exit('Could not find <activity> in AndroidManifest.xml')
+import json
+ads = json.loads(pathlib.Path('ads.json').read_text())
+if 'com.google.android.gms.ads.APPLICATION_ID' not in text:
+    meta = ('<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="%s"/>\n'
+            '        <meta-data android:name="com.google.android.gms.ads.DELAY_APP_MEASUREMENT_INIT" android:value="true"/>\n    ' % ads['android']['appId'])
+    text, n = re.subn(r'(</application>)', meta + r'\1', text, count=1)
+    if n != 1:
+        sys.exit('Could not find </application> in AndroidManifest.xml')
 manifest.write_text(text)
-print('manifest: portrait ok')
+print('manifest: portrait + AdMob app id ok')
 
 res = root / 'res'
 # Use the plain PNG launcher icons (remove the adaptive-icon XML that points at the Capacitor default).

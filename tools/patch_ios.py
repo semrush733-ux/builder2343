@@ -34,6 +34,11 @@ pl['UIRequiresFullScreen'] = True
 pl['UIStatusBarStyle'] = 'UIStatusBarStyleLightContent'
 pl['UIViewControllerBasedStatusBarAppearance'] = False
 pl['ITSAppUsesNonExemptEncryption'] = False
+# AdMob
+ads = json.loads(pathlib.Path('ads.json').read_text())
+pl['GADApplicationIdentifier'] = ads['ios']['appId']
+pl['NSUserTrackingUsageDescription'] = 'This lets us show you ads that are more relevant to you.'
+pl['SKAdNetworkItems'] = [{'SKAdNetworkIdentifier': 'cstr6suwn9.skadnetwork'}]
 with open(plist_path, 'wb') as f:
     plistlib.dump(pl, f)
 print('Info.plist ok')

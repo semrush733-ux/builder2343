@@ -3,6 +3,18 @@
 Block merge puzzle (drop numbered blocks, same numbers merge and double) with weekly 200-player leagues.
 HTML5 + vanilla JS in `www/`, packaged for Android and iOS with Capacitor 7.
 
+## Features
+
+Classic + Time Attack (2 min) modes, bomb and star (wild) blocks, Hammer / Swap / Undo, combos with blast/flower/confetti
+effects, synthesized sound effects + music, first-game tutorial, settings, daily reward (7-day streak), lucky spin,
+daily challenge, 17 missions, shop (6 block skins, 5 board themes), statistics, score sharing, weekly 200-player League
+(simulated players for now), AdMob rewarded + interstitial ads, Android back button, reminder notifications.
+
+## Ads (AdMob)
+
+`ads.json` holds the ad IDs. It ships with Google's **test IDs** (`"testing": true`). Before publishing, create an app
+in AdMob, put your real App IDs and ad unit IDs in `ads.json`, set `"testing": false` and push.
+
 ## Builds (GitHub Actions)
 
 Every push to the `block-merge-2048` branch runs **Build APK + IPA** (`.github/workflows/build.yml`) and publishes a Release with:
@@ -41,11 +53,12 @@ npm install
 npm run android
 ```
 
-This copies the font, creates the `android/` project, applies icon/splash/portrait and opens Android Studio.
+This copies the font, writes the ad config, creates the `android/` project, applies icon/splash/portrait and opens Android Studio.
 
 ## Project layout
 
 - `www/index.html` — the whole game (blocks, effects, league)
 - `assets/` — app icon (1024) and splash images
 - `android-overrides/res/` — Android launcher icons
-- `tools/` — font copy + Android/iOS patch scripts
+- `ads.json` — AdMob app + ad unit IDs
+- `tools/` — prepare script (font + ad config) and Android/iOS patch scripts

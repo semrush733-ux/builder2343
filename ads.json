@@ -1,0 +1,15 @@
+{
+  "_note": "Google TEST ad IDs. Replace with your own AdMob IDs before publishing, and set testing to false.",
+  "testing": true,
+  "interEvery": 3,
+  "android": {
+    "appId": "ca-app-pub-3940256099942544~3347511713",
+    "reward": "ca-app-pub-3940256099942544/5224354917",
+    "inter": "ca-app-pub-3940256099942544/1033173712"
+  },
+  "ios": {
+    "appId": "ca-app-pub-3940256099942544~1458002511",
+    "reward": "ca-app-pub-3940256099942544/1712485313",
+    "inter": "ca-app-pub-3940256099942544/4411468910"
+  }
+}

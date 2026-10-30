@@ -6,3 +6,4 @@ dist/
 out/
 *.jks
 *.keystore
+www/ads-config.js
