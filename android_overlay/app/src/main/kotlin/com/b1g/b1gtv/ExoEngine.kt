@@ -109,7 +109,7 @@ class ExoEngine(
         }
     }
 
-    private inner class Session(val id: Int, private val live: Boolean, ua: String) {
+    private inner class Session(val id: Int, private val live: Boolean, ua: String, buf: Int) {
         private val producer: TextureRegistry.SurfaceProducer = textures.createSurfaceProducer()
         val textureId: Long = producer.id()
         val player: ExoPlayer

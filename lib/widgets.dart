@@ -356,7 +356,6 @@ class _ClockState extends State<Clock> {
   @override
   Widget build(BuildContext context) {
     final t = DateTime.now();
-    String two(int n) => n.toString().padLeft(2, '0');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,

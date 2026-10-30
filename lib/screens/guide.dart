@@ -12,7 +12,6 @@ import 'player.dart';
 const _wd = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const _mo = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-String _two(int n) => n.toString().padLeft(2, '0');
 String _clock(DateTime t) => Ui.hm(t);
 
 String _day(DateTime d) {
