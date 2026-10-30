@@ -110,7 +110,18 @@ jobs:
         run: node tools/copy-fonts.js
 
       - name: Create iOS project
-        run: npx cap add ios --packagemanager SPM
+        run: |
+          set -o pipefail
+          if npx cap add ios --packagemanager SPM 2>&1 | tee cap-spm.log; then exit 0; fi
+          MSG=$(tail -25 cap-spm.log | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          echo "::warning title=cap add ios (SPM) failed, trying CocoaPods::$MSG"
+          rm -rf ios
+          which pod || sudo gem install cocoapods
+          npx cap add ios 2>&1 | tee cap-pods.log || {
+            MSG=$(tail -30 cap-pods.log | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=cap add ios (CocoaPods)::$MSG"
+            exit 1
+          }
 
       - name: Icon, splash, portrait, name
         run: python3 tools/patch_ios.py
@@ -126,7 +137,12 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/App.xcarchive" archive \
             MARKETING_VERSION=1.${{ github.run_number }} CURRENT_PROJECT_VERSION=${{ github.run_number }} \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" | tail -40
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" > xcb.log 2>&1 || {
+            MSG=$( { grep -E "error:|\*\* ARCHIVE FAILED" xcb.log | head -20; tail -15 xcb.log; } | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=xcodebuild::$MSG"
+            exit 1
+          }
+          tail -5 xcb.log
 
       - name: Package .ipa
         run: |
