@@ -5,7 +5,7 @@ HTML5 + vanilla JS in `www/`, packaged for Android and iOS with Capacitor 7.
 
 ## Builds (GitHub Actions)
 
-Every push to `main` runs **Build APK + IPA** (`.github/workflows/build.yml`) and publishes a Release with:
+Every push to the `block-merge-2048` branch runs **Build APK + IPA** (`.github/workflows/build.yml`) and publishes a Release with:
 
 | File | What it is |
 |---|---|
