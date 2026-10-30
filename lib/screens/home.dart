@@ -7,6 +7,7 @@ import '../i18n.dart';
 import '../m3u.dart';
 import '../speedtest.dart';
 import '../stalker.dart';
+import '../autotune.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -41,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _account = widget.account;
     log('screen=home');
+    Future<void>.delayed(const Duration(milliseconds: 1500), AutoTune.start);
     if (_account == null) _refreshAccount();
   }
 

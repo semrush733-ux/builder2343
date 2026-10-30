@@ -152,9 +152,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     final request = ++_pvRequest;
     PlaybackEngine engine;
     try {
-      engine = ExoEngine.available && Store.liveEngine == 'exo'
-          ? await ExoEngine.create(live: true)
-          : MpvEngine(live: true, direct: false);
+      engine = await createEngine(live: true);
     } catch (_) {
       engine = MpvEngine(live: true, direct: false);
     }

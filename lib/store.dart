@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+
 import 'theme.dart' show Ui;
 import 'dart:convert';
 
@@ -209,20 +211,23 @@ class Store {
   }
   static void setVideoMode(String mode) => _p.setString('video_mode', mode);
 
+  /// The device's own best player: Apple's on iPhone / iPad, ExoPlayer on Android.
+  static String get _bestEngine => defaultTargetPlatform == TargetPlatform.iOS ? 'native' : 'exo';
+
   /// Which player engine plays streams: "exo" (Google ExoPlayer, the default on Android) or
   /// "mpv". The app's own controls are the same on both.
   static String get engine {
     final v = _p.getString('player_engine2') ?? '';
-    if (v == 'exo' || v == 'mpv') return v;
-    return 'exo';
+    if (v == 'exo' || v == 'mpv' || v == 'native') return v;
+    return _bestEngine;
   }
   static void setEngine(String engine) => _p.setString('player_engine2', engine);
 
   /// Player for Live TV, chosen separately from the one for films and series ([engine]).
   static String get liveEngine {
     final v = _p.getString('live_engine') ?? '';
-    if (v == 'exo' || v == 'mpv') return v;
-    return 'exo';
+    if (v == 'exo' || v == 'mpv' || v == 'native') return v;
+    return _bestEngine;
   }
   static void setLiveEngine(String engine) => _p.setString('live_engine', engine);
 
@@ -274,7 +279,12 @@ class Store {
   static void setSubtitleLanguage(String code) => _p.setString('sub_lang', code);
 
   /// Stream format that worked last time for live channels: "ts" or "m3u8".
-  static String get liveFormat => _p.getString('live_format') == 'm3u8' ? 'm3u8' : 'ts';
+  static String get liveFormat {
+    final v = _p.getString('live_format');
+    if (v == 'm3u8' || v == 'ts') return v!;
+    // Apple's player only plays HLS (.m3u8) for live channels.
+    return defaultTargetPlatform == TargetPlatform.iOS ? 'm3u8' : 'ts';
+  }
 
   static void setLiveFormat(String format) {
     if (format != liveFormat) _p.setString('live_format', format);
@@ -282,10 +292,28 @@ class Store {
 
   // ---- interface and playback options ----
   /// Lite mode: fewer moving effects (weak TV boxes).
-  static bool get liteMode => _p.getBool('lite_mode') ?? false;
-  static void setLiteMode(bool v) {
-    _p.setBool('lite_mode', v);
-    Ui.lite = v;
+  /// "auto" (the app measures this device), "on" or "off".
+  static String get litePref => _p.getString('lite_pref') ?? 'auto';
+  static bool get autoLite => _p.getBool('lite_auto') ?? false;
+  static bool get liteMode => litePref == 'on' || (litePref == 'auto' && autoLite);
+  static void setLitePref(String v) {
+    _p.setString('lite_pref', v);
+    Ui.lite = liteMode;
+  }
+
+  static bool get tuned => _p.getBool('tuned') ?? false;
+  static void setAutoLite(bool v) {
+    _p.setBool('lite_auto', v);
+    _p.setBool('tuned', true);
+    Ui.lite = liteMode;
+  }
+
+  /// Back to the automatic choices for everything.
+  static void resetToAuto() {
+    for (final k in ['player_engine2', 'live_engine', 'lite_pref', 'lite_auto', 'tuned', 'buffer_level', 'max_quality', 'smart_net', 'default_fit', 'live_format']) {
+      _p.remove(k);
+    }
+    Ui.lite = liteMode;
   }
 
   static bool get clock24 => _p.getBool('clock24') ?? true;

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:video_player/video_player.dart' as vp;
 
 import 'config.dart';
 import 'store.dart';
@@ -490,3 +491,213 @@ class ExoEngine extends PlaybackEngine {
 
 /// Buffer size chosen in Settings: small 0.5x, normal 1x, large 2x.
 double get _bufMul => const [0.5, 1.0, 2.0][Store.bufferLevel];
+
+/// The engine that plays [live] streams (or films) on this device, from the customer's choice.
+/// A saved choice that does not fit this device falls back to the device's best player.
+String chosenEngine(bool live) {
+  final v = live ? Store.liveEngine : Store.engine;
+  if (v == 'exo' && ExoEngine.available) return 'exo';
+  if (v == 'native' && NativeEngine.available) return 'native';
+  if (v == 'mpv') return 'mpv';
+  return ExoEngine.available ? 'exo' : (NativeEngine.available ? 'native' : 'mpv');
+}
+
+/// Creates the engine named by [chosenEngine] (or [name]); never throws: mpv is the fallback.
+Future<PlaybackEngine> createEngine({required bool live, String? name, bool direct = false}) async {
+  final n = name ?? chosenEngine(live);
+  try {
+    if (n == 'exo' && ExoEngine.available) return await ExoEngine.create(live: live);
+    if (n == 'native' && NativeEngine.available) return NativeEngine(live: live);
+  } catch (_) {}
+  return MpvEngine(live: live, direct: direct);
+}
+
+// ----------------------------------------------------------------------- Apple AVPlayer (iPhone / iPad)
+
+/// Apple's own player (AVPlayer): starts in a fraction of a second, uses the phone's video chip
+/// and plays HLS (.m3u8) and MP4 very smoothly. It cannot play raw .ts or .mkv: when it fails
+/// the screen moves that video to mpv by itself.
+class NativeEngine extends PlaybackEngine {
+  NativeEngine({required this.live});
+
+  static bool get available => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
+  final bool live;
+  vp.VideoPlayerController? _c;
+  bool _disposed = false;
+  int _gen = 0;
+  bool _ended = false;
+  bool _errored = false;
+
+  final _position = StreamController<Duration>.broadcast();
+  final _duration = StreamController<Duration>.broadcast();
+  final _buffering = StreamController<bool>.broadcast();
+  final _completed = StreamController<bool>.broadcast();
+  final _tracks = StreamController<Tracks>.broadcast();
+  final _messages = StreamController<EngineMessage>.broadcast();
+  final ValueNotifier<int> _tick = ValueNotifier(0);
+
+  Duration _dur = Duration.zero;
+  bool _playing = false;
+  bool _isBuffering = true;
+  Size _size = Size.zero;
+
+  @override
+  String get name => 'native';
+  @override
+  Stream<Duration> get position => _position.stream;
+  @override
+  Stream<Duration> get duration => _duration.stream;
+  @override
+  Stream<bool> get buffering => _buffering.stream;
+  @override
+  Stream<bool> get completed => _completed.stream;
+  @override
+  Stream<Tracks> get tracks => _tracks.stream;
+  @override
+  Stream<EngineMessage> get messages => _messages.stream;
+  @override
+  Duration get durationNow => _dur;
+  @override
+  Tracks get tracksNow => Tracks();
+  @override
+  int get width => _size.width.toInt();
+  @override
+  int get height => _size.height.toInt();
+  @override
+  bool get playing => _playing;
+  @override
+  bool get isBuffering => _isBuffering;
+
+  void _setBuffering(bool b) {
+    if (b == _isBuffering) return;
+    _isBuffering = b;
+    if (!_disposed) _buffering.add(b);
+  }
+
+  void _onValue() {
+    final c = _c;
+    if (c == null || _disposed) return;
+    final v = c.value;
+    if (v.hasError) {
+      if (!_errored) {
+        _errored = true;
+        _messages.add(EngineMessage('native: ${v.errorDescription ?? 'error'} failed to open', true));
+      }
+      return;
+    }
+    if (!v.isInitialized) return;
+    if (v.size != _size && v.size.width > 0) {
+      _size = v.size;
+      _tick.value++;
+    }
+    if (v.duration != _dur) {
+      _dur = live ? Duration.zero : v.duration;
+      _duration.add(_dur);
+    }
+    _playing = v.isPlaying;
+    _setBuffering(v.isBuffering);
+    if (_playing) _position.add(v.position);
+    if (!live && !_ended && _dur > Duration.zero && v.position >= _dur - const Duration(milliseconds: 400) && !v.isPlaying) {
+      _ended = true;
+      _completed.add(true);
+    }
+  }
+
+  @override
+  Future<void> open(String url, Duration start) async {
+    final gen = ++_gen;
+    final old = _c;
+    _c = null;
+    old?.removeListener(_onValue);
+    try {
+      await old?.dispose();
+    } catch (_) {}
+    _ended = false;
+    _errored = false;
+    _setBuffering(true);
+    final c = vp.VideoPlayerController.networkUrl(
+      Uri.parse(url),
+      httpHeaders: {'User-Agent': kUserAgent},
+      videoPlayerOptions: vp.VideoPlayerOptions(mixWithOthers: false),
+    );
+    _c = c;
+    try {
+      await c.initialize();
+    } catch (e) {
+      if (_disposed || gen != _gen) return;
+      _messages.add(EngineMessage('native: ${e.runtimeType} failed to open', true));
+      return;
+    }
+    if (_disposed || gen != _gen) {
+      try {
+        await c.dispose();
+      } catch (_) {}
+      return;
+    }
+    c.addListener(_onValue);
+    try {
+      if (!live && start > Duration.zero) await c.seekTo(start);
+      await c.play();
+    } catch (_) {}
+    _tick.value++;
+    _onValue();
+  }
+
+  @override
+  Future<void> play() async => _c?.play();
+  @override
+  Future<void> pause() async => _c?.pause();
+  @override
+  Future<void> seek(Duration to) async => _c?.seekTo(to);
+  @override
+  Future<void> setRate(double rate) async => _c?.setPlaybackSpeed(rate);
+  @override
+  Future<void> setAudioTrack(AudioTrack track) async {}
+  @override
+  Future<void> setSubtitleTrack(SubtitleTrack track) async {}
+  @override
+  Future<void> setVideoTrack(VideoTrack track) async {}
+
+  @override
+  Future<List<String>> facts() async => [
+        'Engine: Apple AVPlayer (native)',
+        if (_size.width > 0) 'Picture: ${_size.width.toInt()}x${_size.height.toInt()}',
+        'Decoded by the video chip',
+      ];
+
+  @override
+  Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
+    final c = _c;
+    _c = null;
+    c?.removeListener(_onValue);
+    try {
+      await c?.dispose();
+    } catch (_) {}
+    for (final s in [_position, _duration, _buffering, _completed, _tracks, _messages]) {
+      await s.close();
+    }
+  }
+
+  @override
+  Widget view({required BoxFit fit, required double subtitlePad}) {
+    return ColoredBox(
+      color: Colors.black,
+      child: ValueListenableBuilder<int>(
+        valueListenable: _tick,
+        builder: (context, _, __) {
+          final c = _c;
+          if (c == null || !c.value.isInitialized || _size.width <= 0) return const SizedBox.shrink();
+          return ClipRect(
+            child: FittedBox(
+              fit: fit,
+              child: SizedBox(width: _size.width, height: _size.height, child: vp.VideoPlayer(c)),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}

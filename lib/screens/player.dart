@@ -206,19 +206,12 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Future<PlaybackEngine> _createEngine() async {
     _direct = Store.videoMode == 'direct';
     _pictureFailed = false;
-    PlaybackEngine engine;
-    if (_engineName == 'exo' && ExoEngine.available) {
-      try {
-        engine = await ExoEngine.create(live: widget.live);
-      } catch (e) {
-        // ExoPlayer could not start on this device: MPV plays instead.
-        log('exo could not start: ${e.runtimeType}');
-        _engineName = 'mpv';
-        _engineSwitched = true;
-        engine = MpvEngine(live: widget.live, direct: _direct);
-      }
-    } else {
-      engine = MpvEngine(live: widget.live, direct: _direct);
+    final engine = await createEngine(live: widget.live, name: _engineName, direct: _direct);
+    if (engine.name != _engineName) {
+      // The chosen player could not start on this device: mpv plays instead.
+      log('${_engineName} could not start');
+      _engineName = engine.name;
+      _engineSwitched = true;
     }
     _engine = engine;
     _subs.add(engine.position.listen(_onPosition));
@@ -240,7 +233,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _subs.add(engine.messages.listen((m) {
       _noteError(m.text, m.error);
       // ExoPlayer stops on an error (mpv carries on and reports hiccups): try again at once.
-      if (m.error && engine is ExoEngine && _accepting && identical(engine, _engine)) _failed();
+      if (m.error && (engine is ExoEngine || engine is NativeEngine) && _accepting && identical(engine, _engine)) _failed();
     }));
     return engine;
   }
@@ -576,9 +569,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
   /// Moves this video to the other player, once per video. False when that was done already.
   bool _switchEngine() {
-    if (!ExoEngine.available || _engineSwitched) return false;
+    if ((!ExoEngine.available && !NativeEngine.available) || _engineSwitched) return false;
     _engineSwitched = true;
-    _engineName = _engineName == 'exo' ? 'mpv' : 'exo';
+    final primary = ExoEngine.available ? 'exo' : 'native';
+    _engineName = _engineName == 'mpv' ? primary : 'mpv';
     log('switching engine to $_engineName');
     _fails = 0;
     _urlIndex = 0;
@@ -594,7 +588,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   /// Every new video (next channel, next episode) starts on the customer's player again,
   /// even when the previous one had to move to the other player.
   void _resetEngine() {
-    _engineName = ExoEngine.available ? (widget.live ? Store.liveEngine : Store.engine) : 'mpv';
+    _engineName = chosenEngine(widget.live);
     _engineSwitched = false;
   }
 
@@ -614,7 +608,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
     // The first player could not start this video at all (every address tried): hand it to the
     // other player straight away instead of retrying, so the picture comes quickly.
-    if (_fails >= 3 && !_playedThisUrl && _switchEngine()) return;
+    if (_fails >= (_engineName == 'native' ? 1 : 3) && !_playedThisUrl && _switchEngine()) return;
     if (_fails > _maxFails) {
       log('gave up index=$_index');
       // This engine gave up: let the other engine try once before showing the error.

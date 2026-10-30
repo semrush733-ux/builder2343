@@ -16,9 +16,10 @@ import '../widgets.dart';
 import '../xtream.dart';
 import 'home.dart' show wallpaperAsset;
 
-enum _Section { interface, playback, network, vpn, vod, live, parental, wallpaper, categories, cache, language, info }
+enum _Section { auto, interface, playback, network, vpn, vod, live, parental, wallpaper, categories, cache, language, info }
 
 const _titles = {
+  _Section.auto: 'Auto Setup',
   _Section.interface: 'Interface & Smoothness',
   _Section.playback: 'Playback & Smart Net',
   _Section.network: 'Network',
@@ -34,6 +35,7 @@ const _titles = {
 };
 
 const _icons = {
+  _Section.auto: Icons.auto_fix_high_rounded,
   _Section.interface: Icons.auto_awesome_rounded,
   _Section.playback: Icons.speed_rounded,
   _Section.network: Icons.wifi_rounded,
@@ -48,19 +50,23 @@ const _icons = {
   _Section.info: Icons.info_rounded,
 };
 
+// One calm palette: mint for the everyday sections, violet for the technical ones.
+const _mint = Color(0xFF2FE6D0);
+const _violet = Color(0xFF9B83FF);
 const _colors = {
-  _Section.interface: Color(0xFF2FE6D0),
-  _Section.playback: Color(0xFF7B5CFF),
-  _Section.network: Color(0xFF35A7FF),
-  _Section.vpn: Color(0xFF2ECC71),
-  _Section.vod: Color(0xFFFF9F1C),
-  _Section.live: Color(0xFFFF5A5F),
-  _Section.parental: Color(0xFF2ECC71),
-  _Section.wallpaper: Color(0xFFFF4FD8),
-  _Section.language: Color(0xFF35D6C4),
-  _Section.categories: Color(0xFF4AA3FF),
-  _Section.cache: Color(0xFFB37BFF),
-  _Section.info: Color(0xFFFFC400),
+  _Section.auto: _mint,
+  _Section.interface: _mint,
+  _Section.playback: _mint,
+  _Section.vod: _mint,
+  _Section.live: _mint,
+  _Section.wallpaper: _mint,
+  _Section.language: _mint,
+  _Section.network: _violet,
+  _Section.vpn: _violet,
+  _Section.parental: _violet,
+  _Section.categories: _violet,
+  _Section.cache: _violet,
+  _Section.info: _violet,
 };
 
 /// App settings, opened from the gear on the home screen: the menu on the left, the chosen
@@ -109,14 +115,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final narrow = MediaQuery.of(context).size.width < 900;
     return Scaffold(
-      body: SafeArea(
-        child: Row(
+      body: Stack(
+        children: [
+          const Positioned.fill(child: Aurora(strength: 0.9)),
+          SafeArea(
+            child: Padding(
+              padding: EdgeInsets.all(narrow ? 10 : 18),
+              child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              width: MediaQuery.of(context).size.width < 900 ? 240 : 300,
-              color: C.panel,
+              width: narrow ? 236 : 300,
+              decoration: BoxDecoration(
+                color: const Color(0xB30B0D1C),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: const Color(0x26FFFFFF)),
+              ),
               padding: const EdgeInsets.fromLTRB(14, 18, 14, 10),
               // A scrolling list, so every option can be reached on small (phone) screens too.
               child: ListView(
@@ -145,8 +161,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: TvFocus(
                         autofocus: s == _Section.interface,
                         selected: s == _section,
-                        radius: 11,
-                        color: C.panel,
+                        radius: 16,
+                        color: s == _section ? const Color(0x552FE6D0) : Colors.transparent,
                         onFocus: () => _open(s),
                         onTap: () => _open(s),
                         child: Padding(
@@ -169,11 +185,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
+            SizedBox(width: narrow ? 10 : 18),
             Expanded(
-              child: Padding(
-                padding: MediaQuery.of(context).size.width < 900
-                    ? const EdgeInsets.fromLTRB(18, 16, 16, 10)
-                    : const EdgeInsets.fromLTRB(36, 28, 36, 20),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0x990B0D1C),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: const Color(0x26FFFFFF)),
+                ),
+                padding: narrow ? const EdgeInsets.fromLTRB(18, 16, 16, 10) : const EdgeInsets.fromLTRB(34, 26, 34, 18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -194,15 +214,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+        ),
+        ],
       ),
     );
   }
 
   Widget _body() {
     switch (_section) {
+      case _Section.auto:
+        return _autoPanel();
       case _Section.interface:
         return _interface();
       case _Section.playback:
@@ -213,14 +237,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return const _VpnPanel();
       case _Section.vod:
         return _playerChoice(
-          current: ExoEngine.available ? Store.engine : 'mpv',
+          current: chosenEngine(false),
           onPick: (e) => setState(() => Store.setEngine(e)),
           what: 'Movies and series',
           withMode: true,
         );
       case _Section.live:
         return _playerChoice(
-          current: ExoEngine.available ? Store.liveEngine : 'mpv',
+          current: chosenEngine(true),
           onPick: (e) => setState(() => Store.setLiveEngine(e)),
           what: 'Live TV channels and the channel preview',
           withMode: false,
@@ -249,6 +273,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required bool withMode,
   }) {
     final exo = ExoEngine.available;
+    final native = NativeEngine.available;
     final mpvChosen = current == 'mpv';
     return ListView(
       children: [
@@ -263,6 +288,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             badge: 'RECOMMENDED',
             text: 'Uses the TV\'s own video chip: smooth picture and quick start. Default.',
             onTap: () => onPick('exo'),
+          ),
+        if (native)
+          _option(
+            selected: current == 'native',
+            icon: Icons.apple_rounded,
+            iconColor: _mint,
+            title: 'Apple Player (native)',
+            badge: 'RECOMMENDED',
+            text: 'Starts in a moment and plays smoothly on iPhone and iPad. Best for live channels (HLS) and MP4.',
+            onTap: () => onPick('native'),
           ),
         const SizedBox(height: 10),
         _option(
@@ -299,6 +334,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _autoPanel() {
+    final size = MediaQuery.of(context).size;
+    final px = MediaQuery.of(context).devicePixelRatio;
+    final ios = NativeEngine.available;
+    final os = ios ? 'iPhone / iPad' : (ExoEngine.available ? 'Android' : 'This device');
+    String engineName(String e) => switch (e) {
+          'native' => 'Apple Player (native)',
+          'exo' => 'Google ExoPlayer',
+          _ => 'MPV Player',
+        };
+    final rows = <List<String>>[
+      ['Device', os],
+      ['Screen', '${(size.width * px).round()} x ${(size.height * px).round()}'],
+      ['Live TV player', engineName(chosenEngine(true))],
+      ['Movies player', engineName(chosenEngine(false))],
+      ['Live stream format', Store.liveFormat == 'm3u8' ? 'HLS (.m3u8)' : 'TS'],
+      ['Smoothness', Store.liteMode ? 'Lite' : 'Smooth'],
+      ['Smart Net', Store.smartNet ? 'On' : 'Off'],
+      ['Buffer', const ['Small', 'Normal', 'Large'][Store.bufferLevel]],
+    ];
+    return ListView(
+      children: [
+        const Text(
+          'The app looks at this device and sets the player, the stream format and the effects by itself. '
+          'These are the choices it made. You can change any of them in the other sections.',
+          style: TextStyle(fontSize: 14, color: C.dim, height: 1.5),
+        ),
+        const SizedBox(height: 16),
+        for (final r in rows)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(color: const Color(0x80161934), borderRadius: BorderRadius.circular(14)),
+            child: Row(
+              children: [
+                SizedBox(width: 190, child: Text(r[0], style: const TextStyle(fontSize: 14.5, color: C.dim))),
+                Expanded(child: Text(r[1], style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+              ],
+            ),
+          ),
+        const SizedBox(height: 14),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TvFocus(
+            radius: 16,
+            color: const Color(0x552FE6D0),
+            onTap: () {
+              Store.resetToAuto();
+              setState(() {});
+              _toast('Everything is back on Auto.');
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.auto_fix_high_rounded, color: _mint),
+                  SizedBox(width: 12),
+                  Text('Set everything to Auto', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   // ------------------------------------------------- interface and playback
 
   Widget _head(String text) => Padding(
@@ -323,8 +426,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return ListView(
       children: [
         _head('SMOOTHNESS'),
-        _chips(['Smooth (all effects)', 'Lite (weak boxes)'], Store.liteMode ? 1 : 0, (i) => Store.setLiteMode(i == 1)),
-        _note('Lite stops the moving background, drifting pictures and sparkles. Pick it if the menus feel slow on an old TV box. Takes full effect when you open the screen again.'),
+        _chips(['Auto (recommended)', 'Smooth (all effects)', 'Lite (weak boxes)'],
+            const ['auto', 'off', 'on'].indexOf(Store.litePref), (i) => Store.setLitePref(const ['auto', 'off', 'on'][i])),
+        _note(Store.litePref == 'auto'
+            ? 'Auto watches how smoothly this device draws the home screen and chooses by itself: now ${Store.liteMode ? 'Lite' : 'Smooth'}.'
+            : 'Lite stops the moving background, drifting pictures and sparkles. It takes full effect when you open the screen again.'),
         _head('CLOCK'),
         _chips(['24-hour', '12-hour (AM/PM)'], Store.clock24 ? 0 : 1, (i) => Store.setClock24(i == 0)),
         _note('Used on the home screen, the TV guide and the player.'),
@@ -740,8 +846,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) {
     return TvFocus(
       selected: selected,
-      radius: 12,
-      color: C.panel,
+      radius: 16,
+      color: selected ? const Color(0x402FE6D0) : const Color(0x80161934),
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
@@ -789,7 +895,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return TvFocus(
       selected: selected,
       radius: 20,
-      color: C.panel,
+      color: selected ? const Color(0x552FE6D0) : const Color(0x80161934),
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
