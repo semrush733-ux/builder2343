@@ -1,0 +1,96 @@
+name: 2060 Tele Player iOS
+
+# Builds an UNSIGNED iPhone/iPad app (Tele2060-Player-unsigned.ipa) and adds it to release "tele-latest".
+# Install it by signing with AltStore / Sideloadly (free Apple ID works, expires after 7 days),
+# or re-sign it with a paid Apple Developer account.
+
+on:
+  push:
+    branches: [tele-2060]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+concurrency:
+  group: tele-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create the iOS project
+        run: |
+          mkdir -p out
+          flutter create --no-pub --platforms=ios --org com.tele2060 --project-name b1gtv "$RUNNER_TEMP/scaffold"
+          cp -r "$RUNNER_TEMP/scaffold/ios" ios
+          PL=ios/Runner/Info.plist
+          B=/usr/libexec/PlistBuddy
+          $B -c "Set :CFBundleDisplayName '2060 Tele Player'" "$PL" || $B -c "Add :CFBundleDisplayName string '2060 Tele Player'" "$PL"
+          $B -c "Set :CFBundleName '2060 Tele Player'" "$PL" || true
+          # IPTV servers are plain http:// and on the home network
+          $B -c "Add :NSAppTransportSecurity dict" "$PL" || true
+          $B -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PL" || true
+          $B -c "Add :NSLocalNetworkUsageDescription string 'Receive a playlist from your phone through the QR code.'" "$PL" || true
+          $B -c "Add :UIBackgroundModes array" "$PL" || true
+          $B -c "Add :UIBackgroundModes:0 string audio" "$PL" || true
+          sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = com.tele2060.b1gtv;/PRODUCT_BUNDLE_IDENTIFIER = com.tele2060.player;/g' ios/Runner.xcodeproj/project.pbxproj
+          grep -n "PRODUCT_BUNDLE_IDENTIFIER" ios/Runner.xcodeproj/project.pbxproj | head -3
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Build the app (no signing)
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: |
+          set -o pipefail
+          flutter build ios --release --no-codesign \
+            --build-name "1.0.${{ github.run_number }}" --build-number "${{ github.run_number }}" \
+            --dart-define=B1G_TMDB_KEY="$TMDB_API_KEY" 2>&1 | tee out/ios-build.log
+
+      - name: Pack the IPA
+        run: |
+          rm -rf Payload && mkdir Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qry out/Tele2060-Player-unsigned.ipa Payload
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tele2060-ios
+          path: out/
+
+      - name: Add the IPA to the "tele-latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in 1 2 3; do
+            gh release upload tele-latest out/Tele2060-Player-unsigned.ipa --clobber && exit 0
+            sleep 20
+          done
+          exit 1
+
+      - name: Report a failure in the release notes
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "## iOS build #${{ github.run_number }} FAILED"
+            echo '```'
+            grep -hE "error:|Error|FAILED|Could not|Exception" out/ios-build.log 2>/dev/null | sort -u | cut -c1-300 | head -60
+            echo '```'
+          } > ios-report.md
+          gh release create tele-ios-report --prerelease --title "iOS build report" --notes-file ios-report.md --target "$GITHUB_SHA" 2>/dev/null || gh release edit tele-ios-report --notes-file ios-report.md

@@ -187,7 +187,13 @@ class Backend {
     } catch (_) {}
   }
 
-  static Future<String> cacheDir() async => (await _device.invokeMethod<String>('cacheDir')) ?? '';
+  static Future<String> cacheDir() async {
+    try {
+      return (await _device.invokeMethod<String>('cacheDir')) ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
   static Future<bool> canInstall() async => false;
   static Future<bool> installApk(String path) async => false;
 
