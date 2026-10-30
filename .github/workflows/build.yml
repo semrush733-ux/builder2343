@@ -1,0 +1,164 @@
+name: Build APK + IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Android SDK (pre-installed on the runner)
+        run: |
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+
+      - name: Install packages
+        run: npm install
+
+      - name: Bundle font (offline)
+        run: node tools/copy-fonts.js
+
+      - name: Create Android project
+        run: npx cap add android
+
+      - name: Portrait, app icon, splash
+        run: python3 tools/patch_android.py
+
+      - name: Sync web files
+        run: npx cap sync android
+
+      - name: Version number (higher every build, so phones install it as an update)
+        run: |
+          GRADLE=android/app/build.gradle
+          sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" "$GRADLE"
+          sed -i "s/versionName \"[^\"]*\"/versionName \"1.${{ github.run_number }}\"/" "$GRADLE"
+          grep -E "versionCode|versionName" "$GRADLE"
+
+      - name: Build
+        working-directory: android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          chmod +x gradlew
+          if [ -n "$KEYSTORE_BASE64" ]; then TASKS="assembleRelease bundleRelease"; else TASKS="assembleDebug"; fi
+          echo "Gradle tasks: $TASKS"
+          set -o pipefail
+          ./gradlew $TASKS --no-daemon 2>&1 | tee ../gradle.log || {
+            MSG=$( { grep -E "^e: |error:|ERROR:" ../gradle.log | head -15; grep -A14 "What went wrong" ../gradle.log | head -30; } | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=Gradle::$MSG"
+            exit 1
+          }
+
+      - name: Sign (release key if set, otherwise debug build)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          mkdir -p out
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::No KEYSTORE_BASE64 secret: building a DEBUG APK (installs fine for testing, not for Play Store)."
+            cp android/app/build/outputs/apk/debug/app-debug.apk out/BlockMerge2048.apk
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > release.jks
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/zipalign" -p -f 4 android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+          "$BT/apksigner" sign --ks release.jks --ks-key-alias "$KEY_ALIAS" --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEY_PASSWORD --out out/BlockMerge2048.apk aligned.apk
+          "$BT/apksigner" verify --print-certs out/BlockMerge2048.apk
+          jarsigner -keystore release.jks -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" -signedjar out/BlockMerge2048.aab android/app/build/outputs/bundle/release/app-release.aab "$KEY_ALIAS"
+          rm -f release.jks aligned.apk
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: android
+          path: out/*
+
+  ios:
+    name: iOS IPA
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install packages
+        run: npm install
+
+      - name: Bundle font (offline)
+        run: node tools/copy-fonts.js
+
+      - name: Create iOS project
+        run: npx cap add ios --packagemanager SPM
+
+      - name: Icon, splash, portrait, name
+        run: python3 tools/patch_ios.py
+
+      - name: Sync web files
+        run: npx cap sync ios
+
+      - name: Build (unsigned archive)
+        run: |
+          set -o pipefail
+          if [ -d ios/App/App.xcworkspace ]; then SRC="-workspace ios/App/App.xcworkspace"; else SRC="-project ios/App/App.xcodeproj"; fi
+          xcodebuild $SRC -scheme App -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" archive \
+            MARKETING_VERSION=1.${{ github.run_number }} CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" | tail -40
+
+      - name: Package .ipa
+        run: |
+          mkdir -p out Payload
+          cp -R "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app" Payload/
+          zip -qry out/BlockMerge2048-unsigned.ipa Payload
+          ls -lh out
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ios
+          path: out/*
+
+  release:
+    name: Publish to Releases
+    needs: [android, ios]
+    if: always() && (needs.android.result == 'success' || needs.ios.result == 'success')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          path: dist
+          merge-multiple: true
+
+      - run: ls -lh dist
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.${{ github.run_number }}
+          name: Block Merge 2048 — 1.${{ github.run_number }}
+          body: |
+            BlockMerge2048.apk: install on Android (updates the previous version, progress is kept).
+            BlockMerge2048.aab: upload to Google Play Console (only when the release key secret is set).
+            BlockMerge2048-unsigned.ipa: iOS build. Must be signed before it installs on an iPhone (Sideloadly / AltStore with your Apple ID, or an Apple Developer account).
+          files: dist/*

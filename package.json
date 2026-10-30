@@ -1,0 +1,21 @@
+{
+  "name": "block-merge-2048",
+  "version": "1.0.0",
+  "description": "Block Merge 2048 — block merge puzzle with weekly 200-player leagues (HTML5 + vanilla JS), packaged for Android and iOS with Capacitor.",
+  "private": true,
+  "scripts": {
+    "fonts": "node tools/copy-fonts.js",
+    "start": "npx http-server www -p 8080 -c-1",
+    "android": "node tools/copy-fonts.js && npx cap add android && python tools/patch_android.py && npx cap sync android && npx cap open android",
+    "sync": "node tools/copy-fonts.js && npx cap sync"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/ios": "^7.0.0",
+    "@fontsource/fredoka": "^5.0.0"
+  }
+}
