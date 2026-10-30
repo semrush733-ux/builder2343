@@ -7,6 +7,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import 'config.dart';
+import 'store.dart';
 
 /// A message from an engine: [error] true for real errors, false for chatter.
 class EngineMessage {
