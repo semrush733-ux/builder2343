@@ -162,6 +162,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   int _shownSecond = -1;
 
   int? _zapTarget;
+  int _prevIndex = -1; // the channel before this one ("last channel")
+  String _digits = ''; // number typed on the remote
+  Timer? _digitTimer;
+  Timer? _sleepTimer;
+  int _sleepMin = 0;
   Duration? _seekTarget;
   int _seekPresses = 0;
   bool _okDown = false;
@@ -327,6 +332,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     WidgetsBinding.instance.removeObserver(this);
     _generation++;
     _accepting = false;
+    _digitTimer?.cancel();
+    _sleepTimer?.cancel();
     for (final t in [_hideTimer, _watchdog, _zapTimer, _seekTimer, _retryTimer, _epgTimer]) {
       t?.cancel();
     }
@@ -1073,6 +1080,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _saveResume();
     _resetEngine();
     setState(() {
+      if (index != _index) _prevIndex = _index;
       _index = index;
       _zapTarget = null;
       _urlIndex = 0;
@@ -1084,6 +1092,67 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _open();
     _scheduleEpg();
     _showOverlay();
+  }
+
+  // ------------------------------------------------- number keys, last channel, sleep timer
+
+  static const _digitKeys = [
+    LogicalKeyboardKey.digit0, LogicalKeyboardKey.digit1, LogicalKeyboardKey.digit2, LogicalKeyboardKey.digit3,
+    LogicalKeyboardKey.digit4, LogicalKeyboardKey.digit5, LogicalKeyboardKey.digit6, LogicalKeyboardKey.digit7,
+    LogicalKeyboardKey.digit8, LogicalKeyboardKey.digit9,
+  ];
+  static const _padKeys = [
+    LogicalKeyboardKey.numpad0, LogicalKeyboardKey.numpad1, LogicalKeyboardKey.numpad2, LogicalKeyboardKey.numpad3,
+    LogicalKeyboardKey.numpad4, LogicalKeyboardKey.numpad5, LogicalKeyboardKey.numpad6, LogicalKeyboardKey.numpad7,
+    LogicalKeyboardKey.numpad8, LogicalKeyboardKey.numpad9,
+  ];
+
+  int? _digitOf(LogicalKeyboardKey k) {
+    final a = _digitKeys.indexOf(k);
+    return a >= 0 ? a : (_padKeys.indexOf(k) >= 0 ? _padKeys.indexOf(k) : null);
+  }
+
+  /// Typing 1, 2, 3 on the remote goes to channel number 123 (its place in the list) once the
+  /// remote has been still for a moment.
+  void _typeDigit(int d) {
+    if (widget.entries.length < 2) return;
+    _digits = (_digits + d).replaceFirst(RegExp('^0+'), '');
+    if (_digits.length > 4) _digits = _digits.substring(_digits.length - 4);
+    final n = int.tryParse(_digits) ?? 0;
+    if (n >= 1 && n <= widget.entries.length) {
+      setState(() => _zapTarget = n - 1);
+    } else {
+      setState(() => _buttonLabel = 'Channel $_digits');
+    }
+    _showOverlay();
+    _digitTimer?.cancel();
+    _digitTimer = Timer(const Duration(milliseconds: 1600), () {
+      final next = _zapTarget;
+      _digits = '';
+      if (mounted && next != null) {
+        _tuneTo(next);
+      } else if (mounted) {
+        setState(() => _buttonLabel = 'No such channel');
+      }
+    });
+  }
+
+  void _lastChannelBack() {
+    if (_prevIndex < 0 || _prevIndex >= widget.entries.length) return;
+    _tuneTo(_prevIndex);
+  }
+
+  static const _sleepSteps = [0, 15, 30, 60, 90];
+
+  void _cycleSleep() {
+    _sleepMin = _sleepSteps[(_sleepSteps.indexOf(_sleepMin) + 1) % _sleepSteps.length];
+    _sleepTimer?.cancel();
+    if (_sleepMin > 0) {
+      _sleepTimer = Timer(Duration(minutes: _sleepMin), () {
+        if (mounted) _close();
+      });
+    }
+    setState(() => _buttonLabel = _sleepMin == 0 ? 'Sleep timer: off' : 'Sleep timer: $_sleepMin min');
   }
 
   void _zap(int step) {
@@ -1228,6 +1297,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         return KeyEventResult.handled;
       }
       if (widget.live) {
+        final d = _digitOf(k);
+        if (d != null && down) {
+          _typeDigit(d);
+          return KeyEventResult.handled;
+        }
         if (k == LogicalKeyboardKey.arrowUp || k == LogicalKeyboardKey.channelUp) {
           _zap(1);
           return KeyEventResult.handled;
@@ -1475,6 +1549,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
             if (many) _button(Icons.list_rounded, t('Channel list'), _openChannels, node: _mainButton, size: 52),
             if (many) _button(Icons.skip_previous_rounded, 'Previous channel', () => _zap(-1)),
             if (many) _button(Icons.skip_next_rounded, 'Next channel', () => _zap(1)),
+            if (many && _prevIndex >= 0) _button(Icons.swap_horiz_rounded, 'Last channel', _lastChannelBack),
             _button(Icons.calendar_view_day_rounded, t('TV Guide'), _openGuide),
           ]
         : [
@@ -1495,6 +1570,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _button(Icons.closed_caption_rounded, t('Subtitles'), _openOptions),
       _button(Icons.aspect_ratio_rounded, 'Picture: ${_fitNames[_fit]}', _cycleFit),
       _button(Icons.high_quality_rounded, t('Quality'), _openQuality),
+      _button(Icons.bedtime_rounded, _sleepMin == 0 ? 'Sleep timer' : 'Sleep in $_sleepMin min', _cycleSleep, active: _sleepMin > 0),
       if (!widget.live) _button(Icons.speed_rounded, 'Speed ${_speed}x', _openOptions),
       if (widget.live && item != null)
         _button(favourite ? Icons.star_rounded : Icons.star_border_rounded,

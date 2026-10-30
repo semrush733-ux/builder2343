@@ -443,6 +443,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     const bufs = ['Small', 'Normal', 'Large'];
     return ListView(
       children: [
+        _head('WHEN THE APP STARTS'),
+        _chips(['Home screen', 'Open the last channel'], Store.autoStartLast ? 1 : 0, (i) => Store.setAutoStartLast(i == 1)),
+        _note('Open the last channel plays what you watched last, straight away.'),
         _head('SMART NET'),
         _chips(['On (recommended)', 'Off'], Store.smartNet ? 0 : 1, (i) => Store.setSmartNet(i == 0)),
         _note('When a live channel keeps freezing, the app steps down to a lower picture quality by itself, so the channel keeps playing on a slow connection.'),

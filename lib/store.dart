@@ -291,6 +291,10 @@ class Store {
   }
 
   // ---- interface and playback options ----
+  /// Open the last watched channel by itself when the app starts.
+  static bool get autoStartLast => _p.getBool('auto_start_last') ?? false;
+  static void setAutoStartLast(bool v) => _p.setBool('auto_start_last', v);
+
   /// Lite mode: fewer moving effects (weak TV boxes).
   /// "auto" (the app measures this device), "on" or "off".
   static String get litePref => _p.getString('lite_pref') ?? 'auto';
@@ -310,7 +314,7 @@ class Store {
 
   /// Back to the automatic choices for everything.
   static void resetToAuto() {
-    for (final k in ['player_engine2', 'live_engine', 'lite_pref', 'lite_auto', 'tuned', 'buffer_level', 'max_quality', 'smart_net', 'default_fit', 'live_format']) {
+    for (final k in ['player_engine2', 'live_engine', 'lite_pref', 'lite_auto', 'tuned', 'buffer_level', 'max_quality', 'smart_net', 'default_fit', 'live_format', 'auto_start_last']) {
       _p.remove(k);
     }
     Ui.lite = liteMode;

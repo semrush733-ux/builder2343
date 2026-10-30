@@ -15,7 +15,9 @@ import '../xtream.dart';
 import 'browse.dart';
 import 'catchup.dart';
 import 'login.dart';
+import 'player.dart';
 import 'playlists.dart';
+import 'search_all.dart';
 import 'settings.dart';
 import 'tile_art.dart';
 
@@ -34,6 +36,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  /// The last channel opens by itself once per app start.
+  static bool _autoStarted = false;
   XAccount? _account;
   bool _offline = false;
 
@@ -43,6 +47,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _account = widget.account;
     log('screen=home');
     Future<void>.delayed(const Duration(milliseconds: 1500), AutoTune.start);
+    if (Store.autoStartLast && !_autoStarted) {
+      _autoStarted = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _lastChannel(quiet: true));
+    }
     if (_account == null) _refreshAccount();
   }
 
@@ -212,6 +220,26 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _openSearch() {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => SearchAllScreen(api: widget.api)));
+  }
+
+  /// Plays the channel watched last, with the other recent channels one key away.
+  void _lastChannel({bool quiet = false}) {
+    final recent = Store.recents(XKind.live);
+    if (recent.isEmpty) {
+      if (!quiet && mounted) {
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(const SnackBar(
+              behavior: SnackBarBehavior.floating, width: 340, content: Text('No channel watched yet.', textAlign: TextAlign.center)));
+      }
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => PlayerScreen(api: widget.api, entries: liveEntriesFor(widget.api, recent), index: 0, live: true)));
+  }
+
   Widget _pill(IconData icon, String label, VoidCallback onTap, {bool autofocus = false}) {
     return TvFocus(
       autofocus: autofocus,
@@ -324,9 +352,13 @@ class _HomeScreenState extends State<HomeScreen> {
               border: Border.all(color: const Color(0x33FFFFFF)),
               boxShadow: const [BoxShadow(color: Color(0x40FFB84F), blurRadius: 30, spreadRadius: -14)],
             ),
-            child: Row(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
+                _pill(Icons.search_rounded, t('Search'), _openSearch),
+                _pill(Icons.replay_rounded, 'Last channel', _lastChannel),
                 _pill(Icons.history_rounded, t('Catch Up'), _openCatchup),
                 _pill(Icons.playlist_play_rounded, t('Playlists'), _choosePlaylist),
                 _pill(Icons.add_link_rounded, 'Add playlist', _addPlaylist),
@@ -341,6 +373,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 }),
                 _pill(Icons.logout_rounded, t('Sign out'), _logout),
               ],
+            ),
             ),
           ),
         ],

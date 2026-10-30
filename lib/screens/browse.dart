@@ -211,22 +211,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     });
   }
 
-  List<PlayEntry> _entriesFor(List<XItem> items) {
-    final format = Store.liveFormat;
-    return [
-      for (final i in items)
-        PlayEntry(
-          title: i.name,
-          urls: widget.api is StalkerSource ? <String>[] : widget.api.liveUrlsFor(i, format),
-          resolver: widget.api is StalkerSource ? () => resolveLiveUrls(widget.api, i, format) : null,
-          // Xtream channels use their stream id; playlist channels use the
-          // tvg-id from the M3U (shown when an XMLTV guide is set).
-          epgId: (i.url.isEmpty || widget.api is StalkerSource) ? i.id : (i.epgId.isEmpty ? null : i.epgId),
-          logo: i.icon,
-          item: i,
-        ),
-    ];
-  }
+  List<PlayEntry> _entriesFor(List<XItem> items) => liveEntriesFor(widget.api, items);
 
   Future<void> _playFull(List<XItem> items, int index) async {
     Store.addRecent(items[index]);
@@ -1122,3 +1107,25 @@ Future<String?> _askSearch(BuildContext context, String initial) async {
   controller.dispose();
   return result;
 }
+
+/// Play entries for live channels of any source.
+List<PlayEntry> liveEntriesFor(Source api, List<XItem> items) {
+  final format = Store.liveFormat;
+  return [
+    for (final i in items)
+      PlayEntry(
+        title: i.name,
+        urls: api is StalkerSource ? <String>[] : api.liveUrlsFor(i, format),
+        resolver: api is StalkerSource ? () => resolveLiveUrls(api, i, format) : null,
+        // Xtream channels use their stream id; playlist channels use the
+        // tvg-id from the M3U (shown when an XMLTV guide is set).
+        epgId: (i.url.isEmpty || api is StalkerSource) ? i.id : (i.epgId.isEmpty ? null : i.epgId),
+        logo: i.icon,
+        item: i,
+      ),
+  ];
+}
+
+/// Lower-case letters and digits only, for matching names while typing.
+String plainText(String s) =>
+    s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9\u00c0-\u024f\u0600-\u06ff\u0900-\u097f]+'), ' ').trim();
