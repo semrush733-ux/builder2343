@@ -384,6 +384,6 @@ class _Dot extends StatelessWidget {
       ),
     );
     if (!pulsing) return dot;
-    return const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: C.dim));
+    return const SizedBox(width: 14, height: 14, child: Spinner());
   }
 }

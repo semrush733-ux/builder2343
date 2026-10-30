@@ -1,3 +1,4 @@
+import 'theme.dart' show Ui;
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,6 +17,8 @@ class Store {
     _fav.clear();
     _recent.clear();
     _resume = null;
+    Ui.clock24 = clock24;
+    Ui.lite = liteMode;
   }
 
   // ---- login ----
@@ -276,4 +279,34 @@ class Store {
   static void setLiveFormat(String format) {
     if (format != liveFormat) _p.setString('live_format', format);
   }
+
+  // ---- interface and playback options ----
+  /// Lite mode: fewer moving effects (weak TV boxes).
+  static bool get liteMode => _p.getBool('lite_mode') ?? false;
+  static void setLiteMode(bool v) {
+    _p.setBool('lite_mode', v);
+    Ui.lite = v;
+  }
+
+  static bool get clock24 => _p.getBool('clock24') ?? true;
+  static void setClock24(bool v) {
+    _p.setBool('clock24', v);
+    Ui.clock24 = v;
+  }
+
+  /// Smart Net: step down by itself when a channel keeps stalling.
+  static bool get smartNet => _p.getBool('smart_net') ?? true;
+  static void setSmartNet(bool v) => _p.setBool('smart_net', v);
+
+  /// Highest picture height to use when a stream offers several (0 = no limit).
+  static int get maxQuality => _p.getInt('max_quality') ?? 0;
+  static void setMaxQuality(int h) => _p.setInt('max_quality', h);
+
+  /// How much video is kept ready ahead: 0 small, 1 normal, 2 large (more is smoother on slow nets).
+  static int get bufferLevel => (_p.getInt('buffer_level') ?? 1).clamp(0, 2);
+  static void setBufferLevel(int n) => _p.setInt('buffer_level', n);
+
+  /// Picture shape when a video opens: 0 fit, 1 fill, 2 stretch.
+  static int get defaultFit => (_p.getInt('default_fit') ?? 0).clamp(0, 2);
+  static void setDefaultFit(int n) => _p.setInt('default_fit', n);
 }

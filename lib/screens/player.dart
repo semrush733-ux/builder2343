@@ -56,7 +56,7 @@ String formatTime(Duration d) {
   return h > 0 ? '$h:${two(m)}:${two(sec)}' : '$m:${two(sec)}';
 }
 
-String formatClock(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+String formatClock(DateTime t) => Ui.hm(t);
 
 /// "ts", "m3u8", "mp4"... or "stream" when the address has no file ending.
 String formatOfUrl(String url) {
@@ -175,7 +175,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   String _audioId = '';
   String _subtitleId = 'no';
   bool _tracksApplied = false;
-  int _fit = 0;
+  int _fit = Store.defaultFit;
+  bool _capApplied = false;
   double _speed = 1.0;
 
   List<XEpg> _epg = const [];
@@ -227,7 +228,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _subs.add(engine.buffering.listen((b) {
       if (b == _buffering) return;
       _buffering = b;
-      if (b && _ready && widget.live) _noteStall();
+      if (b && _ready && widget.live && Store.smartNet) _noteStall();
       if (mounted) setState(() {});
     }));
     _subs.add(engine.completed.listen((done) {
@@ -420,6 +421,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _audioTracks = const [];
     _subtitleTracks = const [];
     _videoTracks = const [];
+    _capApplied = false;
     _videoId = 'auto';
     _videoHeight = 0;
     _audioId = '';
@@ -704,6 +706,17 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     final audio = tracks.audio.where((t) => real(t.id)).toList();
     final subtitle = tracks.subtitle.where((t) => real(t.id)).toList();
     _videoTracks = tracks.video.where((t) => real(t.id)).toList();
+    final cap = Store.maxQuality;
+    if (cap > 0 && !_capApplied && _videoTracks.length > 1) {
+      final ok = _videoTracks.where((v) => (v.h ?? 0) > 0 && (v.h ?? 0) <= cap).toList()
+        ..sort((a, b) => (b.h ?? 0).compareTo(a.h ?? 0));
+      if (ok.isNotEmpty) {
+        _capApplied = true;
+        _videoId = ok.first.id;
+        _engine?.setVideoTrack(ok.first);
+        log('quality cap ${ok.first.h}p');
+      }
+    }
     if (audio.length == _audioTracks.length && subtitle.length == _subtitleTracks.length) return;
     _audioTracks = audio;
     _subtitleTracks = subtitle;

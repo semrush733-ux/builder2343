@@ -154,7 +154,7 @@ class _CatchupScreenState extends State<CatchupScreen> {
 
   Widget _body() {
     if (_loadingChannels) {
-      return const Center(child: CircularProgressIndicator(color: C.accent));
+      return const Center(child: Spinner());
     }
     if (_error.isNotEmpty) {
       return Center(child: Text(_error, style: const TextStyle(color: C.dim, fontSize: 15)));
@@ -219,7 +219,7 @@ class _CatchupScreenState extends State<CatchupScreen> {
 
   Widget _programList() {
     if (_loadingPrograms) {
-      return const Center(child: CircularProgressIndicator(color: C.accent));
+      return const Center(child: Spinner());
     }
     if (_programs.isEmpty) {
       return const Center(

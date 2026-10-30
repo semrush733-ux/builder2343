@@ -439,7 +439,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ? const Padding(
                             padding: EdgeInsets.all(14),
                             child: Text('Connect to Wi-Fi first', textAlign: TextAlign.center, style: TextStyle(color: Colors.black87)))
-                        : const SizedBox(width: 30, height: 30, child: CircularProgressIndicator(strokeWidth: 3)))
+                        : const SizedBox(width: 30, height: 30, child: Spinner()))
                     : QrImageView(data: _lanUrl!, padding: const EdgeInsets.all(12), backgroundColor: Colors.white),
               ),
               const SizedBox(width: 20),
@@ -583,7 +583,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   height: 52,
                                   child: Center(
                                     child: _busy
-                                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 3, color: Colors.black))
+                                        ? const SizedBox(width: 22, height: 22, child: Spinner())
                                         : const Text('Continue',
                                             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.black)),
                                   ),

@@ -361,7 +361,7 @@ class _ClockState extends State<Clock> {
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('${two(t.hour)}:${two(t.minute)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+        Text(Ui.hm(t), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
         Text('${_days[t.weekday - 1]} ${t.day} ${_months[t.month - 1]} ${t.year}',
             style: const TextStyle(fontSize: 12.5, color: C.dim)),
       ],
@@ -448,13 +448,7 @@ class _LoadingState extends State<Loading> with SingleTickerProviderStateMixin {
                 fit: StackFit.expand,
                 alignment: Alignment.center,
                 children: [
-                  CircularProgressIndicator(
-                    value: percent / 100,
-                    strokeWidth: 4,
-                    strokeCap: StrokeCap.round,
-                    color: C.accent,
-                    backgroundColor: const Color(0x33FFFFFF),
-                  ),
+                  CustomPaint(painter: _ArcPainter(percent / 100)),
                   Center(
                     child: Text(
                       '$percent%',
@@ -481,23 +475,18 @@ class _LoadingState extends State<Loading> with SingleTickerProviderStateMixin {
   }
 }
 
-/// Three soft dots that rise and glow one after the other: shown while a stream connects,
-/// pauses to buffer, or a list loads. Quiet enough not to look like an error, and on screen
-/// from the first frame.
-class SoftDots extends StatefulWidget {
-  const SoftDots({super.key, this.label, this.size = 12});
-  final String? label;
-
-  /// Diameter of one dot.
-  final double size;
+/// The 2060 loader: a ring of glowing dots that chase each other in the brand colours
+/// (mint, violet, pink). Fills the box it is given (36 px when the box is unbounded).
+class Spinner extends StatefulWidget {
+  const Spinner({super.key, this.size});
+  final double? size;
 
   @override
-  State<SoftDots> createState() => _SoftDotsState();
+  State<Spinner> createState() => _SpinnerState();
 }
 
-class _SoftDotsState extends State<SoftDots> with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 1900))..repeat();
+class _SpinnerState extends State<Spinner> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat();
 
   @override
   void dispose() {
@@ -507,22 +496,71 @@ class _SoftDotsState extends State<SoftDots> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    final d = widget.size;
+    return LayoutBuilder(builder: (context, box) {
+      final bounded = box.hasBoundedWidth && box.hasBoundedHeight;
+      final side = widget.size ?? (bounded ? math.min(box.maxWidth, box.maxHeight) : 36.0);
+      return Center(
+        child: RepaintBoundary(
+          child: SizedBox(width: side, height: side, child: CustomPaint(painter: _OrbitPainter(_c))),
+        ),
+      );
+    });
+  }
+}
+
+class _OrbitPainter extends CustomPainter {
+  _OrbitPainter(this.a) : super(repaint: a);
+  final Animation<double> a;
+
+  static const _n = 10;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final ring = size.shortestSide / 2;
+    final dot = size.shortestSide / 11;
+    final head = a.value * _n; // position of the leading dot
+    for (var i = 0; i < _n; i++) {
+      // 0 = the head, 1 = the tail end of the comet
+      var behind = (head - i) % _n;
+      if (behind < 0) behind += _n;
+      final k = behind / _n;
+      final fade = math.pow(1 - k, 1.6).toDouble();
+      final ang = i / _n * 2 * math.pi - math.pi / 2;
+      final o = c + Offset(math.cos(ang), math.sin(ang)) * (ring - dot * 1.4);
+      final col = k < 0.5
+          ? Color.lerp(C.accent, C.violet, k * 2)!
+          : Color.lerp(C.violet, C.pink, (k - 0.5) * 2)!;
+      if (fade > 0.25) {
+        canvas.drawCircle(o, dot * (1.3 + fade), Paint()..color = col.withValues(alpha: 0.16 * fade)..maskFilter = MaskFilter.blur(BlurStyle.normal, dot));
+      }
+      canvas.drawCircle(o, dot * (0.45 + 0.55 * fade), Paint()..color = col.withValues(alpha: 0.18 + 0.82 * fade));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_OrbitPainter old) => false;
+}
+
+/// Shown while a stream connects, pauses to buffer, or a list loads.
+class SoftDots extends StatelessWidget {
+  const SoftDots({super.key, this.label, this.size = 12});
+  final String? label;
+
+  /// Kept from the older loader: roughly the size of one dot.
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
     return IgnorePointer(
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            RepaintBoundary(
-              child: SizedBox(
-                width: d * 7,
-                height: d * 3,
-                child: CustomPaint(painter: _DotsPainter(_c)),
-              ),
-            ),
-            if (widget.label != null && widget.label!.isNotEmpty) ...[
+            Spinner(size: size * 3.4),
+            if (label != null && label!.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text(widget.label!,
+              Text(label!,
                   style: const TextStyle(color: C.dim, fontSize: 14, shadows: [Shadow(color: Colors.black, blurRadius: 6)])),
             ],
           ],
@@ -530,36 +568,6 @@ class _SoftDotsState extends State<SoftDots> with SingleTickerProviderStateMixin
       ),
     );
   }
-}
-
-/// Painted straight from the animation (no widget rebuilds).
-class _DotsPainter extends CustomPainter {
-  _DotsPainter(this.a) : super(repaint: a);
-  final Animation<double> a;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final r = size.height / 6;
-    final gap = size.width / 3.5;
-    final cy = size.height * 0.62;
-    for (var i = 0; i < 3; i++) {
-      // One continuous wave with no stops or jumps: each dot follows the one before it by a
-      // third of a cycle, so the three rise and settle like a gentle ripple.
-      final phase = (a.value - i * 0.18) * 2 * math.pi;
-      final wave = 0.5 - 0.5 * math.cos(phase); // 0 -> 1 -> 0, smooth at both ends
-      final eased = wave * wave * (3 - 2 * wave); // softer at the top and bottom
-      final lift = eased * r * 1.3;
-      final glow = 0.4 + 0.6 * eased;
-      final cx = size.width / 2 + (i - 1) * gap;
-      final c = Offset(cx, cy - lift);
-      canvas.drawCircle(c, r * (1.6 + 0.5 * eased), Paint()..color = C.accent.withValues(alpha: 0.16 * glow)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, r));
-      canvas.drawCircle(c, r * (0.8 + 0.2 * eased), Paint()..color = Color.lerp(C.dim, Colors.white, eased)!.withValues(alpha: glow));
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DotsPainter old) => false;
 }
 
 /// Message with a "Try again" button, used when a list cannot be loaded.
@@ -594,4 +602,35 @@ class ErrorBox extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Gradient progress ring of the 2060 look.
+class _ArcPainter extends CustomPainter {
+  _ArcPainter(this.v);
+  final double v;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = Rect.fromLTWH(3, 3, size.width - 6, size.height - 6);
+    canvas.drawArc(r, 0, 2 * math.pi, false, Paint()..style = PaintingStyle.stroke..strokeWidth = 4..color = const Color(0x26FFFFFF));
+    canvas.drawArc(
+      r,
+      -math.pi / 2,
+      2 * math.pi * v,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round
+        ..shader = SweepGradient(
+          startAngle: -math.pi / 2,
+          endAngle: 3 * math.pi / 2,
+          colors: [C.accent, C.violet, C.pink],
+          transform: const GradientRotation(-math.pi / 2),
+        ).createShader(r),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ArcPainter old) => old.v != v;
 }

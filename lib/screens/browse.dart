@@ -556,7 +556,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     );
   }
 
-  static String _hm(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  static String _hm(DateTime t) => Ui.hm(t);
 
   /// Live: the preview picture on top, the channel's guide under it, and quick buttons.
   Widget _previewPane() {

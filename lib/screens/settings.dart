@@ -16,9 +16,11 @@ import '../widgets.dart';
 import '../xtream.dart';
 import 'home.dart' show wallpaperAsset;
 
-enum _Section { network, vpn, vod, live, parental, wallpaper, categories, cache, language, info }
+enum _Section { interface, playback, network, vpn, vod, live, parental, wallpaper, categories, cache, language, info }
 
 const _titles = {
+  _Section.interface: 'Interface & Smoothness',
+  _Section.playback: 'Playback & Smart Net',
   _Section.network: 'Network',
   _Section.vpn: 'VPN',
   _Section.vod: 'VOD Player',
@@ -32,6 +34,8 @@ const _titles = {
 };
 
 const _icons = {
+  _Section.interface: Icons.auto_awesome_rounded,
+  _Section.playback: Icons.speed_rounded,
   _Section.network: Icons.wifi_rounded,
   _Section.vpn: Icons.vpn_lock_rounded,
   _Section.vod: Icons.movie_filter_rounded,
@@ -45,6 +49,8 @@ const _icons = {
 };
 
 const _colors = {
+  _Section.interface: Color(0xFF2FE6D0),
+  _Section.playback: Color(0xFF7B5CFF),
   _Section.network: Color(0xFF35A7FF),
   _Section.vpn: Color(0xFF2ECC71),
   _Section.vod: Color(0xFFFF9F1C),
@@ -68,7 +74,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  _Section _section = _Section.network;
+  _Section _section = _Section.interface;
   XKind _kind = XKind.live;
   final Map<XKind, List<XCategory>> _cats = {};
   final Map<XKind, String> _catsError = {};
@@ -137,7 +143,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: TvFocus(
-                        autofocus: s == _Section.network,
+                        autofocus: s == _Section.interface,
                         selected: s == _section,
                         radius: 11,
                         color: C.panel,
@@ -197,6 +203,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _body() {
     switch (_section) {
+      case _Section.interface:
+        return _interface();
+      case _Section.playback:
+        return _playback();
       case _Section.network:
         return const _NetworkPanel();
       case _Section.vpn:
@@ -285,6 +295,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Text('Use Standard if a video plays sound but shows no picture.',
               style: TextStyle(fontSize: 13, color: C.dim)),
         ],
+      ],
+    );
+  }
+
+  // ------------------------------------------------- interface and playback
+
+  Widget _head(String text) => Padding(
+        padding: const EdgeInsets.only(top: 22, bottom: 10),
+        child: Text(text, style: const TextStyle(fontSize: 13, color: C.dim, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+      );
+
+  Widget _note(String text) => Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(text, style: const TextStyle(fontSize: 13, color: C.dim, height: 1.5)),
+      );
+
+  Widget _chips(List<String> labels, int selected, ValueChanged<int> onPick) => Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          for (var i = 0; i < labels.length; i++) _chip(labels[i], i == selected, () => setState(() => onPick(i))),
+        ],
+      );
+
+  Widget _interface() {
+    return ListView(
+      children: [
+        _head('SMOOTHNESS'),
+        _chips(['Smooth (all effects)', 'Lite (weak boxes)'], Store.liteMode ? 1 : 0, (i) => Store.setLiteMode(i == 1)),
+        _note('Lite stops the moving background, drifting pictures and sparkles. Pick it if the menus feel slow on an old TV box. Takes full effect when you open the screen again.'),
+        _head('CLOCK'),
+        _chips(['24-hour', '12-hour (AM/PM)'], Store.clock24 ? 0 : 1, (i) => Store.setClock24(i == 0)),
+        _note('Used on the home screen, the TV guide and the player.'),
+      ],
+    );
+  }
+
+  Widget _playback() {
+    const caps = [0, 1080, 720, 480];
+    const bufs = ['Small', 'Normal', 'Large'];
+    return ListView(
+      children: [
+        _head('SMART NET'),
+        _chips(['On (recommended)', 'Off'], Store.smartNet ? 0 : 1, (i) => Store.setSmartNet(i == 0)),
+        _note('When a live channel keeps freezing, the app steps down to a lower picture quality by itself, so the channel keeps playing on a slow connection.'),
+        _head('HIGHEST PICTURE QUALITY'),
+        _chips(['Auto', '1080p', '720p', '480p'], caps.indexOf(Store.maxQuality).clamp(0, 3), (i) => Store.setMaxQuality(caps[i])),
+        _note('Limit the quality when a stream offers several (adaptive streams). Lower = less data and fewer freezes on a slow net. Applies to the next video you open.'),
+        _head('BUFFER SIZE'),
+        _chips(bufs, Store.bufferLevel, Store.setBufferLevel),
+        _note('A larger buffer keeps more video ready ahead: smoother on a slow connection, but a channel takes a little longer to start. Applies to the next video you open.'),
+        _head('PICTURE SHAPE WHEN A VIDEO OPENS'),
+        _chips(['Fit', 'Fill', 'Stretch'], Store.defaultFit, Store.setDefaultFit),
+        _note('You can still change it while playing with the Picture button.'),
       ],
     );
   }
@@ -602,7 +666,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 _clearing
                     ? const SizedBox(
-                        width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: C.accent))
+                        width: 20, height: 20, child: Spinner())
                     : const Icon(Icons.cleaning_services_rounded, color: Color(0xFFB37BFF)),
                 const SizedBox(width: 12),
                 Text(t('Clear cache now'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
@@ -1009,7 +1073,7 @@ class _NetworkPanelState extends State<_NetworkPanel> with WidgetsBindingObserve
                 style: TextStyle(fontSize: 13, color: C.dim, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
             const SizedBox(width: 14),
             if (_scanning)
-              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: C.accent)),
+              const SizedBox(width: 16, height: 16, child: Spinner()),
             const Spacer(),
             TvFocus(
               radius: 18,
@@ -1236,7 +1300,7 @@ class _VpnPanelState extends State<_VpnPanel> {
             mainAxisSize: MainAxisSize.min,
             children: [
               busy
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: C.accent))
+                  ? const SizedBox(width: 16, height: 16, child: Spinner())
                   : Icon(icon, size: 17, color: C.accent),
               const SizedBox(width: 8),
               Text(label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
@@ -1329,7 +1393,7 @@ class _VpnPanelState extends State<_VpnPanel> {
                           children: [
                             _busy == p.name
                                 ? const SizedBox(
-                                    width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: C.accent))
+                                    width: 20, height: 20, child: Spinner())
                                 : Icon(Icons.shield_rounded,
                                     color: up && Vpn.activeName == p.name ? const Color(0xFF2ECC71) : C.dim),
                             const SizedBox(width: 12),

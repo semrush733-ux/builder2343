@@ -154,6 +154,21 @@ class Logo extends StatelessWidget {
   }
 }
 
+/// Look-and-feel switches read by many widgets (set from Store at start and in Settings).
+class Ui {
+  static bool clock24 = true;
+
+  /// Lite mode: fewer moving effects, for weak TV boxes.
+  static bool lite = false;
+
+  static String hm(DateTime t) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    if (clock24) return '${two(t.hour)}:${two(t.minute)}';
+    final h = t.hour % 12 == 0 ? 12 : t.hour % 12;
+    return '$h:${two(t.minute)} ${t.hour < 12 ? 'AM' : 'PM'}';
+  }
+}
+
 /// Slow drifting colour clouds behind a screen (aurora). Cheap: three blurred circles,
 /// painted once per frame without any shader work.
 class Aurora extends StatefulWidget {
@@ -165,7 +180,13 @@ class Aurora extends StatefulWidget {
 }
 
 class _AuroraState extends State<Aurora> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 28))..repeat();
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 28), value: 0.3);
+
+  @override
+  void initState() {
+    super.initState();
+    if (!Ui.lite) _c.repeat();
+  }
 
   @override
   void dispose() {

@@ -385,7 +385,7 @@ class _TileState extends State<_Tile> with TickerProviderStateMixin {
   bool _focused = false;
 
   // Loops forever: drives the moving picture.
-  late final AnimationController _loop = AnimationController(vsync: this, duration: const Duration(seconds: 6))..repeat();
+  late final AnimationController _loop = AnimationController(vsync: this, duration: const Duration(seconds: 6), value: 0.25);
   // Plays once when the screen opens (staggered by tile order).
   late final AnimationController _enter = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
   // Plays each time the tile gets focus: the sweep of light.
@@ -394,6 +394,7 @@ class _TileState extends State<_Tile> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    if (!Ui.lite) _loop.repeat();
     Future<void>.delayed(Duration(milliseconds: 120 + widget.order * 140), () {
       if (mounted) _enter.forward();
     });
@@ -466,11 +467,11 @@ class _TileState extends State<_Tile> with TickerProviderStateMixin {
                           animation: _loop,
                           builder: (_, child) {
                             final w = math.sin(_loop.value * 2 * math.pi);
-                            final zoom = 1.08 + 0.035 * w + (_focused ? 0.04 : 0);
+                            final zoom = 1.08 + (Ui.lite ? 0 : 0.035 * w) + (_focused ? 0.04 : 0);
                             return Transform(
                               alignment: Alignment.center,
                               transform: Matrix4.identity()
-                                ..translateByDouble(w * 8, w * -4, 0, 1)
+                                ..translateByDouble(Ui.lite ? 0 : w * 8, Ui.lite ? 0 : w * -4, 0, 1)
                                 ..scaleByDouble(zoom, zoom, 1, 1),
                               child: child,
                             );

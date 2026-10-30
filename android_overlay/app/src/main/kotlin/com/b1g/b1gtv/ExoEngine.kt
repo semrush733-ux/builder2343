@@ -71,7 +71,8 @@ class ExoEngine(
                 val id = nextId++
                 val live = call.argument<Boolean>("live") ?: true
                 val ua = call.argument<String>("ua") ?: "CloudPlayer/1.0 (Android TV)"
-                val s = Session(id, live, ua)
+                val buf = call.argument<Int>("buf") ?: 1
+                val s = Session(id, live, ua, buf)
                 sessions[id] = s
                 result.success(mapOf("id" to id, "texture" to s.textureId))
                 return
@@ -132,8 +133,9 @@ class ExoEngine(
                 .setReadTimeoutMs(20000)
             // Slow-connection friendly: start after 2 s of video and keep a deep buffer ahead
             // (live up to 40 s, films up to 2 min), so short drops in speed are not noticed.
+            val mul = when (buf) { 0 -> 0.5; 2 -> 2.0; else -> 1.0 }
             val load = DefaultLoadControl.Builder()
-                .setBufferDurationsMs(if (live) 12000 else 25000, if (live) 40000 else 120000, 2000, 5000)
+                .setBufferDurationsMs(((if (live) 12000 else 25000) * mul).toInt(), ((if (live) 40000 else 120000) * mul).toInt(), 2000, 5000)
                 .setPrioritizeTimeOverSizeThresholds(true)
                 .build()
             val renderers = DefaultRenderersFactory(context)

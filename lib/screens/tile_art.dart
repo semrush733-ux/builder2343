@@ -31,7 +31,7 @@ class _ArtPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size s) {
-    _particles(canvas, s);
+    if (!Ui.lite) _particles(canvas, s);
     if (kind == TileArtKind.live) _liveBadge(canvas, s);
   }
 

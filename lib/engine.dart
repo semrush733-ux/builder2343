@@ -134,8 +134,8 @@ class MpvEngine extends PlaybackEngine {
       set('cache', 'yes'),
       set('cache-pause-initial', 'no'),
       set('cache-pause-wait', live ? '1' : '2'),
-      set('demuxer-readahead-secs', live ? '10' : '60'),
-      set('demuxer-max-bytes', live ? '64MiB' : '192MiB'),
+      set('demuxer-readahead-secs', '${((live ? 10 : 60) * _bufMul).round()}'),
+      set('demuxer-max-bytes', '${((live ? 64 : 192) * _bufMul).round()}MiB'),
       set('demuxer-max-back-bytes', live ? '16MiB' : '64MiB'),
       if (!live) set('demuxer-seekable-cache', 'yes'),
       set('vd-lavc-dr', 'yes'),
@@ -291,7 +291,7 @@ class ExoEngine extends PlaybackEngine {
       });
     }
     final e = ExoEngine._(live);
-    final r = await _channel.invokeMethod<Map<dynamic, dynamic>>('create', {'live': live, 'ua': kUserAgent});
+    final r = await _channel.invokeMethod<Map<dynamic, dynamic>>('create', {'live': live, 'ua': kUserAgent, 'buf': Store.bufferLevel});
     e._id = (r?['id'] as num?)?.toInt() ?? 0;
     e._texture = (r?['texture'] as num?)?.toInt() ?? -1;
     if (e._id == 0 || e._texture < 0) throw StateError('ExoPlayer could not start');
@@ -486,3 +486,6 @@ class ExoEngine extends PlaybackEngine {
     );
   }
 }
+
+/// Buffer size chosen in Settings: small 0.5x, normal 1x, large 2x.
+double get _bufMul => const [0.5, 1.0, 2.0][Store.bufferLevel];
