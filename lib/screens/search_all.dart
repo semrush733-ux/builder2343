@@ -3,8 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../i18n.dart';
-import '../parental.dart';
-import '../stalker.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -27,7 +25,6 @@ class _SearchAllScreenState extends State<SearchAllScreen> {
   final _text = TextEditingController();
   final Map<XKind, List<XItem>> _all = {};
   bool _loading = false;
-  String _error = '';
   String _query = '';
   Map<XKind, List<XItem>> _found = {};
 
@@ -57,7 +54,6 @@ class _SearchAllScreenState extends State<SearchAllScreen> {
     }
     setState(() {
       _loading = true;
-      _error = '';
       _query = q;
     });
     await Future.wait([for (final k in XKind.values) _load(k)]);

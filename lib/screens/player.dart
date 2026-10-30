@@ -1116,7 +1116,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   /// remote has been still for a moment.
   void _typeDigit(int d) {
     if (widget.entries.length < 2) return;
-    _digits = (_digits + d).replaceFirst(RegExp('^0+'), '');
+    _digits = '$_digits$d'.replaceFirst(RegExp('^0+'), '');
     if (_digits.length > 4) _digits = _digits.substring(_digits.length - 4);
     final n = int.tryParse(_digits) ?? 0;
     if (n >= 1 && n <= widget.entries.length) {
