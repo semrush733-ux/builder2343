@@ -90,7 +90,7 @@ jobs:
           {
             echo "## iOS build #${{ github.run_number }} FAILED"
             echo '```'
-            grep -hE "error:|Error|FAILED|Could not|Exception" out/ios-build.log 2>/dev/null | sort -u | cut -c1-300 | head -60
+            grep -hE "error:|Error|FAILED|Could not|Exception|\.swift:|\.m:[0-9]|Podfile|pod " out/ios-build.log 2>/dev/null | sort -u | cut -c1-360 | head -80
             echo '```'
           } > ios-report.md
           gh release create tele-ios-report --prerelease --title "iOS build report" --notes-file ios-report.md --target "$GITHUB_SHA" 2>/dev/null || gh release edit tele-ios-report --notes-file ios-report.md
