@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../backend.dart';
 import '../config.dart';
+import '../country.dart';
 import '../engine.dart';
 import '../i18n.dart';
 import '../network.dart';
@@ -15,11 +16,15 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../xtream.dart';
 import 'home.dart' show wallpaperAsset;
+import 'profiles.dart';
+import 'package:flutter/services.dart';
 
-enum _Section { auto, interface, playback, network, vpn, vod, live, parental, wallpaper, categories, cache, language, info }
+enum _Section { auto, profiles, interface, playback, backup, network, vpn, vod, live, parental, wallpaper, categories, cache, language, info }
 
 const _titles = {
   _Section.auto: 'Auto Setup',
+  _Section.profiles: 'Profiles',
+  _Section.backup: 'Backup & Restore',
   _Section.interface: 'Interface & Smoothness',
   _Section.playback: 'Playback & Smart Net',
   _Section.network: 'Network',
@@ -36,6 +41,8 @@ const _titles = {
 
 const _icons = {
   _Section.auto: Icons.auto_fix_high_rounded,
+  _Section.profiles: Icons.people_alt_rounded,
+  _Section.backup: Icons.backup_rounded,
   _Section.interface: Icons.auto_awesome_rounded,
   _Section.playback: Icons.speed_rounded,
   _Section.network: Icons.wifi_rounded,
@@ -55,6 +62,8 @@ const _mint = Color(0xFF2FE6D0);
 const _violet = Color(0xFF9B83FF);
 const _colors = {
   _Section.auto: _mint,
+  _Section.profiles: _mint,
+  _Section.backup: _violet,
   _Section.interface: _mint,
   _Section.playback: _mint,
   _Section.vod: _mint,
@@ -228,6 +237,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     switch (_section) {
       case _Section.auto:
         return _autoPanel();
+      case _Section.profiles:
+        return _profilesPanel();
+      case _Section.backup:
+        return _backupPanel();
       case _Section.interface:
         return _interface();
       case _Section.playback:
@@ -403,6 +416,102 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // --------------------------------------------------------- profiles, backup
+
+  Widget _profilesPanel() {
+    final list = Store.profiles;
+    return ListView(
+      children: [
+        const Text(
+          'Each profile has its own favourites, recently watched, resume points and parental PIN. '
+          'A Kids profile hides adult content and the settings.',
+          style: TextStyle(fontSize: 14, color: C.dim, height: 1.5),
+        ),
+        const SizedBox(height: 14),
+        for (final p in list)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(color: const Color(0x80161934), borderRadius: BorderRadius.circular(14)),
+            child: Row(
+              children: [
+                Icon(p['kids'] == true ? Icons.child_care_rounded : Icons.person_rounded, color: _mint),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('${p['name']}${p['id'] == Store.profileId ? '   (in use)' : ''}',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                ),
+                _chip(p['kids'] == true ? 'Kids: on' : 'Kids: off', p['kids'] == true, () {
+                  Store.setProfileKids('${p['id']}', p['kids'] != true);
+                  setState(() {});
+                }),
+                const SizedBox(width: 8),
+                _chip('Use', p['id'] == Store.profileId, () {
+                  Store.setProfile('${p['id']}');
+                  setState(() {});
+                }),
+                if (p['id'] != 'p1') ...[
+                  const SizedBox(width: 8),
+                  _chip('Delete', false, () {
+                    Store.removeProfile('${p['id']}');
+                    setState(() {});
+                  }),
+                ],
+              ],
+            ),
+          ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _chip('+ Add profile', false, () async {
+            final n = await askProfileName(context);
+            if (n == null) return;
+            Store.addProfile(n.text, kids: n.kids);
+            if (mounted) setState(() {});
+          }),
+        ),
+      ],
+    );
+  }
+
+  final _restoreText = TextEditingController();
+
+  Widget _backupPanel() {
+    return ListView(
+      children: [
+        const Text(
+          'Copy a backup code with your playlists, favourites and settings, and paste it on another device '
+          'to bring everything over. Keep the code private: it contains your logins.',
+          style: TextStyle(fontSize: 14, color: C.dim, height: 1.5),
+        ),
+        const SizedBox(height: 16),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _chip('Copy backup code', false, () async {
+            await Clipboard.setData(ClipboardData(text: Store.exportBackup()));
+            _toast('Backup code copied.');
+          }),
+        ),
+        _head('RESTORE'),
+        TvField(
+          controller: _restoreText,
+          label: 'Paste the backup code here',
+          icon: Icons.paste_rounded,
+          action: TextInputAction.done,
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _chip('Restore', false, () async {
+            final ok = await Store.importBackup(_restoreText.text);
+            _toast(ok ? 'Restored. Restart the app to use it fully.' : 'That code is not valid.');
+            if (ok && mounted) setState(() {});
+          }),
+        ),
+      ],
+    );
+  }
+
   // ------------------------------------------------- interface and playback
 
   Widget _head(String text) => Padding(
@@ -432,6 +541,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _note(Store.litePref == 'auto'
             ? 'Auto watches how smoothly this device draws the home screen and chooses by itself: now ${Store.liteMode ? 'Lite' : 'Smooth'}.'
             : 'Lite stops the moving background, drifting pictures and sparkles. It takes full effect when you open the screen again.'),
+        _head('COLOUR THEME'),
+        _chips(Ui.themeNames, Store.theme, (i) => Store.setTheme(i)),
+        _note('Changes the glow colours of the background, tiles and loader.'),
+        _head('COUNTRY ON TOP'),
+        _chips(['Auto', ...[for (final c in Country.all) c.name]],
+            Store.countryPref == 'auto' ? 0 : 1 + Country.all.indexWhere((c) => c.code == Store.countryPref).clamp(0, 999),
+            (i) => Store.setCountryPref(i == 0 ? 'auto' : Country.all[i - 1].code)),
+        _note(Store.countryPref == 'auto'
+            ? 'Auto found: ${Country.current?.name ?? 'not known yet'}. The channel and movie categories of that country come first in the lists.'
+            : 'The categories of this country come first in the lists.'),
+        _head('IDLE SCREEN'),
+        _chips(['Off', '3 min', '5 min', '10 min'], const [0, 3, 5, 10].indexOf(Store.idleMinutes).clamp(0, 3),
+            (i) => Store.setIdleMinutes(const [0, 3, 5, 10][i])),
+        _note('A big clock on the moving background when nobody uses the app. Any key brings it back.'),
         _head('CLOCK'),
         _chips(['24-hour', '12-hour (AM/PM)'], Store.clock24 ? 0 : 1, (i) => Store.setClock24(i == 0)),
         _note('Used on the home screen, the TV guide and the player.'),

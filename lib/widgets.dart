@@ -528,8 +528,8 @@ class _OrbitPainter extends CustomPainter {
       final ang = i / _n * 2 * math.pi - math.pi / 2;
       final o = c + Offset(math.cos(ang), math.sin(ang)) * (ring - dot * 1.4);
       final col = k < 0.5
-          ? Color.lerp(C.accent, C.violet, k * 2)!
-          : Color.lerp(C.violet, C.pink, (k - 0.5) * 2)!;
+          ? Color.lerp(Ui.c1, Ui.c2, k * 2)!
+          : Color.lerp(Ui.c2, Ui.c3, (k - 0.5) * 2)!;
       if (fade > 0.25) {
         canvas.drawCircle(o, dot * (1.3 + fade), Paint()..color = col.withValues(alpha: 0.16 * fade)..maskFilter = MaskFilter.blur(BlurStyle.normal, dot));
       }

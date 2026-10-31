@@ -12,6 +12,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../stalker.dart';
 import '../xtream.dart';
+import '../country.dart';
 import 'guide.dart';
 import 'movie.dart';
 import 'player.dart';
@@ -21,6 +22,7 @@ const _favId = '*fav';
 const _searchId = '*search';
 const _allId = '*all';
 const _recentId = '*recent';
+const _newId = '*new';
 
 String kindTitle(XKind kind) {
   switch (kind) {
@@ -258,7 +260,14 @@ class _BrowseScreenState extends State<BrowseScreen> {
       _catsError = null;
     });
     try {
-      final cats = await widget.api.categories(widget.kind);
+      var cats = await widget.api.categories(widget.kind);
+      // The customer's own country first (UK in the UK, Saudi in Saudi Arabia, ...).
+      final home = Country.current;
+      if (home != null) {
+        final mine = cats.where((c) => home.matches(c.name)).toList();
+        if (mine.isNotEmpty) cats = [...mine, ...cats.where((c) => !home.matches(c.name))];
+      }
+      if (Store.isKids) cats = cats.where((c) => !Store.isAdultName(c.name)).toList();
       if (!mounted) return;
       setState(() => _cats = cats);
       log('browse ${widget.kind.name} categories=${cats.length}');
@@ -298,7 +307,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
         ? List<XItem>.of(Store.favourites(widget.kind))
         : id == _recentId
             ? List<XItem>.of(Store.recents(widget.kind))
-            : cached?.where(Store.allowed).toList();
+            : (cached == null ? null : Store.organize(cached));
     setState(() {
       _selected = id;
       _selectedName = name;
@@ -314,6 +323,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
       List<XItem> items;
       if (id == _allId) {
         items = await _loadAll();
+      } else if (id == _newId) {
+        final all = [...await _loadAll()];
+        final dated = all.where((i) => i.added > 0).toList()..sort((a, b) => b.added.compareTo(a.added));
+        items = dated.isNotEmpty ? dated.take(120).toList() : all.reversed.take(120).toList();
       } else {
         items = await widget.api.items(widget.kind, categoryId: id);
         // Some servers ignore the category filter and send everything.
@@ -323,7 +336,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
       }
       _cache[id] = items;
       if (!mounted || request != _request) return;
-      setState(() => _items = items.where(Store.allowed).toList());
+      setState(() => _items = Store.organize(items));
       log('browse ${widget.kind.name} items=${items.length}');
     } catch (e) {
       if (!mounted || request != _request) return;
@@ -387,7 +400,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
       final starts = <XItem>[];
       final rest = <XItem>[];
       for (final i in all) {
-        if (!Store.allowed(i)) continue;
+        if (!Store.allowed(i) || Store.isItemHidden(i)) continue;
         final name = _plain(i.name);
         if (name.isEmpty || !words.every(name.contains)) continue;
         (name.startsWith(needle) ? starts : rest).add(i);
@@ -412,6 +425,67 @@ class _BrowseScreenState extends State<BrowseScreen> {
     }
     _selected = '';
     _select(id, name);
+  }
+
+  /// Hold OK on a channel / title: favourite, pin to the top, rename or hide it.
+  Future<void> _itemMenu(XItem item) async {
+    final fav = Store.isFavourite(item);
+    final pinned = Store.isPinned(item);
+    final pick = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        backgroundColor: C.panel,
+        title: Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+        children: [
+          SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, 'fav'),
+              child: Text(fav ? 'Remove from Favourites' : 'Add to Favourites')),
+          SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, 'pin'), child: Text(pinned ? 'Unpin from the top' : 'Pin to the top')),
+          SimpleDialogOption(onPressed: () => Navigator.pop(ctx, 'rename'), child: const Text('Rename')),
+          SimpleDialogOption(onPressed: () => Navigator.pop(ctx, 'hide'), child: const Text('Hide')),
+        ],
+      ),
+    );
+    if (!mounted || pick == null) return;
+    switch (pick) {
+      case 'fav':
+        _toggleFavourite(item);
+      case 'pin':
+        Store.setPinned(item, !pinned);
+        _refreshList();
+      case 'hide':
+        Store.setItemHidden(item, true);
+        _refreshList();
+      case 'rename':
+        final c = TextEditingController(text: item.name);
+        final name = await showDialog<String>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: C.panel,
+            title: const Text('Rename'),
+            content: TextField(controller: c, autofocus: true),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t('Cancel'))),
+              FilledButton(onPressed: () => Navigator.pop(ctx, c.text), child: const Text('OK')),
+            ],
+          ),
+        );
+        if (name != null) {
+          Store.setRename(item, name);
+          _refreshList();
+        }
+    }
+  }
+
+  /// Redraws the open list with the customer's hide / rename / pin choices.
+  void _refreshList() {
+    final cached = _cache[_selected];
+    if (cached == null) {
+      setState(() {});
+      return;
+    }
+    setState(() => _items = Store.organize(cached));
   }
 
   void _toggleFavourite(XItem item) {
@@ -801,7 +875,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     final cats = all.where((c) => !Store.isHidden(widget.kind, c.id)).toList();
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 16),
-      itemCount: cats.length + 4,
+      itemCount: cats.length + (_live ? 4 : 5),
       itemExtent: 42,
       itemBuilder: (context, index) {
         // "All" is the first row, so the whole list of the server opens straight away.
@@ -844,7 +918,16 @@ class _BrowseScreenState extends State<BrowseScreen> {
             onFocus: () => _focusCategory(_recentId, t('Recent')),
           );
         }
-        final cat = cats[index - 4];
+        if (!_live && index == 4) {
+          return _CategoryRow(
+            icon: Icons.fiber_new_rounded,
+            name: 'New',
+            selected: _selected == _newId,
+            onTap: () => _select(_newId, 'New'),
+            onFocus: () => _focusCategory(_newId, 'New'),
+          );
+        }
+        final cat = cats[index - (_live ? 4 : 5)];
         final locked = Store.isLocked(widget.kind, cat.id) && !Store.parentalUnlocked;
         return _CategoryRow(
           icon: locked ? Icons.lock_rounded : null,
@@ -899,7 +982,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
           final item = items[index];
           final fav = Store.isFavourite(item);
           void open() => _openItem(items, index);
-          void hold() => _toggleFavourite(item);
+          void hold() => _itemMenu(item);
           return _live
               ? _ChannelTile(
                   item: item,

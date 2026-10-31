@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../i18n.dart';
 import '../store.dart';
@@ -23,6 +24,8 @@ class SearchAllScreen extends StatefulWidget {
 
 class _SearchAllScreenState extends State<SearchAllScreen> {
   final _text = TextEditingController();
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _listening = false;
   final Map<XKind, List<XItem>> _all = {};
   bool _loading = false;
   String _query = '';
@@ -32,6 +35,33 @@ class _SearchAllScreenState extends State<SearchAllScreen> {
   void dispose() {
     _text.dispose();
     super.dispose();
+  }
+
+  Future<void> _voice() async {
+    if (_listening) {
+      await _speech.stop();
+      if (mounted) setState(() => _listening = false);
+      return;
+    }
+    final ok = await _speech.initialize(onStatus: (st) {
+      if ((st == 'done' || st == 'notListening') && mounted) setState(() => _listening = false);
+    }, onError: (_) {
+      if (mounted) setState(() => _listening = false);
+    });
+    if (!ok || !mounted) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(const SnackBar(content: Text('Voice search is not available on this device.')));
+      return;
+    }
+    setState(() => _listening = true);
+    await _speech.listen(onResult: (r) {
+      _text.text = r.recognizedWords;
+      if (r.finalResult) {
+        _listening = false;
+        _run(r.recognizedWords);
+      }
+    });
   }
 
   Future<void> _load(XKind kind) async {
@@ -65,7 +95,7 @@ class _SearchAllScreenState extends State<SearchAllScreen> {
       final starts = <XItem>[];
       final rest = <XItem>[];
       for (final i in _all[kind] ?? const <XItem>[]) {
-        if (!Store.allowed(i)) continue;
+        if (!Store.allowed(i) || Store.isItemHidden(i)) continue;
         final name = plainText(i.name);
         if (name.isEmpty || !words.every(name.contains)) continue;
         (name.startsWith(needle) ? starts : rest).add(i);
@@ -136,6 +166,16 @@ class _SearchAllScreenState extends State<SearchAllScreen> {
                           autofocus: true,
                           action: TextInputAction.search,
                           onSubmitted: _run,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      TvFocus(
+                        radius: 24,
+                        color: _listening ? const Color(0x552FE6D0) : const Color(0x80161934),
+                        onTap: _voice,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Icon(_listening ? Icons.mic_rounded : Icons.mic_none_rounded, size: 26),
                         ),
                       ),
                     ],

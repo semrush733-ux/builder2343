@@ -97,6 +97,7 @@ class XItem {
     this.url = '',
     this.epgId = '',
     this.archive = false,
+    this.added = 0,
   });
 
   final XKind kind;
@@ -107,6 +108,24 @@ class XItem {
   final String ext;
   final String rating;
   final int num;
+
+  /// When the server added it (seconds since 1970); 0 when unknown.
+  final int added;
+
+  XItem copyWith({String? name}) => XItem(
+        kind: kind,
+        id: id,
+        name: name ?? this.name,
+        icon: icon,
+        categoryId: categoryId,
+        ext: ext,
+        rating: rating,
+        num: num,
+        url: url,
+        epgId: epgId,
+        archive: archive,
+        added: added,
+      );
 
   /// True for live channels whose server keeps a recording (catch-up / TV archive).
   final bool archive;
@@ -132,6 +151,7 @@ class XItem {
       rating: str(m['rating']),
       num: toInt(m['num']),
       archive: kind == XKind.live && toInt(m['tv_archive']) == 1,
+      added: toInt(m['added'] ?? m['last_modified']),
     );
   }
 
@@ -147,6 +167,7 @@ class XItem {
         if (url.isNotEmpty) 'u': url,
         if (epgId.isNotEmpty) 'g': epgId,
         if (archive) 'a': 1,
+        if (added > 0) 'ad': added,
       };
 
   static XItem? fromJson(dynamic j) {
@@ -166,6 +187,7 @@ class XItem {
       url: str(j['u']),
       epgId: str(j['g']),
       archive: toInt(j['a']) == 1,
+      added: toInt(j['ad']),
     );
   }
 }

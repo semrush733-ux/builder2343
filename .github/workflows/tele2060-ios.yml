@@ -51,6 +51,8 @@ jobs:
           $B -c "Add :NSAppTransportSecurity dict" "$PL" || true
           $B -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PL" || true
           $B -c "Add :NSLocalNetworkUsageDescription string 'Receive a playlist from your phone through the QR code.'" "$PL" || true
+          $B -c "Add :NSMicrophoneUsageDescription string 'Voice search in the Search screen.'" "$PL" || true
+          $B -c "Add :NSSpeechRecognitionUsageDescription string 'Voice search in the Search screen.'" "$PL" || true
           $B -c "Add :UIBackgroundModes array" "$PL" || true
           $B -c "Add :UIBackgroundModes:0 string audio" "$PL" || true
           sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = com.tele2060.b1gtv;/PRODUCT_BUNDLE_IDENTIFIER = com.tele2060.player;/g' ios/Runner.xcodeproj/project.pbxproj

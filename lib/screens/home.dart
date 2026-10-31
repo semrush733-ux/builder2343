@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../backend.dart';
 import '../i18n.dart';
@@ -8,6 +10,7 @@ import '../m3u.dart';
 import '../speedtest.dart';
 import '../stalker.dart';
 import '../autotune.dart';
+import '../country.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -15,7 +18,9 @@ import '../xtream.dart';
 import 'browse.dart';
 import 'catchup.dart';
 import 'login.dart';
+import 'idle.dart';
 import 'player.dart';
+import 'profiles.dart';
 import 'playlists.dart';
 import 'search_all.dart';
 import 'settings.dart';
@@ -38,6 +43,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   /// The last channel opens by itself once per app start.
   static bool _autoStarted = false;
+  Timer? _remindTimer;
+  Timer? _idleTimer;
   XAccount? _account;
   bool _offline = false;
 
@@ -46,6 +53,10 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _account = widget.account;
     log('screen=home');
+    _remindTimer = Timer.periodic(const Duration(seconds: 20), (_) => _checkReminders());
+    HardwareKeyboard.instance.addHandler(_anyKey);
+    _resetIdle();
+    Country.detect();
     Future<void>.delayed(const Duration(milliseconds: 1500), AutoTune.start);
     if (Store.autoStartLast && !_autoStarted) {
       _autoStarted = true;
@@ -220,6 +231,61 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ---- idle screen and programme reminders ----
+
+  bool _anyKey(KeyEvent e) {
+    _resetIdle();
+    return false;
+  }
+
+  void _resetIdle() {
+    _idleTimer?.cancel();
+    final m = Store.idleMinutes;
+    if (m <= 0) return;
+    _idleTimer = Timer(Duration(minutes: m), () {
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) {
+        _resetIdle();
+        return;
+      }
+      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const IdleScreen())).then((_) => _resetIdle());
+    });
+  }
+
+  Future<void> _checkReminders() async {
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+    final due = Store.takeDueReminders();
+    for (final r in due) {
+      if (!mounted) return;
+      final ch = XItem.fromJson(r['ch']);
+      if (ch == null) continue;
+      final watch = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: C.panel,
+          title: const Text('Starting now'),
+          content: Text('${r['title']}\n${ch.name}'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('Cancel'))),
+            FilledButton(autofocus: true, onPressed: () => Navigator.pop(ctx, true), child: const Text('Watch now')),
+          ],
+        ),
+      );
+      if (watch == true && mounted) {
+        Store.addRecent(ch);
+        await Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => PlayerScreen(api: widget.api, entries: liveEntriesFor(widget.api, [ch]), index: 0, live: true)));
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _remindTimer?.cancel();
+    _idleTimer?.cancel();
+    HardwareKeyboard.instance.removeHandler(_anyKey);
+    super.dispose();
+  }
+
   void _openSearch() {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => SearchAllScreen(api: widget.api)));
   }
@@ -270,6 +336,28 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               const Logo(size: 28),
               const Spacer(),
+              TvFocus(
+                radius: 22,
+                color: Colors.transparent,
+                onTap: () => Navigator.of(context).pushReplacement(MaterialPageRoute<void>(
+                    builder: (_) => ProfilePickerScreen(next: (_) => HomeScreen(api: widget.api, account: _account)))),
+                child: Padding(
+                  padding: const EdgeInsets.all(5),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Ui.c1, Ui.c2])),
+                      child: Center(
+                          child: Text('${Store.profile['name']}'.characters.first.toUpperCase(),
+                              style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.black87))),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('${Store.profile['name']}', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                  ]),
+                ),
+              ),
+              const SizedBox(width: 18),
               const Clock(),
               Container(width: 1, height: 34, margin: const EdgeInsets.symmetric(horizontal: 20), color: const Color(0x33FFFFFF)),
               Column(
@@ -300,7 +388,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: t('Live TV'),
                     subtitle: t('Channels and TV guide'),
                     colors: const [Color(0xFF14315F), Color(0xFF3A1B7A)],
-                    glow: C.accent,
+                    glow: Ui.c1,
                     onTap: () => _open(XKind.live),
                   ),
                 ),
@@ -319,7 +407,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           title: t('Movies'),
                           subtitle: t('Films on demand'),
                           colors: const [Color(0xFF4A1747), Color(0xFF1A1236)],
-                          glow: C.pink,
+                          glow: Ui.c3,
                           onTap: () => _open(XKind.vod),
                         ),
                       ),
@@ -333,7 +421,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           title: t('Series'),
                           subtitle: t('Seasons and episodes'),
                           colors: const [Color(0xFF0C3B3C), Color(0xFF151A3A)],
-                          glow: C.accent,
+                          glow: Ui.c1,
                           onTap: () => _open(XKind.series),
                         ),
                       ),
@@ -360,10 +448,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 _pill(Icons.search_rounded, t('Search'), _openSearch),
                 _pill(Icons.replay_rounded, 'Last channel', _lastChannel),
                 _pill(Icons.history_rounded, t('Catch Up'), _openCatchup),
-                _pill(Icons.playlist_play_rounded, t('Playlists'), _choosePlaylist),
-                _pill(Icons.add_link_rounded, 'Add playlist', _addPlaylist),
+                if (!Store.isKids) _pill(Icons.playlist_play_rounded, t('Playlists'), _choosePlaylist),
+                if (!Store.isKids) _pill(Icons.add_link_rounded, 'Add playlist', _addPlaylist),
                 _pill(Icons.speed_rounded, 'Speed', () => showSpeedTest(context)),
-                _pill(Icons.settings_rounded, t('Settings'), () {
+                if (!Store.isKids) _pill(Icons.settings_rounded, t('Settings'), () {
                   // Language or wallpaper may have changed: redraw when the customer comes back.
                   Navigator.of(context)
                       .push(MaterialPageRoute<void>(builder: (_) => SettingsScreen(api: widget.api)))
@@ -371,7 +459,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (mounted) setState(() {});
                   });
                 }),
-                _pill(Icons.logout_rounded, t('Sign out'), _logout),
+                if (!Store.isKids) _pill(Icons.logout_rounded, t('Sign out'), _logout),
               ],
             ),
             ),

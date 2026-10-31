@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../xtream.dart';
@@ -263,7 +264,13 @@ class _GuideScreenState extends State<GuideScreen> {
       _toast('This programme has no recording on the server.');
       return;
     }
-    _toast('Starts ${_day(sel.start)} at ${_clock(sel.start)}.');
+    final ch = entry.item;
+    if (ch == null) {
+      _toast('Starts ${_day(sel.start)} at ${_clock(sel.start)}.');
+      return;
+    }
+    final on = Store.toggleReminder(ch, sel.title, sel.start);
+    _toast(on ? 'Reminder set: ${sel.title} at ${_clock(sel.start)}' : 'Reminder removed.');
   }
 
   void _toast(String text) {

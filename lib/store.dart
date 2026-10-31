@@ -21,6 +21,215 @@ class Store {
     _resume = null;
     Ui.clock24 = clock24;
     Ui.lite = liteMode;
+    Ui.setTheme(theme);
+  }
+
+  // ---- profiles ----
+  static List<Map<String, dynamic>> get profiles {
+    try {
+      final d = jsonDecode(_p.getString('profiles') ?? '');
+      if (d is List && d.isNotEmpty) return [for (final e in d) Map<String, dynamic>.from(e as Map)];
+    } catch (_) {}
+    return [
+      {'id': 'p1', 'name': 'Main', 'kids': false}
+    ];
+  }
+
+  static void _saveProfiles(List<Map<String, dynamic>> l) => _p.setString('profiles', jsonEncode(l));
+
+  static String get profileId {
+    final id = _p.getString('profile') ?? 'p1';
+    return profiles.any((e) => e['id'] == id) ? id : 'p1';
+  }
+
+  static String get _pk => profileId == 'p1' ? '' : '|$profileId';
+  static Map<String, dynamic> get profile => profiles.firstWhere((e) => e['id'] == profileId, orElse: () => profiles.first);
+  static bool get isKids => profile['kids'] == true;
+
+  /// Set once the customer picked a profile in this run of the app.
+  static bool profileChosen = false;
+
+  static void setProfile(String id) {
+    _p.setString('profile', id);
+    _fav.clear();
+    _recent.clear();
+    _resume = null;
+    parentalUnlocked = false;
+    profileChosen = true;
+  }
+
+  static void addProfile(String name, {bool kids = false}) {
+    final l = profiles;
+    l.add({'id': 'p${DateTime.now().millisecondsSinceEpoch}', 'name': name, 'kids': kids});
+    _saveProfiles(l);
+  }
+
+  static void setProfileKids(String id, bool kids) {
+    final l = profiles;
+    for (final e in l) {
+      if (e['id'] == id) e['kids'] = kids;
+    }
+    _saveProfiles(l);
+  }
+
+  static void removeProfile(String id) {
+    if (id == 'p1') return;
+    final l = profiles..removeWhere((e) => e['id'] == id);
+    _saveProfiles(l);
+    if (_p.getString('profile') == id) setProfile('p1');
+  }
+
+  static final _adult = RegExp(r'(^|[^a-z])(xxx|adult|adults|porn|18\+|sex|erotic|nude|playboy)([^a-z]|$)', caseSensitive: false);
+  static bool isAdultName(String name) => _adult.hasMatch(name);
+
+  // ---- channel organiser: hide, rename, pin to top ----
+  static Set<String> _set(String key) => (_p.getStringList('$key|$_accountKey$_pk') ?? const <String>[]).toSet();
+  static String _ik(XItem i) => '${i.kind.name}|${i.id}';
+
+  static bool isItemHidden(XItem i) => _set('hid_items').contains(_ik(i));
+  static void setItemHidden(XItem i, bool v) {
+    final s = _set('hid_items');
+    v ? s.add(_ik(i)) : s.remove(_ik(i));
+    _p.setStringList('hid_items|$_accountKey$_pk', s.toList());
+  }
+
+  static bool isPinned(XItem i) => _set('pin_items').contains(_ik(i));
+  static void setPinned(XItem i, bool v) {
+    final s = _set('pin_items');
+    v ? s.add(_ik(i)) : s.remove(_ik(i));
+    _p.setStringList('pin_items|$_accountKey$_pk', s.toList());
+  }
+
+  static Map<String, String> get _renames {
+    try {
+      final d = jsonDecode(_p.getString('renames|$_accountKey$_pk') ?? '{}');
+      if (d is Map) return {for (final e in d.entries) e.key.toString(): e.value.toString()};
+    } catch (_) {}
+    return {};
+  }
+
+  static void setRename(XItem i, String name) {
+    final m = _renames;
+    name.trim().isEmpty ? m.remove(_ik(i)) : m[_ik(i)] = name.trim();
+    _p.setString('renames|$_accountKey$_pk', jsonEncode(m));
+  }
+
+  /// Applies the customer's own hide / rename / pin choices (and the kids filter) to a list.
+  static List<XItem> organize(List<XItem> list) {
+    final hidden = _set('hid_items');
+    final pinned = _set('pin_items');
+    final ren = _renames;
+    final top = <XItem>[];
+    final rest = <XItem>[];
+    for (final i in list) {
+      if (!allowed(i)) continue;
+      final k = _ik(i);
+      if (hidden.contains(k)) continue;
+      final item = ren.containsKey(k) ? i.copyWith(name: ren[k]) : i;
+      (pinned.contains(k) ? top : rest).add(item);
+    }
+    return [...top, ...rest];
+  }
+
+  // ---- reminders for programmes ----
+  static List<Map<String, dynamic>> get reminders {
+    try {
+      final d = jsonDecode(_p.getString('reminders|$_accountKey') ?? '[]');
+      if (d is List) return [for (final e in d) Map<String, dynamic>.from(e as Map)];
+    } catch (_) {}
+    return [];
+  }
+
+  static void _saveReminders(List<Map<String, dynamic>> l) => _p.setString('reminders|$_accountKey', jsonEncode(l));
+
+  static bool hasReminder(XItem ch, DateTime start) =>
+      reminders.any((r) => r['ch'] is Map && (r['ch'] as Map)['id'] == ch.id && r['at'] == start.millisecondsSinceEpoch);
+
+  /// Returns true when the reminder is set after the call (false when it was removed).
+  static bool toggleReminder(XItem ch, String title, DateTime start) {
+    final l = reminders;
+    final i = l.indexWhere((r) => r['ch'] is Map && (r['ch'] as Map)['id'] == ch.id && r['at'] == start.millisecondsSinceEpoch);
+    if (i >= 0) {
+      l.removeAt(i);
+      _saveReminders(l);
+      return false;
+    }
+    l.add({'ch': ch.toJson(), 'title': title, 'at': start.millisecondsSinceEpoch});
+    _saveReminders(l);
+    return true;
+  }
+
+  /// Reminders whose programme starts within a minute (or just started); they are removed.
+  static List<Map<String, dynamic>> takeDueReminders() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final l = reminders;
+    final due = l.where((r) => (r['at'] as int) - now < 60000).toList();
+    if (due.isEmpty) return const [];
+    l.removeWhere((r) => (r['at'] as int) - now < 60000);
+    _saveReminders(l);
+    // Skip reminders that are more than 30 minutes late (the app was closed).
+    return due.where((r) => now - (r['at'] as int) < 1800000).toList();
+  }
+
+  // ---- country on top, colour theme, idle screen ----
+  static String get countryPref => _p.getString('country_pref') ?? 'auto';
+  static void setCountryPref(String v) => _p.setString('country_pref', v);
+  static String get detectedCountry => _p.getString('country_detected') ?? '';
+  static int get detectedAt => _p.getInt('country_at') ?? 0;
+  static void setDetectedCountry(String c) {
+    _p.setString('country_detected', c);
+    _p.setInt('country_at', DateTime.now().millisecondsSinceEpoch);
+  }
+
+  static int get theme => _p.getInt('theme') ?? 0;
+  static void setTheme(int i) {
+    _p.setInt('theme', i);
+    Ui.setTheme(i);
+  }
+
+  /// Minutes without a key press before the idle screen shows (0 = never).
+  static int get idleMinutes => _p.getInt('idle_min') ?? 5;
+  static void setIdleMinutes(int m) => _p.setInt('idle_min', m);
+
+  // ---- backup: playlists and settings as one code ----
+  static String exportBackup() {
+    final m = <String, dynamic>{};
+    for (final k in _p.getKeys()) {
+      final v = _p.get(k);
+      if (v != null) m[k] = v;
+    }
+    return base64Url.encode(utf8.encode(jsonEncode(m)));
+  }
+
+  static Future<bool> importBackup(String code) async {
+    try {
+      final d = jsonDecode(utf8.decode(base64Url.decode(code.trim())));
+      if (d is! Map) return false;
+      for (final e in d.entries) {
+        final k = e.key.toString();
+        final v = e.value;
+        if (v is bool) {
+          await _p.setBool(k, v);
+        } else if (v is int) {
+          await _p.setInt(k, v);
+        } else if (v is double) {
+          await _p.setDouble(k, v);
+        } else if (v is String) {
+          await _p.setString(k, v);
+        } else if (v is List) {
+          await _p.setStringList(k, [for (final x in v) x.toString()]);
+        }
+      }
+      _fav.clear();
+      _recent.clear();
+      _resume = null;
+      Ui.clock24 = clock24;
+      Ui.lite = liteMode;
+      Ui.setTheme(theme);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   // ---- login ----
@@ -53,10 +262,10 @@ class Store {
   static Future<void> _switchAccount(String identity) async {
     if (_p.getString('identity') == identity) return;
     for (final kind in XKind.values) {
-      await _p.remove('fav_${kind.name}');
-      await _p.remove('recent_${kind.name}');
+      await _p.remove('fav_${kind.name}$_pk');
+      await _p.remove('recent_${kind.name}$_pk');
     }
-    await _p.remove('resume');
+    await _p.remove('resume$_pk');
     _fav.clear();
     _recent.clear();
     _resume = null;
@@ -110,7 +319,7 @@ class Store {
     final cached = _fav[kind];
     if (cached != null) return cached;
     final list = <XItem>[];
-    for (final raw in _p.getStringList('fav_${kind.name}') ?? const <String>[]) {
+    for (final raw in _p.getStringList('fav_${kind.name}$_pk') ?? const <String>[]) {
       try {
         final item = XItem.fromJson(jsonDecode(raw));
         if (item != null) list.add(item);
@@ -131,7 +340,7 @@ class Store {
     } else {
       list.insert(0, item);
     }
-    _p.setStringList('fav_${item.kind.name}', list.map((f) => jsonEncode(f.toJson())).toList());
+    _p.setStringList('fav_${item.kind.name}$_pk', list.map((f) => jsonEncode(f.toJson())).toList());
     return index < 0;
   }
 
@@ -143,7 +352,7 @@ class Store {
     final cached = _recent[kind];
     if (cached != null) return cached;
     final list = <XItem>[];
-    for (final raw in _p.getStringList('recent_${kind.name}') ?? const <String>[]) {
+    for (final raw in _p.getStringList('recent_${kind.name}$_pk') ?? const <String>[]) {
       try {
         final item = XItem.fromJson(jsonDecode(raw));
         if (item != null) list.add(item);
@@ -160,7 +369,7 @@ class Store {
     while (list.length > 30) {
       list.removeLast();
     }
-    _p.setStringList('recent_${item.kind.name}', list.map((f) => jsonEncode(f.toJson())).toList());
+    _p.setStringList('recent_${item.kind.name}$_pk', list.map((f) => jsonEncode(f.toJson())).toList());
   }
 
   // ---- resume positions (seconds) ----
@@ -169,7 +378,7 @@ class Store {
     if (cached != null) return cached;
     final map = <String, int>{};
     try {
-      final data = jsonDecode(_p.getString('resume') ?? '{}');
+      final data = jsonDecode(_p.getString('resume$_pk') ?? '{}');
       if (data is Map) {
         data.forEach((k, v) {
           if (v is int) map[k.toString()] = v;
@@ -191,7 +400,7 @@ class Store {
         map.remove(map.keys.first);
       }
     }
-    _p.setString('resume', jsonEncode(map));
+    _p.setString('resume$_pk', jsonEncode(map));
   }
 
   // ---- playback ----
@@ -242,8 +451,8 @@ class Store {
   // ---- parental control and category management (per account) ----
 
   /// The PIN that unlocks locked categories; empty = parental control off.
-  static String get parentalPin => _p.getString('parental_pin') ?? '';
-  static void setParentalPin(String pin) => _p.setString('parental_pin', pin);
+  static String get parentalPin => _p.getString('parental_pin$_pk') ?? '';
+  static void setParentalPin(String pin) => _p.setString('parental_pin$_pk', pin);
 
   /// The PIN was typed since the app started: locked categories stay open until the app closes.
   static bool parentalUnlocked = false;
@@ -251,13 +460,13 @@ class Store {
   static String _catKey(XKind kind, String id) => '${kind.name}|$id';
   static String get _accountKey => _p.getString('identity') ?? '';
 
-  static Set<String> _catSet(String name) => (_p.getStringList('$name|$_accountKey') ?? const <String>[]).toSet();
+  static Set<String> _catSet(String name) => (_p.getStringList('$name|$_accountKey$_pk') ?? const <String>[]).toSet();
 
   static void _setCat(String name, XKind kind, String id, bool on) {
     final set = _catSet(name);
     final key = _catKey(kind, id);
     on ? set.add(key) : set.remove(key);
-    _p.setStringList('$name|$_accountKey', set.toList());
+    _p.setStringList('$name|$_accountKey$_pk', set.toList());
   }
 
   /// Categories the customer switched off in Settings › Manage categories.
@@ -272,7 +481,9 @@ class Store {
 
   /// May this item be listed? Not in a hidden category, and not in a locked one while locked.
   static bool allowed(XItem item) =>
-      !isHidden(item.kind, item.categoryId) && (parentalUnlocked || !isLocked(item.kind, item.categoryId));
+      !isHidden(item.kind, item.categoryId) &&
+      (parentalUnlocked || !isLocked(item.kind, item.categoryId)) &&
+      !(isKids && isAdultName(item.name));
 
   /// Subtitle language picked last time; empty = subtitles off.
   static String get subtitleLanguage => _p.getString('sub_lang') ?? '';
@@ -314,7 +525,7 @@ class Store {
 
   /// Back to the automatic choices for everything.
   static void resetToAuto() {
-    for (final k in ['player_engine2', 'live_engine', 'lite_pref', 'lite_auto', 'tuned', 'buffer_level', 'max_quality', 'smart_net', 'default_fit', 'live_format', 'auto_start_last']) {
+    for (final k in ['player_engine2', 'live_engine', 'lite_pref', 'lite_auto', 'tuned', 'buffer_level', 'max_quality', 'smart_net', 'default_fit', 'live_format', 'auto_start_last', 'country_pref', 'theme', 'idle_min']) {
       _p.remove(k);
     }
     Ui.lite = liteMode;

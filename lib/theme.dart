@@ -158,6 +158,21 @@ class Logo extends StatelessWidget {
 class Ui {
   static bool clock24 = true;
 
+  /// Colour themes: three glow colours each (names shown in Settings).
+  static const themeNames = ['Mint', 'Gold', 'Rose', 'Ocean', 'Emerald'];
+  static const _themes = <List<Color>>[
+    [Color(0xFF2FE6D0), Color(0xFF7B5CFF), Color(0xFFFF4FA3)],
+    [Color(0xFFFFB84F), Color(0xFFFF7A3D), Color(0xFFFF4F6D)],
+    [Color(0xFFFF6FA8), Color(0xFFB05CFF), Color(0xFF5CC8FF)],
+    [Color(0xFF3DA9FF), Color(0xFF2FE6D0), Color(0xFF7B5CFF)],
+    [Color(0xFF3DDC84), Color(0xFF2FE6D0), Color(0xFF9BE15D)],
+  ];
+  static int theme = 0;
+  static Color get c1 => _themes[theme][0];
+  static Color get c2 => _themes[theme][1];
+  static Color get c3 => _themes[theme][2];
+  static void setTheme(int i) => theme = i.clamp(0, _themes.length - 1);
+
   /// Lite mode: fewer moving effects, for weak TV boxes.
   static bool lite = false;
 
@@ -246,13 +261,13 @@ class _AuroraPainter extends CustomPainter {
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.4
-          ..color = (k == 0 ? const Color(0xFFFFB84F) : C.violet).withValues(alpha: 0.20 * this.k),
+          ..color = (k == 0 ? const Color(0xFFFFB84F) : Ui.c2).withValues(alpha: 0.20 * this.k),
       );
     }
 
-    blob(C.violet, 0.15, 0.20, 0.85, 0, 0.0);
-    blob(C.accent, 0.88, 0.85, 0.75, 0, 0.35);
-    blob(C.pink, 0.78, 0.10, 0.55, 0, 0.7);
+    blob(Ui.c2, 0.15, 0.20, 0.85, 0, 0.0);
+    blob(Ui.c1, 0.88, 0.85, 0.75, 0, 0.35);
+    blob(Ui.c3, 0.78, 0.10, 0.55, 0, 0.7);
   }
 
   @override
