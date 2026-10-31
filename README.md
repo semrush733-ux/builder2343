@@ -5,8 +5,8 @@ HTML5 + vanilla JS in `www/`, packaged for Android and iOS with Capacitor 7.
 
 ## Features
 
-Classic + Time Attack (2 min) modes, bomb and star (wild) blocks, Hammer / Swap / Undo, combos with blast/flower/confetti
-effects, synthesized sound effects + music, first-game tutorial, settings, daily reward (7-day streak), lucky spin,
+Adventure mode (50 levels in 5 worlds, goals, stars, ice and stone blocks, boss levels, lives), Classic (levels, rising rows, move timer) + Time Attack (2 min) modes, bomb and star (wild) blocks, Hammer / Swap / Undo, combos with blast/flower/confetti
+effects, synthesized sound effects + music, first-game tutorial, settings, daily reward (7-day streak), lucky spin (free daily + 3 ad spins, jackpot, double reward),
 daily challenge, 17 missions, shop (6 block skins, 5 board themes), statistics, score sharing, weekly 200-player League
 (simulated players for now), AdMob rewarded + interstitial ads, Android back button, reminder notifications.
 
