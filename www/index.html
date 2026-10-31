@@ -71,11 +71,18 @@ button{font-family:inherit}
 .sc.rank{background:linear-gradient(180deg,#ffd86b2a,#ffd86b10);cursor:pointer}
 .sc.rank b{color:#ffd86b}
 .sc small .ic{margin-top:-2px}
-.nextbar{display:flex;justify-content:center;align-items:flex-end;gap:18px;margin:8px 0 4px;height:80px;position:relative}
+.nextbar{display:flex;justify-content:center;align-items:flex-end;gap:18px;margin:6px 0 4px;height:88px;position:relative}
 .nextbar small{display:block;text-align:center;font-size:11px;color:#b8bde8;font-weight:600;letter-spacing:1px;margin-bottom:4px}
 .pvslot{position:relative;display:flex;justify-content:center}
 .pvslot .blk{position:relative}
-#modeTag{position:absolute;left:0;bottom:6px;font-size:11px;font-weight:700;letter-spacing:1px;color:#b8bde8;background:#0005;border-radius:10px;padding:4px 8px;display:flex;align-items:center;gap:4px}
+#modeTag{position:absolute;left:0;bottom:4px;font-size:12px;font-weight:700;letter-spacing:1px;color:#fff;background:#0005;border-radius:12px;padding:5px 9px;display:flex;flex-direction:column;gap:4px;min-width:78px}
+#modeTag .row1{display:flex;align-items:center;gap:4px}
+.lvbar{height:5px;border-radius:4px;background:#ffffff1f;overflow:hidden}.lvbar i{display:block;height:100%;background:linear-gradient(90deg,#ffd86b,#ff9a3c);transition:width .3s}
+#riseTag{position:absolute;right:0;bottom:4px;font-size:12px;font-weight:700;color:#fff;background:#0005;border-radius:12px;padding:5px 9px;display:flex;align-items:center;gap:4px;text-align:left;line-height:1.1}
+#riseTag small{display:block;font-size:9px;color:#b8bde8;letter-spacing:1px}
+#riseTag.warn{background:#ff5f7e88;animation:pulse .6s infinite}
+#moveBar{width:58px;height:6px;border-radius:4px;background:#0006;margin:4px auto 0;overflow:hidden;visibility:hidden}
+#moveBar i{display:block;height:100%;width:100%;background:#4fe08f;border-radius:4px}
 #timer{height:12px;border-radius:8px;background:#0006;overflow:hidden;margin:0 auto 6px;display:none;position:relative}
 #timer i{display:block;height:100%;background:linear-gradient(90deg,#ff5f7e,#ffd86b,#4fe08f);background-size:var(--tw,300px) 100%;width:100%}
 #timer span{position:absolute;inset:0;text-align:center;font-size:10px;line-height:12px;font-weight:700;text-shadow:0 1px 2px #000}
@@ -353,8 +360,9 @@ button{font-family:inherit}
     </div>
     <div class="nextbar">
       <div id="modeTag"></div>
-      <div><small>NOW</small><div class="pvslot" id="curSlot"></div></div>
+      <div><small>NOW</small><div class="pvslot" id="curSlot"></div><div id="moveBar"><i id="moveFill"></i></div></div>
       <div><small>NEXT</small><div class="pvslot" id="nextSlot"></div></div>
+      <div id="riseTag"></div>
     </div>
     <div id="boardWrap">
       <div id="timer"><i id="timerFill"></i><span id="timerTxt"></span></div>
@@ -606,6 +614,7 @@ const Snd={
   whoosh(){this.noise(.25,.2,400,0,3000)},
   hammer(){this.noise(.12,.35,3000,0,500);this.tone(180,.15,'square',.12,0,60)},
   error(){this.tone(160,.15,'sawtooth',.1);this.tone(120,.15,'sawtooth',.1,.1)},
+  rumble(){this.noise(.45,.4,300,0,80);this.tone(55,.4,'sine',.4,0,40)},
   rainbow(){[0,1,2,3,4,5].forEach(i=>this.tone(this.note(10+i),.15,'sine',.12,i*.04))}
 };
 const Music={
@@ -650,7 +659,7 @@ const SF=['_Khan','99','PK','_Pro','007','X','_Gamer','_UK','786','_King','_Quee
 const botCache={};
 function makeBots(seed,tier){
   const k=seed+'_'+tier; if(botCache[k])return botCache[k];
-  const r=mulberry32(seed), base=[5000,9000,15000,24000,36000][tier], used=new Set(), out=[];
+  const r=mulberry32(seed), base=[2500,4500,7500,11000,16000][tier], used=new Set(), out=[];
   while(out.length<GROUP-1){
     let n=FN[Math.floor(r()*FN.length)]+SF[Math.floor(r()*SF.length)];
     if(used.has(n))n+=Math.floor(r()*90+10);
@@ -668,11 +677,15 @@ function standings(lg,f){
   return arr;
 }
 const myRank=()=>standings(league,frac()).findIndex(x=>x.me)+1;
-const newLeague=(week,tier)=>({week,tier,points:0,seed:(Math.random()*2147483647)|0});
+const newLeague=(week,tier)=>({week,tier,points:0,best:[],seed:(Math.random()*2147483647)|0});
+const top3=a=>[...a].sort((x,y)=>y-x).slice(0,3);
+function syncLeague(){const arr=G&&!G.recorded&&G.score>0?[...league.best,G.score]:league.best;league.points=top3(arr).reduce((s,x)=>s+x,0);saveLeague()}
+function recordGame(){if(G&&!G.recorded){G.prevBest=[...league.best];if(G.score>0)league.best=top3([...league.best,G.score]);G.recorded=true;syncLeague()}}
 function checkWeek(){
   const id=weekId(now());
   league=store.get('league',null);
   if(!league){league=newLeague(id,0);saveLeague();return}
+  if(!Array.isArray(league.best)){league.best=[];league.points=0;saveLeague()}
   if(league.week===id)return;
   const st=standings(league,1), rank=st.findIndex(x=>x.me)+1;
   let tier=league.tier, move=0;
@@ -781,7 +794,7 @@ function renderHome(){
   const ch=curChallenge(),pc=profile.challenge,done=pc.prog>=ch.goal;
   $('#hChal').innerHTML=`${ic('target',40)}<div class="ct"><small>DAILY CHALLENGE</small><b>${ch.t}</b><div class="bar"><i style="width:${Math.min(100,pc.prog/ch.goal*100)}%"></i></div></div>`+
     (pc.claimed?`<span style="color:#4fe08f">${ic('check',28)}</span>`:done?`<button class="btn sm gold" id="chalClaim">Claim</button>`:`<small style="color:#cfd3f5">${ic('coin',16)}200</small>`);
-  const cb=$('#chalClaim');if(cb)cb.onclick=e=>{e.stopPropagation();pc.claimed=true;saveProfile();giveReward({c:200,lp:300},'Challenge complete!')};
+  const cb=$('#chalClaim');if(cb)cb.onclick=e=>{e.stopPropagation();pc.claimed=true;saveProfile();giveReward({c:200,h:1},'Challenge complete!')};
   $('#dDaily').classList.toggle('on',dailyState().can);
   $('#dSpin').classList.toggle('on',profile.spin.last!==today());
   $('#dMiss').classList.toggle('on',MISSIONS.some(missionReady));
@@ -793,8 +806,9 @@ function howTo(){
   <li>One merge triggering another is a <b>COMBO</b>: points ×2, ×3 and more.</li>
   <li>${ic('bomb',20)} <b>Bomb</b> blocks blow up everything around them. ${ic('rainbow',20)} <b>Star</b> blocks copy a neighbour and merge with it.</li>
   <li><b>Hammer</b> smashes a block, <b>Swap</b> switches Now and Next, <b>Undo</b> takes back your last move.</li>
+  <li><b>Classic</b> gets harder every <b>Level</b>: a new row of blocks rises from the bottom every few moves (faster each level), bigger numbers appear, and from Level 4 every move has a <b>time limit</b>. Rows reaching the top = <b>Overflow</b>, game over.</li>
   <li><b>Time Attack</b>: score as much as you can in 2 minutes. Combos add time!</li>
-  <li>Every point goes into your <b>weekly League</b> of 200 players. Top 20 go up, bottom 20 go down, No.1 wins the crown.</li></ul>`,[{t:'Got it',cls:'green'}]);
+  <li>Your <b>weekly League</b> score is your <b>best 3 games</b> of the week, so skill wins, not just play time. Top 20 go up, bottom 20 go down, No.1 wins the crown.</li></ul>`,[{t:'Got it',cls:'green'}]);
 }
 function askName(after){
   showModal(`${ic('party',64,'margin:0 auto 4px;display:block')}<h2>${profile.name?'Change name':'Welcome!'}</h2><p>What name should the League show?</p><input id="nameIn" maxlength="14" placeholder="Your name" value="${esc(profile.name)}">`,
@@ -940,7 +954,7 @@ function renderLeague(scroll){
   $('#ladder').innerHTML=TIERS.map((x,i)=>`<div class="${i===t?'cur':''}">${tierIc(i,32)}<small>${x}</small></div>`).join('');
   const L=st[0];
   $('#leader').innerHTML=`${ic('crown',40)}<div><small>LEAGUE NO.1</small><b>${esc(L.name)}${L.me?' (You!)':''}</b></div><div class="lp">${L.pts.toLocaleString()}</div>`;
-  $('#lInfo').textContent=(t<TIERS.length-1?`Top ${PROMO} move up to the next league`:'You are in the highest league!')+(t>0?` · Bottom ${DEMO} move down`:'');
+  $('#lInfo').innerHTML='Your score = your <b>best 3 games</b> this week<br>'+(t<TIERS.length-1?`Top ${PROMO} move up to the next league`:'You are in the highest league!')+(t>0?` · Bottom ${DEMO} move down`:'');
   let h='';
   st.forEach((p,i)=>{
     const r=i+1;
@@ -1053,7 +1067,7 @@ const neigh4=b=>[[0,-1],[-1,0],[1,0],[0,1]].map(([dc,dr])=>{const c=b.c+dc,r=b.r
 
 function layout(){
   const timerH=G&&G.mode==='time'?18:0;
-  const W=Math.min(window.innerWidth,440)-24, H=$('#app').clientHeight-262-timerH;
+  const W=Math.min(window.innerWidth,440)-24, H=$('#app').clientHeight-272-timerH;
   cell=Math.max(40,Math.floor(Math.min(W/COLS,H/ROWS,84)));
   const b=$('#board'),s=$('#stage');
   b.style.width=s.style.width=cell*COLS+'px'; b.style.height=s.style.height=cell*ROWS+'px';
@@ -1063,9 +1077,12 @@ function layout(){
 }
 function spawn(){
   if(G.maxV>=64&&!G.tut){const r=Math.random();if(r<.035)return{v:2,t:'bomb'};if(r<.07)return{v:2,t:'rainbow'}}
-  const k=Math.max(3,Math.min(6,Math.floor(Math.log2(G.maxV))-2));
-  const ws=[];let tot=0;for(let e=1;e<=k;e++){const w=Math.pow(k-e+1,1.6);ws.push(w);tot+=w}
-  let x=Math.random()*tot;for(let e=1;e<=k;e++){x-=ws[e-1];if(x<=0)return{v:2**e}}return{v:2};
+  const L=G.mode==='classic'?G.level:3;
+  const kmin=L>=6?2:1;
+  const kmax=Math.max(kmin+2,Math.max(3,Math.min(6+Math.floor(L/3),Math.floor(Math.log2(G.maxV))-2+Math.floor(L/2))));
+  const pw=Math.max(.8,1.6-L*.12);
+  const ws=[];let tot=0;for(let e=kmin;e<=kmax;e++){const w=Math.pow(kmax-e+1,pw);ws.push(w);tot+=w}
+  let x=Math.random()*tot;for(let e=kmin;e<=kmax;e++){x-=ws[e-kmin];if(x<=0)return{v:2**e}}return{v:2**kmin};
 }
 function place(b){b.el.style.transform=posT(b.c,b.r)}
 function rm(b){G.grid[b.c][b.r]=null;b.el.remove()}
@@ -1093,24 +1110,23 @@ function tweenScore(){
 function chooseMode(){
   if(!profile.tutDone)return startGame('classic');
   showModal(`<h2>Choose mode</h2><div class="modes">
-    <div class="mode" data-mode="classic">${ic('blocks',48)}<div><b>Classic</b><small>Play until the board is full. Best score: ${profile.best.toLocaleString()}</small></div></div>
+    <div class="mode" data-mode="classic">${ic('blocks',48)}<div><b>Classic</b><small>Levels get harder: rows rise, move timer from Level 4. Best: ${profile.best.toLocaleString()}</small></div></div>
     <div class="mode" data-mode="time">${ic('timer',48)}<div><b>Time Attack</b><small>2 minutes. Combos add time! Best: ${profile.bestTime.toLocaleString()}</small></div></div></div>`,[{t:'Close',cls:'ghost'}]);
   document.querySelectorAll('.mode').forEach(m=>m.onclick=()=>{Snd.click();hideModal();startGame(m.dataset.mode)});
 }
 function startGame(mode){
-  hideModal(); checkWeek(); mode=mode||(G&&G.mode)||'classic';
+  hideModal(); recordGame(); checkWeek(); mode=mode||(G&&G.mode)||'classic';
   if(pendingResult){show('home');renderHome();showPending();return}
   document.querySelectorAll('#board .blk').forEach(e=>e.remove()); $('#fx').innerHTML='';
-  G={grid:Array.from({length:COLS},()=>Array(ROWS).fill(null)),score:0,busy:false,over:false,hammer:false,continued:false,maxV:2,startPts:league.points,mode,timeLeft:TIME_MODE_MS,undo:null,tut:null};
+  G={grid:Array.from({length:COLS},()=>Array(ROWS).fill(null)),score:0,busy:false,over:false,hammer:false,continued:false,maxV:2,mode,timeLeft:TIME_MODE_MS,undo:null,tut:null,level:1,sinceRise:0,moveLeft:0,recorded:false};
   shownScore=0;
   profile.stats.games++;if(mode==='time')profile.stats.gamesTime++;saveProfile();track('game');
   $('#timer').style.display=mode==='time'?'block':'none';
-  $('#modeTag').innerHTML=mode==='time'?ic('timer',16)+'TIME':ic('blocks',16)+'CLASSIC';
   show('game'); layout(); setHammer(false);
   if(!profile.tutDone){
     addBlock(1,0,2);addBlock(3,0,4);G.cur={v:2};G.next={v:8};lastCol=2;G.tut={step:0,col:2};renderTut();
   }else{G.cur=spawn();G.next=spawn()}
-  updHud(true); updGhost();
+  updHud(true); updGhost(); resetMoveTimer();
 }
 function renderTut(){
   const T=$('#tut');T.style.display=G&&G.tut?'block':'none';if(!G||!G.tut)return;
@@ -1119,7 +1135,7 @@ function renderTut(){
     T.innerHTML=`<div class="bubble">Tap this column to drop your <b>2</b> next to the other <b>2</b></div><div class="arrow" style="left:${x}px;top:${y-cell*1.7}px">${ic('down',40)}</div><div class="tap" style="left:${x}px;top:${y}px"></div>`;
   }else{
     T.innerHTML=`<div class="bubble">${ic('fire',22)} <b>COMBO!</b> 2+2 made 4, then 4+4 made 8.<br>Chains give ×2, ×3 points. Don't let a column fill up!<button class="btn green" id="tutOk">Let's play!</button></div>`;
-    $('#tutOk').onclick=()=>{Snd.click();G.tut=null;profile.tutDone=true;saveProfile();renderTut();updHud(true)};
+    $('#tutOk').onclick=()=>{Snd.click();G.tut=null;profile.tutDone=true;saveProfile();renderTut();updHud(true);resetMoveTimer()};
   }
 }
 function updHud(previews){
@@ -1131,11 +1147,12 @@ function updHud(previews){
   $('#hamBtn').innerHTML=ic('hammer',28)+'Hammer<span class="cnt">'+profile.hammers+'</span>';
   $('#swapBtn').innerHTML=ic('swap',28)+'Swap<span class="cnt">'+profile.swaps+'</span>';
   $('#undoBtn').innerHTML=ic('undo',28)+'Undo<span class="cnt">'+profile.undos+'</span>';
+  updLevelHud();
 }
 function addPts(b,chain){
   const pts=b.v*Math.max(1,chain);
-  G.score+=pts; league.points+=pts; saveLeague();
-  bumpBest();
+  G.score+=pts; syncLeague();
+  bumpBest(); checkLevel();
   floatPts(b,'+'+pts.toLocaleString(),chain>=2); tweenScore(); updHud();
 }
 function bumpBest(){if(G.mode==='time'){if(G.score>profile.bestTime)profile.bestTime=G.score}else if(G.score>profile.best)profile.best=G.score;saveProfile()}
@@ -1143,12 +1160,12 @@ function checkRecord(b){
   track('block',b.v);
   if(b.v<=profile.bestBlock)return;
   profile.bestBlock=b.v; saveProfile();
-  if(b.v>=128){G.score+=b.v;league.points+=b.v;saveLeague();bumpBest();tweenScore();updHud();
+  if(b.v>=128){G.score+=b.v;syncLeague();bumpBest();checkLevel();tweenScore();updHud();
     setTimeout(()=>{const {x,y}=center(b);confetti(x,y,40);queuePopup('NEW RECORD!','#ff5fa2',true,cell*1.6);floatPts(b,'BONUS +'+b.v,true)},400)}
 }
 function canPlace(){if(G.cur.t)return true;for(let c=0;c<COLS;c++){const h=height(c);if(h<ROWS||G.grid[c][ROWS-1].v===G.cur.v)return true}return false}
 function advance(){G.cur=G.next;G.next=spawn();updHud(true)}
-function snapshot(){G.undo={cells:G.grid.map(col=>col.map(b=>b?b.v:0)),cur:{...G.cur},next:{...G.next},score:G.score,lp:league.points,maxV:G.maxV}}
+function snapshot(){G.undo={cells:G.grid.map(col=>col.map(b=>b?b.v:0)),cur:{...G.cur},next:{...G.next},score:G.score,maxV:G.maxV,level:G.level,since:G.sinceRise}}
 function onMerged(b,chain){
   profile.stats.merges++;track('merge');
   if(chain>profile.stats.maxCombo)profile.stats.maxCombo=chain;
@@ -1158,18 +1175,23 @@ function onMerged(b,chain){
 
 async function drop(c){
   if(!G||G.busy||G.over)return;
-  if(G.tut){if(G.tut.step!==0||c!==G.tut.col){Snd.error();return}}
+  const moved=await dropCore(c);
+  if(moved&&G&&!G.over)await afterMove();
+}
+async function dropCore(c){
+  if(!G||G.busy||G.over)return false;
+  if(G.tut){if(G.tut.step!==0||c!==G.tut.col){Snd.error();return false}}
   lastCol=c;
   const h=height(c),cur=G.cur;
   if(h>=ROWS){
     const top=G.grid[c][ROWS-1];
-    if(cur.t==='bomb'){snapshot();G.busy=true;advance();await explode(top.c,top.r,null);G.busy=false;endTurn();return}
+    if(cur.t==='bomb'){snapshot();G.busy=true;advance();await explode(top.c,top.r,null);G.busy=false;endTurn();return true}
     if(cur.t==='rainbow'||top.v===cur.v){
       snapshot();G.busy=true;advance();const oldS=shapeOf(lvl(top.v));top.v*=2;styleBlock(top.el,top.v);
       G.maxV=Math.max(G.maxV,top.v);onMerged(top,1);mergeFx(top,1,oldS!==shapeOf(lvl(top.v)));addPts(top,1);checkRecord(top);
-      await sleep(220);await resolve([top],1);G.busy=false;endTurn();return;
+      await sleep(220);await resolve([top],1);G.busy=false;endTurn();return true;
     }
-    $('#stage').animate([{transform:'translateX(0)'},{transform:'translateX(-8px)'},{transform:'translateX(8px)'},{transform:'translateX(0)'}],{duration:260});vib('error');Snd.error();return;
+    $('#stage').animate([{transform:'translateX(0)'},{transform:'translateX(-8px)'},{transform:'translateX(8px)'},{transform:'translateX(0)'}],{duration:260});vib('error');Snd.error();return false;
   }
   snapshot();G.busy=true; $('#ghost').style.opacity=0; Snd.drop();
   const b={v:cur.v,t:cur.t||null,c,r:h,id:++uid}; advance(); G.grid[c][h]=b;
@@ -1192,6 +1214,7 @@ async function drop(c){
   }
   G.busy=false; endTurn();
   if(G&&G.tut&&G.tut.step===0){G.tut.step=1;renderTut()}
+  return true;
 }
 async function explode(c,r,bomb){
   const {x,y}=center({c,r});
@@ -1205,7 +1228,7 @@ async function explode(c,r,bomb){
   await sleep(270);vict.forEach(v=>v.el.remove());if(bomb)bomb.el.remove();
   profile.stats.bombs++;saveProfile();track('bomb');
   queuePopup('BOOM!','#ff7b3c',true,Math.max(70,Math.min(y,cell*ROWS-70)));
-  if(pts){G.score+=pts;league.points+=pts;saveLeague();bumpBest();floatTxt(x,y,'+'+pts.toLocaleString(),true);tweenScore();updHud()}
+  if(pts){G.score+=pts;syncLeague();bumpBest();checkLevel();floatTxt(x,y,'+'+pts.toLocaleString(),true);tweenScore();updHud()}
   const moved=gravity();if(moved.length)await sleep(180);await resolve(moved,0);
 }
 async function resolve(start,chain){
@@ -1237,6 +1260,62 @@ function gravity(){
   for(let c=0;c<COLS;c++){let w=0;for(let r=0;r<ROWS;r++){const x=G.grid[c][r];if(x){if(r!==w){G.grid[c][w]=x;G.grid[c][r]=null;x.r=w;place(x);moved.push(x)}w++}}}
   return moved;
 }
+/* ---------- levels / difficulty ---------- */
+const needFor=L=>250*L*(L-1);
+const riseEvery=L=>Math.max(5,Math.round(15-L*1.5));
+const moveTime=L=>L<4?0:Math.max(3500,9000-(L-4)*1000);
+function checkLevel(){
+  if(!G||G.mode!=='classic'||G.tut)return;
+  while(G.score>=needFor(G.level+1)){G.level++;levelUp()}
+  updLevelHud();
+}
+function levelUp(){
+  const L=G.level,bonus=L*10;profile.coins+=bonus;saveProfile();
+  setTimeout(()=>{if(!G)return;Snd.reward();vib('medium');queuePopup('LEVEL '+L+'!','#4fe08f',true,cell*2.2);
+    toast(ic('up',18)+(L===4?' Move timer starts!':L>=6?' Bigger blocks, faster rows!':' Rows rise faster!')+' '+ic('coin',18)+'+'+bonus)},450);
+  resetMoveTimer();
+}
+function updLevelHud(){
+  if(!G)return;const tag=$('#modeTag'),rt=$('#riseTag');
+  if(G.mode==='time'){tag.innerHTML=`<div class="row1">${ic('timer',16)}TIME</div>`;rt.style.display='none';$('#moveBar').style.visibility='hidden';return}
+  const L=G.level,a=needFor(L),b=needFor(L+1),f=Math.min(1,(G.score-a)/(b-a));
+  tag.innerHTML=`<div class="row1">${ic('star',16)}LEVEL ${L}</div><div class="lvbar"><i style="width:${(f*100).toFixed(0)}%"></i></div>`;
+  if(G.tut){rt.style.display='none';return}
+  const left=riseEvery(L)-G.sinceRise;rt.style.display='flex';rt.classList.toggle('warn',left<=2);
+  rt.innerHTML=`${ic('up',18)}<div><small>NEW ROW IN</small>${left} move${left===1?'':'s'}</div>`;
+  $('#moveBar').style.visibility=moveTime(L)?'visible':'hidden';
+}
+function resetMoveTimer(){if(G){G.moveLeft=moveTime(G.level);const f=$('#moveFill');if(f){f.style.width='100%';f.style.background='#4fe08f'}}}
+async function afterMove(){
+  if(!G||G.mode!=='classic'||G.tut||G.over)return;
+  G.sinceRise++;
+  if(G.sinceRise>=riseEvery(G.level)){G.sinceRise=0;G.busy=true;await riseRow();if(!G)return;G.busy=false;if(!G.over)endTurn()}
+  resetMoveTimer();updLevelHud();
+}
+async function riseRow(){
+  const gap=Math.floor(Math.random()*COLS);
+  for(let c=0;c<COLS;c++)if(c!==gap&&G.grid[c][ROWS-1]){gameOver('overflow');return}
+  Snd.rumble();shake(5);vib('medium');
+  for(let c=0;c<COLS;c++){if(c===gap)continue;for(let r=ROWS-2;r>=0;r--){const b=G.grid[c][r];if(b){G.grid[c][r+1]=b;G.grid[c][r]=null;b.r=r+1;place(b)}}}
+  const emax=Math.min(7,2+G.level),row=[];
+  for(let c=0;c<COLS;c++){
+    if(c===gap)continue;
+    const v=2**(1+Math.floor(Math.random()*emax)),b={v,t:null,c,r:0,id:++uid};
+    b.el=blockEl(v);$('#board').appendChild(b.el);G.grid[c][0]=b;
+    b.el.style.transition='none';b.el.style.transform=`translate(${c*cell+3}px,${ROWS*cell+3}px)`;void b.el.offsetWidth;
+    b.el.style.transition='transform .3s cubic-bezier(.3,1.3,.5,1)';place(b);row.push(b);
+  }
+  await sleep(320);row.forEach(b=>{b.el.style.transition='';b.el.querySelector('.in').animate([{filter:'brightness(2)'},{filter:'brightness(1)'}],{duration:300})});
+  updGhost();
+  await resolve(row,0);
+}
+function autoDrop(){
+  const opts=[];for(let c=0;c<COLS;c++){const h=height(c);if(h<ROWS||G.cur.t||G.grid[c][ROWS-1].v===G.cur.v)opts.push([c,h])}
+  if(!opts.length)return gameOver();
+  opts.sort((a,b)=>a[1]-b[1]);const lowest=opts.filter(o=>o[1]===opts[0][1]);
+  toast(ic('clock',18)+' Too slow! Block dropped');Snd.error();
+  drop(lowest[Math.floor(Math.random()*lowest.length)][0]);
+}
 function endTurn(){if(!G)return;updHud();updGhost();if(!canPlace())gameOver()}
 function doUndo(){
   if(!G||G.busy||G.over||G.tut)return;
@@ -1245,36 +1324,40 @@ function doUndo(){
   document.querySelectorAll('#board .blk').forEach(e=>e.remove());
   G.grid=Array.from({length:COLS},()=>Array(ROWS).fill(null));
   u.cells.forEach((col,c)=>col.forEach((v,r)=>{if(v)addBlock(c,r,v)}));
-  G.cur=u.cur;G.next=u.next;G.score=u.score;league.points=u.lp;G.maxV=u.maxV;saveLeague();G.undo=null;
+  G.cur=u.cur;G.next=u.next;G.score=u.score;G.maxV=u.maxV;G.level=u.level;G.sinceRise=u.since;syncLeague();G.undo=null;resetMoveTimer();
   profile.undos--;saveProfile();Snd.whoosh();
   allBlocks().forEach(b=>b.el.querySelector('.in').animate([{transform:'scale(.7)',opacity:.3},{transform:'scale(1)',opacity:1}],{duration:250}));
   tweenScore();updHud(true);updGhost();
 }
 async function gameOver(reason){
   if(G.over)return;
-  G.over=true; vib('over'); Snd.over(); updGhost();
+  G.over=true; G.overReason=reason; vib('over'); Snd.over(); updGhost();
   allBlocks().forEach((b,i)=>b.el.querySelector('.in').animate([{filter:'none'},{filter:'grayscale(.8) brightness(.7)'}],{duration:400,delay:i*15,fill:'forwards'}));
   if(reason==='time')popup("TIME'S UP!",'#ff5f7e',true,cell*ROWS/2);
-  await sleep(reason==='time'?1200:700);
+  if(reason==='overflow')popup('OVERFLOW!','#ff5f7e',true,cell*ROWS/2);
+  await sleep(reason?1200:700);
   if(!G||!G.over)return;
   await Ads.inter();
   showGameOver();
 }
 function showGameOver(){
-  const earned=league.points-G.startPts, rank=myRank(), coins=Math.floor(G.score/50);
+  const coins=Math.floor(G.score/50);
   if(!G.coinsGiven){G.coinsGiven=coins;profile.coins+=coins;profile.stats.totalScore+=G.score;saveProfile();
     track(G.mode==='time'?'timescore':'gamescore',G.score)}
+  const prev=G.prevBest||league.best;recordGame();
+  const counts=G.score>0&&(prev.length<3||G.score>Math.min(...prev));
+  const rank=myRank(), lowest=league.best.length>=3?Math.min(...league.best):0;
   const best=G.mode==='time'?profile.bestTime:profile.best;
   const btns=[];
   if(!G.continued&&G.mode==='classic')btns.push({t:'Watch ad to continue',ic:'tv',icS:30,cls:'gold',fn:continueGame});
   if(coins>0&&!G.doubled)btns.push({t:`Double coins (+${coins})`,ic:'coin',icS:26,cls:'gold',fn:()=>Ads.reward(()=>{G.doubled=true;profile.coins+=coins;saveProfile();Snd.coin();showGameOver()})});
   btns.push({t:'Play again',ic:'replay',cls:'green',fn:()=>startGame(G.mode)},{t:'Share score',ic:'share',fn:()=>{shareText(`I scored ${G.score.toLocaleString()} in Block Merge 2048${G.maxV>=512?' and made a '+fmt(G.maxV)+' block':''}! Can you beat me?`);setTimeout(showGameOver,300)}},{t:'Home',ic:'home',cls:'ghost',fn:goHome});
-  showModal(`<h2>${G.mode==='time'?"Time's up!":'Game Over'}</h2><div class="go-score">${G.score.toLocaleString()}</div><p>${ic('star',20)} Best: ${best.toLocaleString()} · ${ic('coin',20)} +${coins+(G.doubled?coins:0)}</p>
-    <div class="go-league">${tierIc(league.tier,28)} ${TIERS[league.tier]} League<br>+${earned.toLocaleString()} league points<br>Your rank: <b>#${rank}</b> of ${GROUP}</div>`,btns);
+  showModal(`<h2>${G.mode==='time'?"Time's up!":G.overReason==='overflow'?'Overflow!':'Game Over'}</h2>${G.mode==='classic'?`<p>Reached <b>Level ${G.level}</b></p>`:''}<div class="go-score">${G.score.toLocaleString()}</div><p>${ic('star',20)} Best: ${best.toLocaleString()} · ${ic('coin',20)} +${coins+(G.doubled?coins:0)}</p>
+    <div class="go-league">${tierIc(league.tier,28)} ${TIERS[league.tier]} League<br>${counts?`${ic('check',18,'color:#4fe08f')} This game is in your <b>Top 3</b>!`:`Score over <b>${lowest.toLocaleString()}</b> to enter your Top 3`}<br>League score: <b>${league.points.toLocaleString()}</b> · Rank <b>#${rank}</b> of ${GROUP}</div>`,btns);
 }
 function continueGame(){
   Ads.reward(()=>{
-    G.continued=true; G.over=false;
+    G.continued=true; G.over=false; if(G.recorded){league.best=G.prevBest||league.best;G.recorded=false;syncLeague()}
     allBlocks().forEach(b=>b.el.querySelector('.in').getAnimations().forEach(a=>a.cancel()));
     allBlocks().filter(x=>x.r>=ROWS-3).forEach(x=>{const {x:px,y:py}=center(x);G.grid[x.c][x.r]=null;shards(px,py,[...colorsOf(lvl(x.v)),'#fff'],8);
       x.el.querySelector('.in').animate([{transform:'scale(1)',opacity:1},{transform:'scale(1.5)',opacity:0}],{duration:250,fill:'forwards'});setTimeout(()=>x.el.remove(),260)});
@@ -1282,7 +1365,7 @@ function continueGame(){
     if(!canPlace())gameOver();
   });
 }
-function goHome(){hideModal();G=null;$('#tut').style.display='none';checkWeek();show('home');renderHome();showPending()}
+function goHome(){hideModal();recordGame();G=null;$('#tut').style.display='none';checkWeek();show('home');renderHome();showPending()}
 function pauseMenu(){
   if(!G||G.over)return;
   showModal(`<h2>Paused</h2><p>Your points are already saved to the League.</p>`,[{t:'Resume',ic:'play',cls:'green'},{t:'New game',ic:'replay',fn:()=>startGame(G.mode)},{t:'Settings',ic:'gear',fn:openSettings},{t:'Home',ic:'home',cls:'ghost',fn:goHome}]);
@@ -1302,6 +1385,12 @@ function gameLoop(t){
     const s=Math.ceil(Math.max(0,G.timeLeft)/1000);$('#timerTxt').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
     if(G.timeLeft<=10000&&Math.floor(G.timeLeft/1000)!==Math.floor((G.timeLeft+dt)/1000))Snd.tick();
     if(G.timeLeft<=0&&!G.busy)gameOver('time');
+  }
+  if(G&&G.mode==='classic'&&!G.over&&!G.tut&&!G.busy&&!G.hammer&&moveTime(G.level)&&isActive('game')&&!modalOpen()&&!document.hidden){
+    G.moveLeft-=dt;const f=Math.max(0,G.moveLeft/moveTime(G.level)),el=$('#moveFill');
+    el.style.width=(f*100)+'%';el.style.background=f>.5?'#4fe08f':f>.25?'#ffd86b':'#ff5f7e';
+    if(G.moveLeft<=3000&&Math.floor(G.moveLeft/1000)!==Math.floor((G.moveLeft+dt)/1000))Snd.tick();
+    if(G.moveLeft<=0){G.moveLeft=moveTime(G.level);autoDrop()}
   }
   requestAnimationFrame(gameLoop);
 }
