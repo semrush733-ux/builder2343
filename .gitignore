@@ -7,3 +7,4 @@ out/
 *.jks
 *.keystore
 www/ads-config.js
+www/auth-config.js

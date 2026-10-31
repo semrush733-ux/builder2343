@@ -43,3 +43,38 @@ if colors.exists():
     c = re.sub(r'(<color name="colorPrimaryDark">)[^<]*', r'\g<1>#0d1024', c)
     colors.write_text(c)
     print('colors.xml patched')
+
+# ---------- Login (Firebase Authentication) ----------
+import os
+if os.environ.get('FIREBASE_ENABLED') == '1':
+    var_file = pathlib.Path('android/variables.gradle')
+    v = var_file.read_text()
+    if 'rgcfaIncludeGoogle' not in v:
+        v = v.replace('ext {', 'ext {\n    rgcfaIncludeGoogle = true\n    rgcfaIncludeFacebook = %s' % ('true' if os.environ.get('FB_APP_ID') else 'false'), 1)
+        var_file.write_text(v)
+    print('variables.gradle: Google login on, Facebook', bool(os.environ.get('FB_APP_ID')))
+    fb_id = os.environ.get('FB_APP_ID', '').strip()
+    fb_token = os.environ.get('FB_CLIENT_TOKEN', '').strip()
+    if fb_id:
+        strings = res / 'values' / 'strings.xml'
+        st = strings.read_text()
+        if 'facebook_app_id' not in st:
+            st = st.replace('</resources>', '    <string name="facebook_app_id">%s</string>\n    <string name="facebook_client_token">%s</string>\n    <string name="fb_login_protocol_scheme">fb%s</string>\n</resources>' % (fb_id, fb_token, fb_id))
+            strings.write_text(st)
+        text = manifest.read_text()
+        if 'com.facebook.sdk.ApplicationId' not in text:
+            fb = """<meta-data android:name="com.facebook.sdk.ApplicationId" android:value="@string/facebook_app_id"/>
+        <meta-data android:name="com.facebook.sdk.ClientToken" android:value="@string/facebook_client_token"/>
+        <activity android:name="com.facebook.FacebookActivity" android:configChanges="keyboard|keyboardHidden|screenLayout|screenSize|orientation" android:label="@string/app_name" />
+        <activity android:name="com.facebook.CustomTabActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="@string/fb_login_protocol_scheme" />
+            </intent-filter>
+        </activity>
+    """
+            text = text.replace('</application>', fb + '</application>', 1)
+            manifest.write_text(text)
+        print('Facebook login configured')

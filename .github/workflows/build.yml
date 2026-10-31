@@ -12,6 +12,10 @@ jobs:
   android:
     name: Android APK
     runs-on: ubuntu-24.04
+    env:
+      FIREBASE_ENABLED: ${{ secrets.FIREBASE_ANDROID_JSON != '' && '1' || '0' }}
+      FB_APP_ID: ${{ secrets.FACEBOOK_APP_ID }}
+      FB_CLIENT_TOKEN: ${{ secrets.FACEBOOK_CLIENT_TOKEN }}
     steps:
       - uses: actions/checkout@v5
 
@@ -33,14 +37,27 @@ jobs:
       - name: Install packages
         run: npm install
 
-      - name: Prepare web files (font, ad IDs)
+      - name: Login plugins (only when Firebase keys are set)
+        if: env.FIREBASE_ENABLED == '1'
+        run: npm install @capacitor-firebase/authentication@^7 @capacitor-firebase/firestore@^7 firebase@^11
+
+      - name: Prepare web files (font, ad IDs, login switch)
         run: node tools/prepare.js
 
       - name: Create Android project
         run: npx cap add android
 
-      - name: Portrait, app icon, splash
+      - name: Portrait, app icon, splash, ads, login
         run: python3 tools/patch_android.py
+
+      - name: Firebase config (google-services.json)
+        if: env.FIREBASE_ENABLED == '1'
+        env:
+          GSJ: ${{ secrets.FIREBASE_ANDROID_JSON }}
+        run: printf '%s' "$GSJ" > android/app/google-services.json && python3 -c "import json;json.load(open('android/app/google-services.json'));print('google-services.json ok')"
+
+      - name: Fixed debug signing key (keeps the same SHA-1 for Google/Facebook login)
+        run: mkdir -p ~/.android && cp android-overrides/debug.keystore ~/.android/debug.keystore
 
       - name: Sync web files
         run: npx cap sync android
@@ -96,6 +113,10 @@ jobs:
   ios:
     name: iOS IPA
     runs-on: macos-latest
+    env:
+      FIREBASE_ENABLED: ${{ secrets.FIREBASE_IOS_PLIST != '' && '1' || '0' }}
+      FB_APP_ID: ${{ secrets.FACEBOOK_APP_ID }}
+      FB_CLIENT_TOKEN: ${{ secrets.FACEBOOK_CLIENT_TOKEN }}
     steps:
       - uses: actions/checkout@v5
 
@@ -106,13 +127,23 @@ jobs:
       - name: Install packages
         run: npm install
 
-      - name: Prepare web files (font, ad IDs)
+      - name: Login plugins (only when Firebase keys are set)
+        if: env.FIREBASE_ENABLED == '1'
+        run: npm install @capacitor-firebase/authentication@^7 @capacitor-firebase/firestore@^7 firebase@^11
+
+      - name: Prepare web files (font, ad IDs, login switch)
         run: node tools/prepare.js
 
       - name: Create iOS project
         run: npx cap add ios
 
-      - name: Icon, splash, portrait, name
+      - name: Firebase config (GoogleService-Info.plist)
+        if: env.FIREBASE_ENABLED == '1'
+        env:
+          GSI: ${{ secrets.FIREBASE_IOS_PLIST }}
+        run: printf '%s' "$GSI" > ios/App/App/GoogleService-Info.plist && plutil -lint ios/App/App/GoogleService-Info.plist
+
+      - name: Icon, splash, portrait, name, ads, login
         run: python3 tools/patch_ios.py
 
       - name: Sync web files

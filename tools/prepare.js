@@ -1,6 +1,7 @@
 // Prepares www/ before a native build:
 //  1. copies the Fredoka font (OFL licence) from node_modules into www/fonts (app works offline)
 //  2. writes www/ads-config.js from ads.json (ad unit IDs used by the game)
+//  3. writes www/auth-config.js (login on/off, set by the build when Firebase keys exist)
 const fs = require('fs');
 const path = require('path');
 const root = path.join(__dirname, '..');
@@ -24,3 +25,7 @@ const web = {
 };
 fs.writeFileSync(path.join(root, 'www', 'ads-config.js'), 'window.ADS_CONFIG=' + JSON.stringify(web) + ';\n');
 console.log('ads-config.js written (testing=' + web.testing + ')');
+
+const authOn = process.env.FIREBASE_ENABLED === '1';
+fs.writeFileSync(path.join(root, 'www', 'auth-config.js'), 'window.AUTH_CONFIG=' + JSON.stringify({ enabled: authOn }) + ';\n');
+console.log('auth-config.js written (login ' + (authOn ? 'ON' : 'off') + ')');
