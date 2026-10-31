@@ -8,3 +8,4 @@ out/
 *.keystore
 www/ads-config.js
 www/auth-config.js
+!android-overrides/debug.keystore
