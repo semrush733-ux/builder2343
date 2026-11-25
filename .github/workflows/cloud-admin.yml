@@ -1,0 +1,141 @@
+name: Cloud Admin app
+
+# Builds the Cloud Admin Android app (cloud_admin/). Result: release "cloud-admin-latest" with CloudAdmin.apk
+# (signed with the same key secrets as the player when they are set).
+
+on:
+  push:
+    branches: [cloud-admin]
+    paths: ['cloud_admin/**', '.github/workflows/cloud-admin.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: cloud-admin-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create the Android project
+        working-directory: cloud_admin
+        run: |
+          flutter create --platforms=android --org com.cloudplayer --project-name cloud_admin --no-pub .
+          rm -rf test
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET" />\n    <application|' "$M"
+          sed -i 's|android:label="[^"]*"|android:label="Cloud Admin"|' "$M"
+          python3 -m pip install --quiet pillow || true
+          python3 - <<'PY'
+          from PIL import Image, ImageDraw
+          # Icon: orange rounded square with a white cloud.
+          def icon(s):
+              img = Image.new('RGBA', (s, s), (0, 0, 0, 0))
+              d = ImageDraw.Draw(img)
+              d.rounded_rectangle([0, 0, s - 1, s - 1], radius=round(s * .22), fill=(255, 139, 6, 255))
+              u = s / 100.0
+              w = (255, 255, 255, 255)
+              d.ellipse([20*u, 42*u, 48*u, 70*u], fill=w)
+              d.ellipse([36*u, 30*u, 68*u, 62*u], fill=w)
+              d.ellipse([56*u, 40*u, 82*u, 70*u], fill=w)
+              d.rounded_rectangle([30*u, 52*u, 72*u, 70*u], radius=9*u, fill=w)
+              return img
+          for name, k in {'mdpi': 1, 'hdpi': 1.5, 'xhdpi': 2, 'xxhdpi': 3, 'xxxhdpi': 4}.items():
+              icon(round(48 * k)).save('android/app/src/main/res/mipmap-%s/ic_launcher.png' % name)
+          PY
+
+      - name: Get packages
+        working-directory: cloud_admin
+        run: flutter pub get
+
+      - name: Check the code
+        working-directory: cloud_admin
+        run: |
+          mkdir -p ../out
+          set -o pipefail
+          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee ../out/analyze.log
+
+      - name: Build CloudAdmin.apk
+        working-directory: cloud_admin
+        run: |
+          set -o pipefail
+          flutter build apk --release --build-name "1.0.${{ github.run_number }}" --build-number "${{ github.run_number }}" 2>&1 | tee ../out/build.log
+          mkdir -p ../out && cp build/app/outputs/flutter-apk/app-release.apk ../out/CloudAdmin.apk
+
+      - name: Sign with your own key
+        if: env.HAS_SIGNING == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -e
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          cp out/CloudAdmin.apk "$RUNNER_TEMP/universal.apk"
+          zip -q -d "$RUNNER_TEMP/universal.apk" 'META-INF/*.SF' 'META-INF/*.RSA' 'META-INF/*.EC' 'META-INF/*.DSA' 'META-INF/MANIFEST.MF' >/dev/null 2>&1 || true
+          "$BT/zipalign" -f -P 16 4 "$RUNNER_TEMP/universal.apk" "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEY_PASSWORD \
+            --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
+            --out out/CloudAdmin.apk "$RUNNER_TEMP/aligned.apk"
+          rm -f "$RUNNER_TEMP/release.jks" "$RUNNER_TEMP"/*.apk
+          ls -la out/*.apk
+
+      - name: Check the APK
+        if: always()
+        run: |
+          [ -f out/CloudAdmin.apk ] || exit 0
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          {
+            "$BT/aapt2" dump badging out/CloudAdmin.apk 2>&1 | grep -E "^package|dkVersion|^application-label:" | head -5
+            echo "sha256 $(sha256sum out/CloudAdmin.apk | cut -c1-16)  $(du -m out/CloudAdmin.apk | cut -f1) MB"
+            "$BT/apksigner" verify --verbose out/CloudAdmin.apk 2>&1 | grep -E "^Verifies|^DOES NOT|v1 scheme|v2 scheme|v3 scheme|ERROR" | head -6
+          } | tee out/CHECK.txt
+
+      - name: Publish to the "cloud-admin-latest" release
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="Cloud Admin - build #${{ github.run_number }}"
+          FILES=""
+          [ -f out/CloudAdmin.apk ] && FILES="out/CloudAdmin.apk"
+          [ -z "$FILES" ] && TITLE="$TITLE FAILED"
+          {
+            echo "Cloud Admin app (change the Cloud Player main address from the phone). Signed with own key: $HAS_SIGNING"
+            echo
+            echo '### APK check'
+            echo '```'
+            cat out/CHECK.txt 2>/dev/null || true
+            echo '```'
+            echo '### Errors'
+            echo '```'
+            grep -h -E "error •|Error:|error:" out/analyze.log out/build.log 2>/dev/null | head -40 || true
+            echo '```'
+          } > out/NOTES.md
+          if gh release view cloud-admin-latest >/dev/null 2>&1; then
+            [ -n "$FILES" ] && gh release upload cloud-admin-latest $FILES --clobber
+            gh release edit cloud-admin-latest --title "$TITLE" --notes-file out/NOTES.md --prerelease
+          else
+            gh release create cloud-admin-latest $FILES --target "$GITHUB_SHA" --title "$TITLE" --notes-file out/NOTES.md --prerelease
+          fi

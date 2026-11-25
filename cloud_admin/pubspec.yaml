@@ -1,0 +1,22 @@
+name: cloud_admin
+description: Cloud Player Admin - change the app's main website address from your phone.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  shared_preferences: ^2.2.0
+
+dependency_overrides:
+  # shared_preferences_android 2.5.0 fails in release APKs (saved sign-in cannot be read);
+  # same pin as the player apps.
+  shared_preferences_android: ">=2.4.0 <2.5.0"
+  shared_preferences_foundation: ">=2.5.0 <2.6.0"
+
+flutter:
+  uses-material-design: true
