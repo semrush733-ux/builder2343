@@ -29,11 +29,14 @@ class AppState {
         serverUrl = '${j['server_url'] ?? ''}',
         serverName = '${j['server_name'] ?? ''}',
         host = '${j['host'] ?? ''}',
+        stats = j['stats'] is Map ? Map<String, dynamic>.from(j['stats'] as Map) : null,
         history = [
           for (final h in (j['history'] is List ? j['history'] as List : const []))
             if (h is Map<String, dynamic>) Change(h)
         ];
   final String site, serverUrl, serverName, host;
+  /// Install and activity numbers from the website (null: the website has no device list).
+  final Map<String, dynamic>? stats;
   final List<Change> history;
 }
 
@@ -132,8 +135,8 @@ class Api {
     await _p?.remove('token');
   }
 
-  static Future<AppState> state() async {
-    final j = await _send('GET', site, 'state');
+  static Future<AppState> state({bool fresh = false}) async {
+    final j = await _send('GET', site, fresh ? 'state?fresh=1' : 'state');
     return AppState(j);
   }
 

@@ -319,6 +319,14 @@ class _HomeScreenState extends State<HomeScreen> {
         toast(context, r.message, error: !r.ok);
       });
 
+  Widget _stat(String label, Object? v) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(children: [
+          Expanded(child: Text(label, style: const TextStyle(color: _muted))),
+          Text(v == null ? '-' : '$v', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+        ]),
+      );
+
   String _when(DateTime t) {
     String two(int n) => n.toString().padLeft(2, '0');
     return '${two(t.day)}/${two(t.month)}/${t.year} ${two(t.hour)}:${two(t.minute)} UTC';
@@ -409,6 +417,35 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: TextStyle(color: _muted, fontSize: 13),
                     ),
                   ]),
+                ),
+                _Card(
+                  title: 'Users',
+                  child: s?.stats == null
+                      ? const Text('No device list found on this website.', style: TextStyle(color: _muted))
+                      : Column(children: [
+                          _stat('Total installs (devices)', s!.stats!['installs']),
+                          _stat('New in ${s.stats!['month_label'] ?? 'this month'}', s.stats!['new_this_month']),
+                          _stat('New in the last 30 days', s.stats!['new_last_30']),
+                          _stat('Active (7 days)', s.stats!['active_7']),
+                          _stat('Active (30 days)', s.stats!['active_30']),
+                          _stat('Quiet (30 to 90 days)', s.stats!['quiet']),
+                          _stat('Inactive (not seen for 3 months)', s.stats!['inactive_90']),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Every install is one device. Play Store, LG and Samsung download counts are in their own consoles.',
+                            style: TextStyle(color: _muted, fontSize: 12),
+                          ),
+                          const SizedBox(height: 8),
+                          OutlinedButton(
+                            onPressed: _busy
+                                ? null
+                                : () => _run(() async {
+                                      final st = await Api.state(fresh: true);
+                                      if (mounted) setState(() => _apply(st));
+                                    }),
+                            child: const Text('Refresh numbers'),
+                          ),
+                        ]),
                 ),
                 _Card(
                   title: 'Recent changes',
