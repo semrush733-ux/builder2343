@@ -23,6 +23,16 @@ class Change {
   final DateTime time;
 }
 
+class Admin {
+  Admin(Map<String, dynamic> j)
+      : user = '${j['user'] ?? ''}',
+        owner = j['owner'] == true,
+        added = int.tryParse('${j['added'] ?? 0}') ?? 0;
+  final String user;
+  final bool owner;
+  final int added;
+}
+
 class AppState {
   AppState(Map<String, dynamic> j)
       : site = '${j['site'] ?? ''}',
@@ -30,6 +40,10 @@ class AppState {
         serverName = '${j['server_name'] ?? ''}',
         host = '${j['host'] ?? ''}',
         stats = j['stats'] is Map ? Map<String, dynamic>.from(j['stats'] as Map) : null,
+        admins = [
+          for (final a in (j['admins'] is List ? j['admins'] as List : const []))
+            if (a is Map) Admin(Map<String, dynamic>.from(a))
+        ],
         history = [
           for (final h in (j['history'] is List ? j['history'] as List : const []))
             if (h is Map<String, dynamic>) Change(h)
@@ -38,6 +52,7 @@ class AppState {
   /// Install and activity numbers from the website (null: the website has no device list).
   final Map<String, dynamic>? stats;
   final List<Change> history;
+  final List<Admin> admins;
 }
 
 class Reply {
@@ -157,6 +172,16 @@ class Api {
 
   static Future<Reply> restore(String id) async {
     final j = await _send('POST', site, 'restore', {'id': id});
+    return Reply(j['success'] == true, '${j['message'] ?? ''}', j.containsKey('host') ? AppState(j) : null);
+  }
+
+  static Future<Reply> addAdmin(String user, String pass) async {
+    final j = await _send('POST', site, 'addadmin', {'username': user, 'password': pass});
+    return Reply(j['success'] == true, '${j['message'] ?? ''}', j.containsKey('host') ? AppState(j) : null);
+  }
+
+  static Future<Reply> removeAdmin(String user) async {
+    final j = await _send('POST', site, 'rmadmin', {'username': user});
     return Reply(j['success'] == true, '${j['message'] ?? ''}', j.containsKey('host') ? AppState(j) : null);
   }
 }

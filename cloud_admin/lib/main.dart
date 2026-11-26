@@ -392,6 +392,105 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       });
 
+  Future<void> _addAdmin() async {
+    final u = TextEditingController();
+    final p1 = TextEditingController();
+    final p2 = TextEditingController();
+    String? err;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, set) => AlertDialog(
+          title: const Text('Add an admin'),
+          content: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              TextField(controller: u, autocorrect: false, enableSuggestions: false, decoration: const InputDecoration(labelText: 'User name')),
+              const SizedBox(height: 10),
+              TextField(controller: p1, obscureText: true, decoration: const InputDecoration(labelText: 'Password (10 or more characters)')),
+              const SizedBox(height: 10),
+              TextField(controller: p2, obscureText: true, decoration: const InputDecoration(labelText: 'Password again')),
+              if (err != null) Padding(padding: const EdgeInsets.only(top: 10), child: Text(err!, style: const TextStyle(color: _bad))),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () {
+                if (p1.text != p2.text) {
+                  set(() => err = 'The two passwords are not the same.');
+                } else {
+                  Navigator.pop(c, true);
+                }
+              },
+              child: const Text('Add admin'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final user = u.text.trim(), pass = p1.text;
+    u.dispose();
+    p1.dispose();
+    p2.dispose();
+    if (ok != true) return;
+    await _run(() async {
+      final r = await Api.addAdmin(user, pass);
+      if (!mounted) return;
+      setState(() {
+        if (r.state != null) _apply(r.state!);
+        _note = r.message;
+        _noteOk = r.ok;
+      });
+    });
+  }
+
+  Future<void> _removeAdmin(Admin a) async {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Remove admin?'),
+        content: Text('${a.user} will be signed out and cannot sign in again.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Remove')),
+        ],
+      ),
+    );
+    if (yes != true) return;
+    await _run(() async {
+      final r = await Api.removeAdmin(a.user);
+      if (!mounted) return;
+      setState(() {
+        if (r.state != null) _apply(r.state!);
+        _note = r.message;
+        _noteOk = r.ok;
+      });
+    });
+  }
+
+  Widget _admins(AppState? s) {
+    final list = s?.admins ?? const <Admin>[];
+    return _Panel(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        for (var i = 0; i < list.length; i++)
+          Container(
+            padding: EdgeInsets.only(top: i == 0 ? 0 : 12, bottom: 12),
+            decoration: BoxDecoration(border: i == 0 ? null : const Border(top: BorderSide(color: _line))),
+            child: Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(list[i].user, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  Text(list[i].owner ? 'Main admin' : 'Admin', style: const TextStyle(color: _muted, fontSize: 13)),
+                ]),
+              ),
+              if (!list[i].owner) TextButton(onPressed: _busy ? null : () => _removeAdmin(list[i]), child: const Text('Remove')),
+            ]),
+          ),
+        OutlinedButton.icon(onPressed: _busy ? null : _addAdmin, icon: const Icon(Icons.person_add_alt_1_outlined, size: 20), label: const Text('Add an admin')),
+      ]),
+    );
+  }
+
   String _when(DateTime t) {
     const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     String two(int n) => n.toString().padLeft(2, '0');
@@ -625,6 +724,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const _Heading('Users'),
                   _users(s),
+                  const _Heading('Admins', 'Everyone listed here can sign in to the panel and this app. Give each person their own login.'),
+                  _admins(s),
                   const _Heading('Recent changes'),
                   _Panel(
                     child: (s == null || s.history.isEmpty)
